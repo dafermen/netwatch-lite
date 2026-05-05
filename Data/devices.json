@@ -1,0 +1,175 @@
+{
+  "settings": {
+    "intervalSeconds": 15,
+    "timeoutMs": 1000,
+    "maxParallelChecks": 50
+  },
+  "devices": [
+    {
+      "name": "Web Server",
+      "ip": "192.168.4.10",
+      "category": "Servers",
+      "enabled": true,
+      "checks": [
+        {
+          "type": "ping"
+        },
+        {
+          "type": "tcp",
+          "port": 80
+        },
+        {
+          "type": "tcp",
+          "port": 443
+        }
+      ]
+    },
+    {
+      "name": "Database Server",
+      "ip": "192.168.4.20",
+      "category": "Servers",
+      "enabled": true,
+      "checks": [
+        {
+          "type": "ping"
+        },
+        {
+          "type": "tcp",
+          "port": 1433
+        }
+      ]
+    },
+    {
+      "name": "Example DNS",
+      "ip": "8.8.8.8",
+      "category": "Servers",
+      "enabled": true,
+      "checks": [
+        {
+          "type": "ping"
+        },
+        {
+          "type": "tcp",
+          "port": 53
+        }
+      ]
+    },
+    {
+      "name": "Accounting Workstation",
+      "ip": "192.168.4.31",
+      "category": "Critical Workstations",
+      "enabled": true,
+      "checks": [
+        {
+          "type": "ping"
+        },
+        {
+          "type": "tcp",
+          "port": 3389
+        }
+      ]
+    },
+    {
+      "name": "Security Desk Workstation",
+      "ip": "192.168.4.32",
+      "category": "Critical Workstations",
+      "enabled": true,
+      "checks": [
+        {
+          "type": "ping"
+        }
+      ]
+    },
+    {
+      "name": "Front Entrance Camera",
+      "ip": "192.168.4.61",
+      "category": "IP Cameras",
+      "enabled": true,
+      "checks": [
+        {
+          "type": "ping"
+        },
+        {
+          "type": "tcp",
+          "port": 80
+        },
+        {
+          "type": "tcp",
+          "port": 554
+        }
+      ]
+    },
+    {
+      "name": "Warehouse Camera",
+      "ip": "192.168.4.62",
+      "category": "IP Cameras",
+      "enabled": true,
+      "checks": [
+        {
+          "type": "ping"
+        },
+        {
+          "type": "tcp",
+          "port": 80
+        },
+        {
+          "type": "tcp",
+          "port": 554
+        }
+      ]
+    },
+    {
+      "name": "Main Rack UPS",
+      "ip": "192.168.4.80",
+      "category": "UPS Units",
+      "enabled": true,
+      "checks": [
+        {
+          "type": "ping"
+        },
+        {
+          "type": "tcp",
+          "port": 80
+        },
+        {
+          "type": "tcp",
+          "port": 161
+        }
+      ]
+    },
+    {
+      "name": "Gateway",
+      "ip": "192.168.4.1",
+      "category": "Network Infrastructure",
+      "enabled": true,
+      "checks": [
+        {
+          "type": "ping"
+        },
+        {
+          "type": "tcp",
+          "port": 80
+        }
+      ]
+    },
+    {
+      "name": "Localhost",
+      "ip": "127.0.0.1",
+      "category": "Development",
+      "enabled": true,
+      "checks": [
+        {
+          "type": "ping"
+        },
+        {
+          "type": "tcp",
+          "port": 80
+        },
+        {
+          "type": "tcp",
+          "port": 443
+        }
+      ]
+    }
+  ]
+}

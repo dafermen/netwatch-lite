@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NetWatch-Lite</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+  <link href="/styles.css" rel="stylesheet">
+</head>
+<body>
+  <main class="container py-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+      <div>
+        <h1 class="h3 mb-1">NetWatch-Lite</h1>
+        <p class="text-secondary mb-0">Device availability and TCP port monitor</p>
+      </div>
+      <div class="d-flex flex-wrap align-items-center justify-content-end gap-2">
+        <div class="text-end">
+          <div class="text-secondary small" id="execution-mode">Auto refresh active</div>
+          <div class="text-secondary small" id="last-check">Waiting for first check...</div>
+        </div>
+        <button class="btn btn-success btn-sm" type="button" id="auto-refresh-toggle">
+          <i class="fa-solid fa-arrows-rotate me-1"></i>
+          <span id="auto-refresh-label">Auto Refresh: ON</span>
+        </button>
+        <button class="btn btn-primary btn-sm" type="button" id="refresh-now">
+          <span class="spinner-border spinner-border-sm me-1 d-none" id="refresh-now-spinner" aria-hidden="true"></span>
+          <i class="fa-solid fa-rotate me-1" id="refresh-now-icon"></i>
+          Refresh Now
+        </button>
+        <button class="btn btn-warning btn-sm" type="button" id="run-full-check">
+          <span class="spinner-border spinner-border-sm me-1 d-none" id="run-full-check-spinner" aria-hidden="true"></span>
+          <i class="fa-solid fa-bolt me-1" id="run-full-check-icon"></i>
+          Run Full Check
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" type="button" id="reload-json">
+          <i class="fa-solid fa-rotate-right me-1"></i>
+          Reload JSON
+        </button>
+      </div>
+    </div>
+
+    <section class="row g-3 mb-4" id="summary-cards" aria-label="Monitoring summary">
+      <div class="col-12 col-sm-6 col-xl">
+        <div class="card metric-card h-100">
+          <div class="card-body">
+            <div class="metric-icon text-bg-secondary">
+              <i class="fa-solid fa-server"></i>
+            </div>
+            <div>
+              <div class="text-secondary small">Total devices</div>
+              <div class="h4 mb-0" id="metric-total">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-xl">
+        <div class="card metric-card h-100">
+          <div class="card-body">
+            <div class="metric-icon text-bg-success">
+              <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <div>
+              <div class="text-secondary small">Online devices</div>
+              <div class="h4 mb-0" id="metric-online">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-xl">
+        <div class="card metric-card h-100">
+          <div class="card-body">
+            <div class="metric-icon text-bg-danger">
+              <i class="fa-solid fa-circle-xmark"></i>
+            </div>
+            <div>
+              <div class="text-secondary small">Offline devices</div>
+              <div class="h4 mb-0" id="metric-offline">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-xl">
+        <div class="card metric-card h-100">
+          <div class="card-body">
+            <div class="metric-icon text-bg-warning">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div>
+              <div class="text-secondary small">Degraded devices</div>
+              <div class="h4 mb-0" id="metric-degraded">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-xl">
+        <div class="card metric-card h-100">
+          <div class="card-body">
+            <div class="metric-icon text-bg-success">
+              <i class="fa-solid fa-chart-line"></i>
+            </div>
+            <div>
+              <div class="text-secondary small">Availability</div>
+              <div class="h4 mb-0" id="metric-availability">0%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+      <div class="input-group input-group-sm search-box">
+        <span class="input-group-text">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </span>
+        <input
+          type="search"
+          class="form-control"
+          id="device-search"
+          placeholder="Search by name or IP"
+          autocomplete="off">
+      </div>
+
+      <div class="btn-group btn-group-sm" role="group" aria-label="Device status filters">
+        <input type="radio" class="btn-check" name="status-filter" id="filter-all" value="all" checked>
+        <label class="btn btn-outline-secondary" for="filter-all">Show All</label>
+
+        <input type="radio" class="btn-check" name="status-filter" id="filter-online" value="online">
+        <label class="btn btn-outline-success" for="filter-online">Online</label>
+
+        <input type="radio" class="btn-check" name="status-filter" id="filter-offline" value="offline">
+        <label class="btn btn-outline-danger" for="filter-offline">Offline</label>
+
+        <input type="radio" class="btn-check" name="status-filter" id="filter-problems" value="problems">
+        <label class="btn btn-outline-warning" for="filter-problems">Problems</label>
+      </div>
+    </div>
+
+    <div id="results-body">
+      <div class="text-center text-secondary py-4">Loading...</div>
+    </div>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
