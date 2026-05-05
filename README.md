@@ -25,7 +25,7 @@ Release notes and commit-level project history are summarized in [CHANGELOG.md](
   - Degraded devices.
   - Availability percentage.
 - Search and client-side filters.
-- Collapsible category groups.
+- Category groups collapsed by default.
 - Manual mode by default.
 - Optional auto refresh toggle.
 - Manual refresh.

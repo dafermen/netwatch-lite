@@ -23,7 +23,7 @@ let activeFilter = "all";
 let activeSearch = "";
 let autoRefreshEnabled = false;
 let latestIntervalSeconds = 15;
-const collapsedCategoryNames = new Set();
+const expandedCategoryNames = new Set();
 
 /**
  * Fetches monitor data from the backend and renders the dashboard.
@@ -221,7 +221,7 @@ function renderCategory(category, index) {
   const onlineDevices = category.onlineDevices ?? devices.filter(device => device.isOnline).length;
   const offlineDevices = category.offlineDevices ?? totalDevices - onlineDevices;
   const categoryId = `category-${index}-${slugify(category.name)}`;
-  const isCollapsed = collapsedCategoryNames.has(category.name);
+  const isExpanded = expandedCategoryNames.has(category.name);
 
   return `
     <section class="category-section mb-4">
@@ -232,7 +232,7 @@ function renderCategory(category, index) {
             type="button"
             data-bs-toggle="collapse"
             data-bs-target="#${categoryId}"
-            aria-expanded="${!isCollapsed}"
+            aria-expanded="${isExpanded}"
             aria-controls="${categoryId}">
             <i class="fa-solid fa-chevron-down"></i>
           </button>
@@ -251,7 +251,7 @@ function renderCategory(category, index) {
         </div>
       </div>
       <div
-        class="collapse ${isCollapsed ? "" : "show"}"
+        class="collapse ${isExpanded ? "show" : ""}"
         id="${categoryId}"
         data-category-name="${escapeHtml(category.name)}">
         <div class="table-responsive border rounded-bottom">
@@ -550,14 +550,14 @@ resultsBody.addEventListener("hidden.bs.collapse", event => {
   const categoryName = event.target.dataset.categoryName;
 
   if (categoryName) {
-    collapsedCategoryNames.add(categoryName);
+    expandedCategoryNames.delete(categoryName);
   }
 });
 resultsBody.addEventListener("shown.bs.collapse", event => {
   const categoryName = event.target.dataset.categoryName;
 
   if (categoryName) {
-    collapsedCategoryNames.delete(categoryName);
+    expandedCategoryNames.add(categoryName);
   }
 });
 searchInput.addEventListener("input", debounce(event => {
