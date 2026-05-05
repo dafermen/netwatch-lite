@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NetWatch-Lite Documentation</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --ink: #17202a;
+      --muted: #5f6b7a;
+      --line: #d9dee7;
+      --green: #198754;
+      --yellow: #997404;
+      --red: #dc3545;
+      --blue: #0d6efd;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+      margin: 0;
+    }
+
+    header {
+      background: #111827;
+      color: #fff;
+      padding: 32px 24px;
+    }
+
+    header p {
+      color: #cbd5e1;
+      margin: 8px 0 0;
+      max-width: 900px;
+    }
+
+    main {
+      display: grid;
+      gap: 18px;
+      margin: 0 auto;
+      max-width: 1180px;
+      padding: 24px;
+    }
+
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    h1,
+    h2,
+    h3 {
+      line-height: 1.2;
+      margin: 0 0 12px;
+    }
+
+    h1 {
+      font-size: 2rem;
+    }
+
+    h2 {
+      font-size: 1.35rem;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      margin-top: 18px;
+    }
+
+    p {
+      margin: 0 0 12px;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    code,
+    pre {
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      color: #0f172a;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.92rem;
+    }
+
+    code {
+      padding: 1px 5px;
+    }
+
+    pre {
+      overflow: auto;
+      padding: 14px;
+      white-space: pre;
+    }
+
+    table {
+      border-collapse: collapse;
+      margin-top: 10px;
+      width: 100%;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f8fafc;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .tag {
+      border-radius: 999px;
+      color: #fff;
+      display: inline-block;
+      font-size: 0.78rem;
+      font-weight: 700;
+      margin-right: 6px;
+      padding: 2px 8px;
+    }
+
+    .get { background: var(--blue); }
+    .post { background: var(--green); }
+    .healthy { color: var(--green); font-weight: 700; }
+    .degraded { color: var(--yellow); font-weight: 700; }
+    .down { color: var(--red); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>NetWatch-Lite Documentation</h1>
+    <p>Documentacion tecnica y operativa del monitor de red ASP.NET Core + Bootstrap. Cubre arquitectura, JSON editable, endpoints, servicios, UI y publicacion portable para Windows.</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Resumen Del Proyecto</h2>
+      <p>NetWatch-Lite monitorea dispositivos desde un archivo JSON editable, ejecuta checks asincronos de ping y TCP, calcula estado agregado por dispositivo y muestra resultados en un dashboard web.</p>
+      <div class="grid">
+        <div class="card">
+          <h3>Backend</h3>
+          <p>ASP.NET Core minimal API en .NET 8. Expone endpoints para leer cache, forzar ejecuciones, recargar JSON y consultar dispositivos.</p>
+        </div>
+        <div class="card">
+          <h3>Monitor</h3>
+          <p>Usa <code>Ping.SendPingAsync</code>, <code>TcpClient.ConnectAsync</code>, <code>Task.WhenAll</code> y <code>SemaphoreSlim</code> para concurrencia controlada.</p>
+        </div>
+        <div class="card">
+          <h3>UI</h3>
+          <p>HTML, Bootstrap 5, FontAwesome y JavaScript con fetch API. Incluye resumen, categorias, filtros, busqueda y controles de ejecucion.</p>
+        </div>
+        <div class="card">
+          <h3>Portable</h3>
+          <p>Se publica como <code>win-x64</code> self-contained. El archivo <code>devices.json</code> queda junto a <code>NetWatch-Lite.exe</code> para editar inventario sin recompilar.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Estructura</h2>
+      <pre>netwatch-lite/
+├── Data/devices.json
+├── Models/
+├── Services/
+├── wwwroot/
+├── docs/index.html
+├── appsettings.json
+├── NetWatch.csproj
+├── Program.cs
+└── README.md</pre>
+    </section>
+
+    <section>
+      <h2>Flujo De Ejecucion</h2>
+      <ol>
+        <li>La aplicacion inicia en <code>Program.cs</code>.</li>
+        <li><code>JsonDeviceRepository.ReloadAsync</code> carga y normaliza <code>devices.json</code>.</li>
+        <li>La UI llama <code>GET /api/monitor/refresh</code> para obtener resultados cacheados.</li>
+        <li>Si no hay cache, <code>MonitorExecutionService</code> ejecuta un full check inicial.</li>
+        <li><code>NetworkMonitorService.CheckAllDevicesAsync</code> revisa dispositivos habilitados en paralelo.</li>
+        <li>Se calcula <span class="healthy">Healthy</span>, <span class="degraded">Degraded</span> o <span class="down">Down</span>.</li>
+        <li>El backend agrupa resultados por categoria y genera metricas del dashboard.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Configuracion JSON</h2>
+      <p>En desarrollo el archivo fuente vive en <code>Data/devices.json</code>. Al publicar portable se copia como <code>devices.json</code> junto al ejecutable.</p>
+      <pre>{
+  "settings": {
+    "intervalSeconds": 15,
+    "timeoutMs": 1000,
+    "maxParallelChecks": 50
+  },
+  "devices": [
+    {
+      "name": "Web Server",
+      "ip": "192.168.4.10",
+      "category": "Servers",
+      "enabled": true,
+      "checks": [
+        { "type": "ping" },
+        { "type": "tcp", "port": 80 },
+        { "type": "tcp", "port": 443 }
+      ]
+    }
+  ]
+}</pre>
+      <table>
+        <thead>
+          <tr><th>Campo</th><th>Descripcion</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>intervalSeconds</code></td><td>Intervalo de auto refresh en la UI.</td></tr>
+          <tr><td><code>timeoutMs</code></td><td>Timeout de ping y TCP en milisegundos.</td></tr>
+          <tr><td><code>maxParallelChecks</code></td><td>Limite global de checks concurrentes.</td></tr>
+          <tr><td><code>category</code></td><td>Grupo visual del dashboard.</td></tr>
+          <tr><td><code>enabled</code></td><td>Permite conservar dispositivos sin monitorearlos.</td></tr>
+          <tr><td><code>checks</code></td><td>Lista de checks. Soporta <code>ping</code> y <code>tcp</code>.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Estados Y Metricas</h2>
+      <table>
+        <thead>
+          <tr><th>Estado</th><th>Regla</th><th>Color UI</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="healthy">Healthy</td><td>Ping exitoso y todos los puertos TCP abiertos.</td><td>Verde</td></tr>
+          <tr><td class="degraded">Degraded</td><td>Ping exitoso, pero al menos un puerto TCP cerrado.</td><td>Amarillo</td></tr>
+          <tr><td class="down">Down</td><td>Ping fallido.</td><td>Rojo</td></tr>
+        </tbody>
+      </table>
+      <p>Disponibilidad: <code>(HealthyDevices / TotalDevices) * 100</code>, redondeado a un decimal.</p>
+    </section>
+
+    <section>
+      <h2>Endpoints</h2>
+      <table>
+        <thead>
+          <tr><th>Metodo</th><th>Ruta</th><th>Funcion</th><th>Respuesta</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="tag get">GET</span></td><td><code>/api/devices</code></td><td>Obtiene dispositivos normalizados.</td><td>Lista de <code>Device</code>.</td></tr>
+          <tr><td><span class="tag post">POST</span></td><td><code>/api/reload</code></td><td>Recarga <code>devices.json</code> desde disco.</td><td>Conteos y settings.</td></tr>
+          <tr><td><span class="tag get">GET</span></td><td><code>/api/results</code></td><td>Compatibilidad. Fuerza ejecucion completa.</td><td><code>MonitorResponse</code>.</td></tr>
+          <tr><td><span class="tag get">GET</span></td><td><code>/api/monitor/refresh</code></td><td>Devuelve cache actual. Si no existe, ejecuta una vez.</td><td><code>MonitorResponse</code>.</td></tr>
+          <tr><td><span class="tag post">POST</span></td><td><code>/api/monitor/run</code></td><td>Fuerza full check sin permitir solapamiento.</td><td><code>MonitorResponse</code> o HTTP 409.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Referencia De Codigo</h2>
+      <h3>Modelos</h3>
+      <table>
+        <thead>
+          <tr><th>Archivo</th><th>Responsabilidad</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Device.cs</code></td><td>Representa un dispositivo configurado en JSON.</td></tr>
+          <tr><td><code>DeviceCheck.cs</code></td><td>Declara un check <code>ping</code> o <code>tcp</code>.</td></tr>
+          <tr><td><code>DeviceResult.cs</code></td><td>Resultado agregado por dispositivo.</td></tr>
+          <tr><td><code>CheckResult.cs</code></td><td>Resultado individual de un check.</td></tr>
+          <tr><td><code>DeviceStatus.cs</code></td><td>Enum Healthy, Degraded y Down.</td></tr>
+          <tr><td><code>MonitorConfiguration.cs</code></td><td>Objeto raiz del JSON.</td></tr>
+          <tr><td><code>MonitorSettings.cs</code></td><td>Settings globales de ejecucion.</td></tr>
+          <tr><td><code>DashboardSummary.cs</code></td><td>Metricas superiores del dashboard.</td></tr>
+          <tr><td><code>CategoryResult.cs</code></td><td>Resultados agrupados por categoria.</td></tr>
+          <tr><td><code>MonitorResponse.cs</code></td><td>Payload completo consumido por la UI.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Servicios</h3>
+      <table>
+        <thead>
+          <tr><th>Servicio</th><th>Metodos Clave</th><th>Entrada / Salida</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>JsonDeviceRepository</code></td>
+            <td><code>ReloadAsync</code>, <code>GetConfigurationAsync</code>, <code>GetDevicesAsync</code></td>
+            <td>Lee JSON desde disco y entrega configuracion normalizada.</td>
+          </tr>
+          <tr>
+            <td><code>NetworkMonitorService</code></td>
+            <td><code>CheckAllDevicesAsync</code>, <code>PingAsync</code>, <code>CheckPortAsync</code></td>
+            <td>Entrada: configuracion actual. Salida: lista de <code>DeviceResult</code>.</td>
+          </tr>
+          <tr>
+            <td><code>MonitorExecutionService</code></td>
+            <td><code>GetCachedResultsAsync</code>, <code>RunFullCheckAsync</code>, <code>TryRunFullCheckAsync</code></td>
+            <td>Coordina cache, full checks y bloqueo contra ejecuciones simultaneas.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Frontend</h2>
+      <p><code>wwwroot/index.html</code> define el layout: cabecera, controles de ejecucion, metricas, busqueda, filtros y contenedor de resultados.</p>
+      <p><code>wwwroot/app.js</code> contiene funciones JSDoc para:</p>
+      <ul>
+        <li>Consumir <code>/api/monitor/refresh</code> y <code>/api/monitor/run</code>.</li>
+        <li>Renderizar metricas, categorias, filas, badges de estado y puertos.</li>
+        <li>Manejar auto refresh ON/OFF, Refresh Now y Run Full Check.</li>
+        <li>Filtrar por texto, online, offline y problemas.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Build Y Ejecucion Local</h2>
+      <pre>dotnet restore
+dotnet build
+dotnet run</pre>
+      <p>Al iniciar, abrir la URL que imprime la consola, usualmente <code>http://localhost:5000</code> o un puerto similar.</p>
+    </section>
+
+    <section>
+      <h2>Crear Portable Windows</h2>
+      <p>Comando recomendado:</p>
+      <pre>dotnet publish NetWatch.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o publish/win-x64-portable</pre>
+      <p>Resultado esperado:</p>
+      <pre>publish/win-x64-portable/
+├── NetWatch-Lite.exe
+├── devices.json
+├── appsettings.json
+├── wwwroot/
+└── runtime dependencies...</pre>
+      <p>Crear ZIP en macOS:</p>
+      <pre>ditto -c -k --sequesterRsrc --keepParent publish/win-x64-portable publish/NetWatch-Lite-win-x64-portable.zip</pre>
+      <p>Uso en Windows:</p>
+      <ol>
+        <li>Descomprimir el ZIP.</li>
+        <li>Editar <code>devices.json</code> en la misma carpeta de <code>NetWatch-Lite.exe</code>.</li>
+        <li>Ejecutar <code>NetWatch-Lite.exe</code>.</li>
+        <li>Abrir la URL que muestra la consola.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Notas Operativas</h2>
+      <ul>
+        <li>El archivo <code>devices.json</code> puede recargarse desde el boton Reload JSON.</li>
+        <li><code>Run Full Check</code> no permite ejecuciones solapadas; si una ya corre, el backend responde HTTP 409.</li>
+        <li>Para redes grandes, ajustar <code>maxParallelChecks</code> segun capacidad de red y equipo.</li>
+        <li>El ping puede requerir permisos o reglas de firewall dependiendo del sistema operativo y la red.</li>
+        <li>Los checks TCP indican si el puerto acepta conexion, no validan el protocolo de aplicacion.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
