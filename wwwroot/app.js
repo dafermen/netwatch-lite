@@ -23,6 +23,7 @@ let activeFilter = "all";
 let activeSearch = "";
 let autoRefreshEnabled = true;
 let latestIntervalSeconds = 15;
+const collapsedCategoryNames = new Set();
 
 /**
  * Fetches monitor data from the backend and renders the dashboard.
@@ -210,20 +211,34 @@ function renderCategories(categories) {
 /**
  * Renders one category section with summary badges and a device table.
  * @param {object} category Category result from the API or client fallback grouping.
+ * @param {number} index Category index in the rendered list, used to create a stable DOM id.
  * @returns {string} HTML string for the category section.
  */
-function renderCategory(category) {
+function renderCategory(category, index) {
   const devices = category.devices ?? [];
   const totalDevices = category.totalDevices ?? devices.length;
   const onlineDevices = category.onlineDevices ?? devices.filter(device => device.isOnline).length;
   const offlineDevices = category.offlineDevices ?? totalDevices - onlineDevices;
+  const categoryId = `category-${index}-${slugify(category.name)}`;
+  const isCollapsed = collapsedCategoryNames.has(category.name);
 
   return `
     <section class="category-section mb-4">
       <div class="category-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-        <div>
-          <h2 class="h5 mb-0">${escapeHtml(category.name)}</h2>
-          <span class="text-secondary small">${totalDevices} devices monitored</span>
+        <div class="d-flex align-items-center gap-2">
+          <button
+            class="btn btn-sm btn-outline-secondary category-toggle"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#${categoryId}"
+            aria-expanded="${!isCollapsed}"
+            aria-controls="${categoryId}">
+            <i class="fa-solid fa-chevron-down"></i>
+          </button>
+          <div>
+            <h2 class="h5 mb-0">${escapeHtml(category.name)}</h2>
+            <span class="text-secondary small">${totalDevices} devices monitored</span>
+          </div>
         </div>
         <div class="d-flex align-items-center gap-2">
           <span class="badge text-bg-success">
@@ -234,7 +249,11 @@ function renderCategory(category) {
           </span>
         </div>
       </div>
-      <div class="table-responsive border rounded-bottom">
+      <div
+        class="collapse ${isCollapsed ? "" : "show"}"
+        id="${categoryId}"
+        data-category-name="${escapeHtml(category.name)}">
+        <div class="table-responsive border rounded-bottom">
         <table class="table table-hover align-middle mb-0">
           <thead class="table-light">
             <tr>
@@ -250,6 +269,7 @@ function renderCategory(category) {
             ${devices.map(renderRow).join("")}
           </tbody>
         </table>
+        </div>
       </div>
     </section>`;
 }
@@ -340,6 +360,20 @@ function groupResultsByCategory(results) {
       offlineDevices: devices.filter(device => !device.isOnline).length,
       devices: devices.sort((left, right) => left.name.localeCompare(right.name))
     }));
+}
+
+/**
+ * Converts a category name into a safe id fragment for collapse targets.
+ * @param {string} value Category name.
+ * @returns {string} Lowercase id-safe string.
+ */
+function slugify(value) {
+  const slug = String(value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return slug || "category";
 }
 
 /**
@@ -510,6 +544,20 @@ reloadButton.addEventListener("click", reloadJson);
 autoRefreshToggle.addEventListener("click", toggleAutoRefresh);
 refreshNowButton.addEventListener("click", refreshNow);
 runFullCheckButton.addEventListener("click", runFullCheck);
+resultsBody.addEventListener("hidden.bs.collapse", event => {
+  const categoryName = event.target.dataset.categoryName;
+
+  if (categoryName) {
+    collapsedCategoryNames.add(categoryName);
+  }
+});
+resultsBody.addEventListener("shown.bs.collapse", event => {
+  const categoryName = event.target.dataset.categoryName;
+
+  if (categoryName) {
+    collapsedCategoryNames.delete(categoryName);
+  }
+});
 searchInput.addEventListener("input", debounce(event => {
   activeSearch = event.target.value;
   renderFilteredCategories();

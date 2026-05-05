@@ -19,6 +19,19 @@ body {
   max-width: 24rem;
 }
 
+.category-toggle {
+  height: 2rem;
+  width: 2rem;
+}
+
+.category-toggle[aria-expanded="false"] .fa-chevron-down {
+  transform: rotate(-90deg);
+}
+
+.category-toggle .fa-chevron-down {
+  transition: transform 0.15s ease-in-out;
+}
+
 .metric-card {
   border-radius: 0.5rem;
 }

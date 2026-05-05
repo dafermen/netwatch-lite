@@ -23,6 +23,7 @@ Full visual documentation is available at [docs/index.html](docs/index.html).
   - Degraded devices.
   - Availability percentage.
 - Search and client-side filters.
+- Collapsible category groups.
 - Auto refresh toggle.
 - Manual refresh.
 - Forced full check.
