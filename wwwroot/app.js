@@ -21,7 +21,7 @@ let refreshTimer;
 let latestCategories = [];
 let activeFilter = "all";
 let activeSearch = "";
-let autoRefreshEnabled = true;
+let autoRefreshEnabled = false;
 let latestIntervalSeconds = 15;
 const collapsedCategoryNames = new Set();
 
@@ -55,6 +55,7 @@ async function loadResults(options = {}) {
 
 /**
  * Applies a monitor API payload to all dashboard sections.
+ * The first load renders current data once; automatic refresh starts only after the user enables it.
  * @param {object} payload Response from /api/monitor/refresh or /api/monitor/run.
  * @returns {void}
  */
@@ -456,6 +457,7 @@ async function runFullCheck() {
 
 /**
  * Toggles automatic refresh mode and starts or clears the refresh timer.
+ * Auto refresh is disabled by default so operators control when recurring checks begin.
  * @returns {void}
  */
 function toggleAutoRefresh() {
@@ -571,7 +573,7 @@ filterInputs.forEach(input => {
 loadResults();
 
 /**
- * Starts the automatic refresh timer when auto refresh is enabled.
+ * Starts the automatic refresh timer when auto refresh is enabled by the user.
  * @returns {void}
  */
 function scheduleRefresh() {
