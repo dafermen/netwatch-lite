@@ -331,13 +331,13 @@
 
     <section>
       <h2>Frontend</h2>
-      <p><code>wwwroot/index.html</code> define el layout: cabecera, controles de ejecucion, metricas, busqueda, filtros y contenedor de resultados.</p>
+      <p><code>wwwroot/index.html</code> define el layout: cabecera, controles de ejecucion, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto.</p>
       <p><code>wwwroot/app.js</code> contiene funciones JSDoc para:</p>
       <ul>
         <li>Consumir <code>/api/monitor/refresh</code> y <code>/api/monitor/run</code>.</li>
         <li>Renderizar metricas, categorias, filas, badges de estado y puertos.</li>
         <li>Contraer y expandir grupos de categorias para navegar inventarios grandes.</li>
-        <li>Manejar auto refresh ON/OFF, Refresh Now y Run Full Check.</li>
+        <li>Manejar modo manual por defecto, auto refresh ON/OFF, Refresh Now y Run Full Check.</li>
         <li>Filtrar por texto, online, offline y problemas.</li>
       </ul>
     </section>
@@ -348,6 +348,21 @@
 dotnet build
 dotnet run</pre>
       <p>Al iniciar, abrir la URL que imprime la consola, usualmente <code>http://localhost:5000</code> o un puerto similar.</p>
+    </section>
+
+    <section>
+      <h2>Versiones Y Commits</h2>
+      <p>Los cambios relevantes del proyecto se documentan en <code>CHANGELOG.md</code>. Cada commit en GitHub debe tener un mensaje corto y claro. Los cambios visibles para usuarios deben agregarse tambien al changelog.</p>
+      <table>
+        <thead>
+          <tr><th>Version</th><th>Resumen</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Unreleased</code></td><td>Modo manual por defecto; auto refresh inicia solo cuando el operador lo activa.</td></tr>
+          <tr><td><code>v0.2.0</code></td><td>Grupos de categorias colapsables.</td></tr>
+          <tr><td><code>v0.1.0</code></td><td>Version inicial con dashboard, checks, metricas, filtros, controles y portable.</td></tr>
+        </tbody>
+      </table>
     </section>
 
     <section>
@@ -376,6 +391,7 @@ dotnet run</pre>
       <h2>Notas Operativas</h2>
       <ul>
         <li>El archivo <code>devices.json</code> puede recargarse desde el boton Reload JSON.</li>
+        <li>La aplicacion inicia en modo manual; el auto refresh solo empieza cuando el operador activa el boton.</li>
         <li><code>Run Full Check</code> no permite ejecuciones solapadas; si una ya corre, el backend responde HTTP 409.</li>
         <li>Para redes grandes, ajustar <code>maxParallelChecks</code> segun capacidad de red y equipo.</li>
         <li>El ping puede requerir permisos o reglas de firewall dependiendo del sistema operativo y la red.</li>

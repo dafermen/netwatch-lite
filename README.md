@@ -4,6 +4,8 @@ NetWatch-Lite is a .NET 8 ASP.NET Core + Bootstrap network monitoring dashboard.
 
 Full visual documentation is available at [docs/index.html](docs/index.html).
 
+Release notes and commit-level project history are summarized in [CHANGELOG.md](CHANGELOG.md).
+
 ## Features
 
 - Editable `devices.json` inventory.
@@ -24,7 +26,8 @@ Full visual documentation is available at [docs/index.html](docs/index.html).
   - Availability percentage.
 - Search and client-side filters.
 - Collapsible category groups.
-- Auto refresh toggle.
+- Manual mode by default.
+- Optional auto refresh toggle.
 - Manual refresh.
 - Forced full check.
 - JSON reload without restarting.
@@ -114,6 +117,10 @@ Use `category` to group devices in the UI. Use `enabled: false` to keep a device
 | `GET` | `/api/monitor/refresh` | Returns current cached results, running the first check if needed. |
 | `POST` | `/api/monitor/run` | Forces a full check and prevents overlapping executions. |
 
+## Version Notes
+
+Changes are documented in [CHANGELOG.md](CHANGELOG.md). Each Git commit should keep a concise message describing the change, and user-facing changes should also be added to the changelog.
+
 ## Source Documentation
 
 The C# source includes XML documentation comments for models and services. The frontend JavaScript includes JSDoc comments for dashboard rendering, filtering, backend calls, and execution controls.
@@ -173,6 +180,7 @@ Edit `devices.json` in the same folder as `NetWatch-Lite.exe`, then use the dash
 
 - `Run Full Check` executes all configured checks immediately.
 - `Refresh Now` reads the current cached backend result.
-- `Auto Refresh` uses `settings.intervalSeconds`.
+- NetWatch-Lite starts in manual mode by default.
+- `Auto Refresh` uses `settings.intervalSeconds` only after the operator turns it on.
 - `maxParallelChecks` should be adjusted carefully for large networks.
 - TCP checks verify that a connection can be opened; they do not validate application protocol behavior.
