@@ -35,6 +35,7 @@ Release notes and commit-level project history are summarized in [CHANGELOG.md](
 - Manual mode by default.
 - Optional auto refresh toggle that runs a full check every 60 seconds.
 - Forced full check.
+- Progressive dashboard rendering through Server-Sent Events while checks are still running.
 - JSON reload without restarting.
 
 ## Project Structure
@@ -53,6 +54,7 @@ netwatch-lite/
 │   ├── DeviceStatus.cs
 │   ├── MonitorConfiguration.cs
 │   ├── MonitorResponse.cs
+│   ├── MonitorStreamEvent.cs
 │   └── MonitorSettings.cs
 ├── Services/
 │   ├── JsonDeviceRepository.cs
@@ -124,6 +126,7 @@ Use `category` to group devices in the UI. Use `enabled: false` to keep a device
 | `POST` | `/api/config` | Saves the full configuration, creates `config.backup.json`, and reloads memory. |
 | `GET` | `/api/results` | Backwards-compatible endpoint that forces a full check. |
 | `POST` | `/api/monitor/run` | Forces a full check and prevents overlapping executions. |
+| `GET` | `/api/monitor/stream` | Streams a full check progressively with `started`, `result`, `completed`, and `busy` events. |
 
 ## Version Notes
 
@@ -187,6 +190,7 @@ Edit `config.json` in the same folder as `NetWatch-Lite.exe`, or use the `/confi
 ## Operational Notes
 
 - `Run Full Check` executes all configured checks immediately.
+- Dashboard startup and full checks stream results progressively, so devices appear as they finish instead of waiting for the whole execution.
 - NetWatch-Lite starts in manual mode by default.
 - `Auto Refresh` runs a full check every 60 seconds after the operator turns it on.
 - `settings.intervalSeconds` is retained for JSON compatibility but is not used by the current auto full-check timer.

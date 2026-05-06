@@ -1,5 +1,6 @@
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using NetWatch.Models;
 
 namespace NetWatch.Services;
@@ -43,6 +44,38 @@ public sealed class NetworkMonitorService
             CheckDeviceAsync(device, settings, checkLimiter, cancellationToken));
 
         return await Task.WhenAll(checkTasks);
+    }
+
+    /// <summary>
+    /// Runs checks for enabled devices and yields each device result as soon as it completes.
+    /// </summary>
+    /// <param name="configuration">Configuration snapshot used for this execution.</param>
+    /// <param name="cancellationToken">Token used to cancel queued or in-flight check work.</param>
+    /// <returns>An async stream of completed device results.</returns>
+    public async IAsyncEnumerable<DeviceResult> CheckDevicesAsCompletedAsync(
+        MonitorConfiguration configuration,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var settings = configuration.Settings;
+        var enabledDevices = configuration.Devices
+            .Where(device => device.Enabled)
+            .ToList();
+        var maxParallelChecks = Math.Max(1, settings.MaxParallelChecks);
+
+        using var checkLimiter = new SemaphoreSlim(maxParallelChecks, maxParallelChecks);
+        var checkTasks = enabledDevices
+            .Select(device => CheckDeviceAsync(device, settings, checkLimiter, cancellationToken))
+            .ToList();
+
+        while (checkTasks.Count > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var completedTask = await Task.WhenAny(checkTasks);
+            checkTasks.Remove(completedTask);
+
+            yield return await completedTask;
+        }
     }
 
     /// <summary>
