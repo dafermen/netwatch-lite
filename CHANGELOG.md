@@ -10,6 +10,7 @@ All notable changes to NetWatch-Lite are documented here.
 - Removed the `Refresh Now` control and cached refresh endpoint.
 - Added progressive dashboard rendering with Server-Sent Events for full checks.
 - Added visible monitoring progress percentage, checked/total counter, and programmer documentation.
+- Grouped the configuration CRUD device table by category.
 - Device category groups now start collapsed by default.
 - Added hamburger sidebar navigation with Dashboard and Configuration routes.
 - Added `/config` CRUD UI for devices and checks.

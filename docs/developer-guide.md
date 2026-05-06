@@ -269,7 +269,9 @@ Important configuration functions:
 
 - `loadConfig`: reads `/api/config`.
 - `saveConfig`: posts full config to `/api/config`.
-- `renderConfigDevices`: paints the device table.
+- `renderConfigDevices`: paints the grouped device table.
+- `groupConfigDevicesByCategory`: groups devices by category while preserving their original JSON index.
+- `renderConfigDeviceRow`: renders one editable device row inside a category group.
 - `startAddDevice`: opens the add form.
 - `editDevice`: opens the edit form.
 - `submitDevice`: updates local state.
