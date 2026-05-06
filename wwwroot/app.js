@@ -622,16 +622,30 @@ function renderConfigDevices() {
   }
 
   configDevicesBody.innerHTML = groupConfigDevicesByCategory(devices)
-    .map(group => `
+    .map((group, groupIndex) => {
+      const groupId = `config-category-${groupIndex}-${slugify(group.name)}`;
+
+      return `
       <tr class="config-category-row">
         <td colspan="5">
           <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-            <span class="fw-semibold">${escapeHtml(group.name)}</span>
+            <div class="d-flex align-items-center gap-2">
+              <button
+                class="btn btn-sm btn-outline-secondary category-toggle"
+                type="button"
+                data-config-category-toggle="${groupId}"
+                aria-expanded="false"
+                aria-controls="${groupId}">
+                <i class="fa-solid fa-chevron-down"></i>
+              </button>
+              <span class="fw-semibold">${escapeHtml(group.name)}</span>
+            </div>
             <span class="badge text-bg-secondary">${group.devices.length} devices</span>
           </div>
         </td>
       </tr>
-      ${group.devices.map(({ device, index }) => renderConfigDeviceRow(device, index)).join("")}`)
+      ${group.devices.map(({ device, index }) => renderConfigDeviceRow(device, index, groupId)).join("")}`;
+    })
     .join("");
 }
 
@@ -667,11 +681,12 @@ function groupConfigDevicesByCategory(devices) {
  * Renders one editable device row inside its category group.
  * @param {object} device Device configuration object.
  * @param {number} index Original index in configState.devices.
+ * @param {string} groupId Stable group key used to find rows for the category.
  * @returns {string} Table row markup.
  */
-function renderConfigDeviceRow(device, index) {
+function renderConfigDeviceRow(device, index, groupId) {
   return `
-    <tr>
+    <tr class="config-device-row" data-config-category-row="${groupId}" hidden>
       <td>
         <div class="fw-semibold">${escapeHtml(device.name)}</div>
         <div class="text-secondary small">${device.enabled === false ? "Disabled" : "Enabled"}</div>
@@ -688,6 +703,23 @@ function renderConfigDeviceRow(device, index) {
         </button>
       </td>
     </tr>`;
+}
+
+/**
+ * Expands or collapses all device rows that belong to one configuration category.
+ * @param {HTMLButtonElement} toggleButton Button clicked in the category header.
+ */
+function toggleConfigCategory(toggleButton) {
+  const groupId = toggleButton.dataset.configCategoryToggle;
+  const isExpanded = toggleButton.getAttribute("aria-expanded") === "true";
+
+  toggleButton.setAttribute("aria-expanded", String(!isExpanded));
+
+  configDevicesBody
+    .querySelectorAll(`[data-config-category-row="${groupId}"]`)
+    .forEach(row => {
+      row.hidden = isExpanded;
+    });
 }
 
 function startAddDevice() {
@@ -1096,8 +1128,14 @@ checksList.addEventListener("click", event => {
   }
 });
 configDevicesBody.addEventListener("click", event => {
+  const categoryToggle = event.target.closest("[data-config-category-toggle]");
   const editButton = event.target.closest("[data-edit-device]");
   const deleteButton = event.target.closest("[data-delete-device]");
+
+  if (categoryToggle) {
+    toggleConfigCategory(categoryToggle);
+    return;
+  }
 
   if (editButton) {
     editDevice(Number(editButton.dataset.editDevice));
