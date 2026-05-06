@@ -2,6 +2,8 @@
 
 This guide explains how the source code is organized, how the main classes relate to each other, and how a monitoring execution flows from the browser to the network checks and back.
 
+GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.com/dafermen/netwatch-lite).
+
 ## Runtime Overview
 
 NetWatch Lite is an ASP.NET Core Minimal API application with a static Bootstrap frontend.
