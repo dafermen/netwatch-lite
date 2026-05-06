@@ -51,6 +51,78 @@ public sealed class MonitorExecutionService
     }
 
     /// <summary>
+    /// Attempts to stream a full monitor execution, sending each device result as it completes.
+    /// </summary>
+    /// <param name="writeEventAsync">Callback used to send stream events to the client.</param>
+    /// <param name="cancellationToken">Token used to cancel waiting, checks, or writes.</param>
+    /// <returns>True when streaming started; false when another execution is already running.</returns>
+    public async Task<bool> TryStreamFullCheckAsync(
+        Func<MonitorStreamEvent, CancellationToken, Task> writeEventAsync,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await _executionLock.WaitAsync(0, cancellationToken))
+        {
+            return false;
+        }
+
+        try
+        {
+            var configuration = await _deviceRepository.GetConfigurationAsync();
+            var settings = configuration.Settings;
+            var totalDevices = configuration.Devices.Count(device => device.Enabled);
+            var results = new List<DeviceResult>();
+
+            await writeEventAsync(new MonitorStreamEvent
+            {
+                Type = "started",
+                TotalDevices = totalDevices,
+                CompletedDevices = 0,
+                Settings = settings,
+                Summary = CreateDashboardSummary(results, totalDevices),
+                Timestamp = DateTimeOffset.Now,
+                ExecutionStatus = "Running"
+            }, cancellationToken);
+
+            await foreach (var result in _monitorService.CheckDevicesAsCompletedAsync(configuration, cancellationToken))
+            {
+                results.Add(result);
+
+                await writeEventAsync(new MonitorStreamEvent
+                {
+                    Type = "result",
+                    TotalDevices = totalDevices,
+                    CompletedDevices = results.Count,
+                    Settings = settings,
+                    Result = result,
+                    Summary = CreateDashboardSummary(results, totalDevices),
+                    Timestamp = DateTimeOffset.Now,
+                    ExecutionStatus = "Running"
+                }, cancellationToken);
+            }
+
+            var completedAt = DateTimeOffset.Now;
+            await writeEventAsync(new MonitorStreamEvent
+            {
+                Type = "completed",
+                TotalDevices = totalDevices,
+                CompletedDevices = results.Count,
+                Settings = settings,
+                Summary = CreateDashboardSummary(results),
+                Categories = CreateCategoryResults(results),
+                Results = results,
+                Timestamp = completedAt,
+                ExecutionStatus = "Completed"
+            }, cancellationToken);
+
+            return true;
+        }
+        finally
+        {
+            _executionLock.Release();
+        }
+    }
+
+    /// <summary>
     /// Performs the locked execution flow.
     /// </summary>
     /// <param name="cancellationToken">Token used by the network checks.</param>
@@ -132,7 +204,19 @@ public sealed class MonitorExecutionService
     /// <returns>Totals for devices, health states, and availability percentage.</returns>
     private static DashboardSummary CreateDashboardSummary(IReadOnlyCollection<DeviceResult> results)
     {
-        var totalDevices = results.Count;
+        return CreateDashboardSummary(results, results.Count);
+    }
+
+    /// <summary>
+    /// Calculates dashboard metrics while preserving the total expected device count.
+    /// </summary>
+    /// <param name="results">Completed device results.</param>
+    /// <param name="totalDevices">Total number of devices expected in the execution.</param>
+    /// <returns>Totals for devices, health states, and availability percentage.</returns>
+    private static DashboardSummary CreateDashboardSummary(
+        IReadOnlyCollection<DeviceResult> results,
+        int totalDevices)
+    {
         var healthyDevices = results.Count(device => device.Status == DeviceStatus.Healthy);
         var degradedDevices = results.Count(device => device.Status == DeviceStatus.Degraded);
         var offlineDevices = results.Count(device => device.Status == DeviceStatus.Down);

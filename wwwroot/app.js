@@ -50,6 +50,8 @@ const deleteDeviceName = document.querySelector("#delete-device-name");
 const confirmDeleteDeviceButton = document.querySelector("#confirm-delete-device");
 
 let refreshTimer;
+let activeMonitorStream;
+let latestResults = [];
 let latestCategories = [];
 let activeFilter = "all";
 let activeSearch = "";
@@ -63,42 +65,118 @@ const expandedCategoryNames = new Set();
 const mobileSidebarQuery = window.matchMedia("(max-width: 991.98px)");
 const autoFullCheckIntervalMs = 60_000;
 
-async function loadResults({ showErrors = true } = {}) {
-  try {
-    const response = await fetch("/api/monitor/run", { method: "POST" });
-    const payload = await readJsonResponse(response);
+function loadResults({ showErrors = true } = {}) {
+  return streamFullCheck({ showErrors });
+}
 
-    if (!response.ok) {
-      if (response.status === 409) {
-        console.info("A full check is already running.");
-        return;
+function streamFullCheck({ showErrors = true } = {}) {
+  if (activeMonitorStream) {
+    lastCheck.textContent = "A monitoring execution is already running.";
+    return Promise.resolve();
+  }
+
+  return new Promise(resolve => {
+    let settled = false;
+    const source = new EventSource("/api/monitor/stream");
+    activeMonitorStream = source;
+
+    source.addEventListener("started", event => {
+      const payload = JSON.parse(event.data);
+      resetStreamingDashboard(payload);
+    });
+
+    source.addEventListener("result", event => {
+      const payload = JSON.parse(event.data);
+      renderStreamingResult(payload);
+    });
+
+    source.addEventListener("completed", event => {
+      const payload = JSON.parse(event.data);
+      closeMonitorStream();
+      renderMonitorPayload({
+        settings: payload.settings,
+        summary: payload.summary,
+        categories: payload.categories,
+        results: payload.results,
+        lastExecutionTime: payload.timestamp,
+        lastCheck: payload.timestamp,
+        executionStatus: payload.executionStatus
+      });
+      hasLoadedDashboard = true;
+      settled = true;
+      resolve();
+    });
+
+    source.addEventListener("busy", event => {
+      const payload = JSON.parse(event.data);
+      closeMonitorStream();
+      lastCheck.textContent = payload.message || "A monitoring execution is already running.";
+      settled = true;
+      resolve();
+    });
+
+    source.onerror = error => {
+      closeMonitorStream();
+
+      if (showErrors && !settled) {
+        resultsBody.innerHTML = `
+          <div class="text-center text-danger py-4">
+            Unable to stream monitoring results.
+          </div>`;
+        lastCheck.textContent = "Last execution failed";
       }
 
-      throw new Error(payload.detail || payload.error || `Request failed with ${response.status}`);
-    }
-
-    renderMonitorPayload(payload);
-    hasLoadedDashboard = true;
-  } catch (error) {
-    if (showErrors) {
-      resultsBody.innerHTML = `
-        <div class="text-center text-danger py-4">
-          Unable to run full monitoring check.
-        </div>`;
-      lastCheck.textContent = "Last execution failed";
-    }
-
-    console.error(error);
-  }
+      console.error(error);
+      settled = true;
+      resolve();
+    };
+  });
 }
 
 function renderMonitorPayload(payload) {
+  latestResults = payload.results ?? [];
   latestCategories = payload.categories ?? groupResultsByCategory(payload.results ?? []);
   renderSummary(payload.summary ?? createSummaryFromCategories(latestCategories));
   renderFilteredCategories();
   scheduleRefresh();
   executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
   lastCheck.textContent = `Last execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
+}
+
+function resetStreamingDashboard(payload) {
+  latestResults = [];
+  latestCategories = [];
+  renderSummary(payload.summary ?? createProgressSummary([], payload.totalDevices ?? 0));
+  resultsBody.innerHTML = `
+    <div class="progress-panel text-secondary">
+      <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+      Checking devices 0/${Number(payload.totalDevices) || 0}...
+    </div>`;
+  executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
+  lastCheck.textContent = `Checking devices 0/${Number(payload.totalDevices) || 0}...`;
+}
+
+function renderStreamingResult(payload) {
+  if (payload.result) {
+    upsertLatestResult(payload.result);
+  }
+
+  latestCategories = groupResultsByCategory(latestResults);
+  renderSummary(payload.summary ?? createProgressSummary(latestResults, payload.totalDevices ?? latestResults.length));
+  renderFilteredCategories();
+  lastCheck.textContent = `Checking devices ${payload.completedDevices}/${payload.totalDevices}...`;
+}
+
+function upsertLatestResult(result) {
+  const resultIndex = latestResults.findIndex(device =>
+    device.name === result.name && device.ip === result.ip);
+
+  if (resultIndex >= 0) {
+    latestResults[resultIndex] = result;
+    return;
+  }
+
+  latestResults.push(result);
 }
 
 function renderSummary(summary) {
@@ -111,17 +189,21 @@ function renderSummary(summary) {
 
 function createSummaryFromCategories(categories) {
   const devices = categories.flatMap(category => category.devices ?? []);
-  const totalDevices = devices.length;
+  return createProgressSummary(devices, devices.length);
+}
+
+function createProgressSummary(devices, totalDevices = devices.length) {
+  const expectedTotal = Number(totalDevices) || devices.length;
   const healthyDevices = devices.filter(device => device.status === "Healthy").length;
   const onlineDevices = devices.filter(device => device.isOnline).length;
   const offlineDevices = devices.filter(device => device.status === "Down").length;
   const degradedDevices = devices.filter(device => device.status === "Degraded").length;
-  const availabilityPercentage = totalDevices === 0
+  const availabilityPercentage = expectedTotal === 0
     ? 0
-    : Math.round((healthyDevices / totalDevices * 100) * 10) / 10;
+    : Math.round((healthyDevices / expectedTotal * 100) * 10) / 10;
 
   return {
-    totalDevices,
+    totalDevices: expectedTotal,
     healthyDevices,
     onlineDevices,
     offlineDevices,
@@ -940,5 +1022,12 @@ function clearRefreshTimer() {
   if (refreshTimer) {
     clearInterval(refreshTimer);
     refreshTimer = undefined;
+  }
+}
+
+function closeMonitorStream() {
+  if (activeMonitorStream) {
+    activeMonitorStream.close();
+    activeMonitorStream = undefined;
   }
 }

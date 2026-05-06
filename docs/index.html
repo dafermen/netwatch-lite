@@ -206,7 +206,7 @@
       <ol>
         <li>La aplicacion inicia en <code>Program.cs</code>.</li>
         <li><code>JsonDeviceRepository.ReloadAsync</code> carga y normaliza <code>config.json</code>.</li>
-        <li>La UI llama <code>POST /api/monitor/run</code> para ejecutar un full check.</li>
+        <li>La UI llama <code>GET /api/monitor/stream</code> para ejecutar un full check progresivo.</li>
         <li>El modo automatico ejecuta un full check cada 60 segundos.</li>
         <li><code>NetworkMonitorService.CheckAllDevicesAsync</code> revisa dispositivos habilitados en paralelo.</li>
         <li>Se calcula <span class="healthy">Healthy</span>, <span class="degraded">Degraded</span> o <span class="down">Down</span>.</li>
@@ -284,6 +284,7 @@
           <tr><td><span class="tag post">POST</span></td><td><code>/api/config</code></td><td>Guarda la configuracion completa, crea <code>config.backup.json</code> y recarga memoria.</td><td>Configuracion guardada.</td></tr>
           <tr><td><span class="tag get">GET</span></td><td><code>/api/results</code></td><td>Compatibilidad. Fuerza ejecucion completa.</td><td><code>MonitorResponse</code>.</td></tr>
           <tr><td><span class="tag post">POST</span></td><td><code>/api/monitor/run</code></td><td>Fuerza full check sin permitir solapamiento.</td><td><code>MonitorResponse</code> o HTTP 409.</td></tr>
+          <tr><td><span class="tag get">GET</span></td><td><code>/api/monitor/stream</code></td><td>Ejecuta full check y envia resultados progresivos por Server-Sent Events.</td><td>Eventos <code>started</code>, <code>result</code>, <code>completed</code> o <code>busy</code>.</td></tr>
         </tbody>
       </table>
     </section>
@@ -306,6 +307,7 @@
           <tr><td><code>DashboardSummary.cs</code></td><td>Metricas superiores del dashboard.</td></tr>
           <tr><td><code>CategoryResult.cs</code></td><td>Resultados agrupados por categoria.</td></tr>
           <tr><td><code>MonitorResponse.cs</code></td><td>Payload completo consumido por la UI.</td></tr>
+          <tr><td><code>MonitorStreamEvent.cs</code></td><td>Evento incremental para pintar resultados mientras un full check sigue corriendo.</td></tr>
         </tbody>
       </table>
 
@@ -322,13 +324,13 @@
           </tr>
           <tr>
             <td><code>NetworkMonitorService</code></td>
-            <td><code>CheckAllDevicesAsync</code>, <code>PingAsync</code>, <code>CheckPortAsync</code></td>
-            <td>Entrada: configuracion actual. Salida: lista de <code>DeviceResult</code>.</td>
+            <td><code>CheckAllDevicesAsync</code>, <code>CheckDevicesAsCompletedAsync</code>, <code>PingAsync</code>, <code>CheckPortAsync</code></td>
+            <td>Entrada: configuracion actual. Salida: lista o stream de <code>DeviceResult</code>.</td>
           </tr>
           <tr>
             <td><code>MonitorExecutionService</code></td>
-            <td><code>RunFullCheckAsync</code>, <code>TryRunFullCheckAsync</code></td>
-            <td>Coordina full checks y bloqueo contra ejecuciones simultaneas.</td>
+            <td><code>RunFullCheckAsync</code>, <code>TryRunFullCheckAsync</code>, <code>TryStreamFullCheckAsync</code></td>
+            <td>Coordina full checks, streaming progresivo y bloqueo contra ejecuciones simultaneas.</td>
           </tr>
         </tbody>
       </table>
@@ -339,7 +341,7 @@
       <p><code>wwwroot/index.html</code> define el layout compartido: sidebar hamburguesa, topbar, dashboard, pagina de configuracion, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto.</p>
       <p><code>wwwroot/app.js</code> contiene funciones JSDoc para:</p>
       <ul>
-        <li>Consumir <code>/api/monitor/run</code>.</li>
+        <li>Consumir <code>/api/monitor/stream</code> para pintar resultados conforme termina cada dispositivo.</li>
         <li>Renderizar metricas, categorias, filas, badges de estado y puertos.</li>
         <li>Contraer y expandir grupos de categorias para navegar inventarios grandes; inician colapsados por defecto.</li>
         <li>Manejar modo manual por defecto, auto refresh ON/OFF y Run Full Check.</li>
@@ -364,7 +366,7 @@ dotnet run</pre>
           <tr><th>Version</th><th>Resumen</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>Unreleased</code></td><td>Modo manual por defecto; auto refresh ejecuta full check cada 60 segundos cuando el operador lo activa; categorias colapsadas por defecto; formulario de dispositivo bajo demanda; ping opcional por hostname.</td></tr>
+          <tr><td><code>Unreleased</code></td><td>Modo manual por defecto; auto refresh ejecuta full check cada 60 segundos cuando el operador lo activa; render progresivo por dispositivo; categorias colapsadas por defecto; formulario de dispositivo bajo demanda; ping opcional por hostname.</td></tr>
           <tr><td><code>v0.2.0</code></td><td>Grupos de categorias colapsables.</td></tr>
           <tr><td><code>v0.1.0</code></td><td>Version inicial con dashboard, checks, metricas, filtros, controles y portable.</td></tr>
         </tbody>
