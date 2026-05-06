@@ -192,6 +192,17 @@ body {
   margin: 0.15rem;
 }
 
+.monitor-progress {
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.monitor-progress .progress {
+  height: 1.15rem;
+}
+
 .progress-panel {
   align-items: center;
   background: #fff;

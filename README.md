@@ -4,6 +4,8 @@ NetWatch-Lite is a .NET 8 ASP.NET Core + Bootstrap network monitoring dashboard.
 
 Full visual documentation is available at [docs/index.html](docs/index.html).
 
+Programmer documentation is available at [docs/developer-guide.md](docs/developer-guide.md).
+
 Release notes and commit-level project history are summarized in [CHANGELOG.md](CHANGELOG.md).
 
 ## Features
@@ -36,6 +38,7 @@ Release notes and commit-level project history are summarized in [CHANGELOG.md](
 - Optional auto refresh toggle that runs a full check every 60 seconds.
 - Forced full check.
 - Progressive dashboard rendering through Server-Sent Events while checks are still running.
+- Visible monitoring progress with percentage, checked/total count, and completion state.
 - JSON reload without restarting.
 
 ## Project Structure
@@ -66,6 +69,7 @@ netwatch-lite/
 │   ├── index.html
 │   └── styles.css
 ├── docs/
+│   ├── developer-guide.md
 │   └── index.html
 ├── appsettings.json
 ├── NetWatch.csproj
