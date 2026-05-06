@@ -401,12 +401,13 @@ async function loadConfig() {
 
   try {
     const response = await fetch("/api/config");
+    const payload = await readJsonResponse(response);
 
     if (!response.ok) {
-      throw new Error(`Request failed with ${response.status}`);
+      throw new Error(payload.error || `Unable to load configuration. HTTP ${response.status}`);
     }
 
-    configState = await response.json();
+    configState = payload;
     configState.devices ??= [];
     configState.settings ??= {
       intervalSeconds: 15,
@@ -417,7 +418,7 @@ async function loadConfig() {
     renderConfigDevices();
     resetDeviceForm();
   } catch (error) {
-    showConfigAlert("danger", "Unable to load configuration.");
+    showConfigAlert("danger", error.message || "Unable to load configuration.");
     console.error(error);
   } finally {
     setConfigBusy(false);
@@ -437,7 +438,7 @@ async function saveConfig() {
       body: JSON.stringify(configState)
     });
 
-    const payload = await response.json().catch(() => ({}));
+    const payload = await readJsonResponse(response);
 
     if (!response.ok) {
       throw new Error(payload.error || `Request failed with ${response.status}`);
@@ -453,6 +454,20 @@ async function saveConfig() {
     console.error(error);
   } finally {
     setConfigBusy(false);
+  }
+}
+
+async function readJsonResponse(response) {
+  const text = await response.text();
+
+  if (!text) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error("Configuration API did not return JSON. Restart the application so the latest backend endpoints are loaded.");
   }
 }
 
