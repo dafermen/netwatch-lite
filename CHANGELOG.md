@@ -11,6 +11,8 @@ All notable changes to NetWatch-Lite are documented here.
 - Added `/config` CRUD UI for devices and checks.
 - Added `GET /api/config` and `POST /api/config` with validation, backup, and in-memory reload.
 - Renamed the editable runtime inventory file to `config.json`.
+- Configuration device form now opens only when adding or editing a device.
+- Added optional `hostname` per device and `useHostnameForPing` setting for hostname-based ping checks.
 - Documentation updated to describe manual-first behavior.
 
 ## v0.2.0 - 2026-05-05

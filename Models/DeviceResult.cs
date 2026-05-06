@@ -16,6 +16,16 @@ public sealed class DeviceResult
     public required string Ip { get; init; }
 
     /// <summary>
+    /// Optional DNS host name copied from configuration.
+    /// </summary>
+    public string? Hostname { get; init; }
+
+    /// <summary>
+    /// Network target used by the ping check for this execution.
+    /// </summary>
+    public required string PingTarget { get; init; }
+
+    /// <summary>
     /// Device category copied from configuration and used for grouped dashboard rendering.
     /// </summary>
     public required string Category { get; init; }
