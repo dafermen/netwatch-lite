@@ -4,6 +4,10 @@ All notable changes to NetWatch-Lite are documented here.
 
 ## Unreleased
 
+- No changes yet.
+
+## v0.3.0 - 2026-05-06
+
 - Default dashboard execution mode changed to manual.
 - Auto refresh now starts only when the operator enables `Auto Refresh: ON`.
 - Auto refresh now runs a full check every 60 seconds.
