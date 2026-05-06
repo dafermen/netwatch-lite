@@ -1,3 +1,11 @@
+const sidebar = document.querySelector("#sidebar");
+const sidebarBackdrop = document.querySelector("#sidebar-backdrop");
+const sidebarToggle = document.querySelector("#sidebar-toggle");
+const navLinks = document.querySelectorAll("[data-route]");
+const currentPageLabel = document.querySelector("#current-page-label");
+
+const dashboardPage = document.querySelector("#dashboard-page");
+const configPage = document.querySelector("#config-page");
 const resultsBody = document.querySelector("#results-body");
 const lastCheck = document.querySelector("#last-check");
 const executionMode = document.querySelector("#execution-mode");
@@ -17,19 +25,43 @@ const metricOnline = document.querySelector("#metric-online");
 const metricOffline = document.querySelector("#metric-offline");
 const metricDegraded = document.querySelector("#metric-degraded");
 const metricAvailability = document.querySelector("#metric-availability");
+
+const configAlert = document.querySelector("#config-alert");
+const configDevicesBody = document.querySelector("#config-devices-body");
+const reloadConfigButton = document.querySelector("#reload-config");
+const saveConfigButton = document.querySelector("#save-config");
+const saveConfigSpinner = document.querySelector("#save-config-spinner");
+const saveConfigIcon = document.querySelector("#save-config-icon");
+const addDeviceButton = document.querySelector("#add-device");
+const deviceForm = document.querySelector("#device-form");
+const deviceFormTitle = document.querySelector("#device-form-title");
+const editingDeviceIndex = document.querySelector("#editing-device-index");
+const deviceNameInput = document.querySelector("#device-name");
+const deviceAddressInput = document.querySelector("#device-address");
+const deviceCategoryInput = document.querySelector("#device-category");
+const deviceEnabledInput = document.querySelector("#device-enabled");
+const checksList = document.querySelector("#checks-list");
+const addCheckButton = document.querySelector("#add-check");
+const resetDeviceFormButton = document.querySelector("#reset-device-form");
+const submitDeviceButton = document.querySelector("#submit-device");
+const deleteDeviceModalElement = document.querySelector("#delete-device-modal");
+const deleteDeviceModal = new bootstrap.Modal(deleteDeviceModalElement);
+const deleteDeviceName = document.querySelector("#delete-device-name");
+const confirmDeleteDeviceButton = document.querySelector("#confirm-delete-device");
+
 let refreshTimer;
 let latestCategories = [];
 let activeFilter = "all";
 let activeSearch = "";
 let autoRefreshEnabled = false;
 let latestIntervalSeconds = 15;
+let currentRoute = normalizeRoute(location.pathname);
+let hasLoadedDashboard = false;
+let hasLoadedConfig = false;
+let configState = createEmptyConfiguration();
+let pendingDeleteIndex = null;
 const expandedCategoryNames = new Set();
 
-/**
- * Fetches monitor data from the backend and renders the dashboard.
- * @param {{ forceRun?: boolean }} options When true, calls POST /api/monitor/run to execute all checks immediately.
- * @returns {Promise<void>} Completes when the response has been rendered or an error has been shown.
- */
 async function loadResults(options = {}) {
   const endpoint = options.forceRun ? "/api/monitor/run" : "/api/monitor/refresh";
   const method = options.forceRun ? "POST" : "GET";
@@ -43,6 +75,7 @@ async function loadResults(options = {}) {
 
     const payload = await response.json();
     renderMonitorPayload(payload);
+    hasLoadedDashboard = true;
   } catch (error) {
     resultsBody.innerHTML = `
       <div class="text-center text-danger py-4">
@@ -53,27 +86,16 @@ async function loadResults(options = {}) {
   }
 }
 
-/**
- * Applies a monitor API payload to all dashboard sections.
- * The first load renders current data once; automatic refresh starts only after the user enables it.
- * @param {object} payload Response from /api/monitor/refresh or /api/monitor/run.
- * @returns {void}
- */
 function renderMonitorPayload(payload) {
-    latestCategories = payload.categories ?? groupResultsByCategory(payload.results ?? []);
-    renderSummary(payload.summary ?? createSummaryFromCategories(latestCategories));
-    renderFilteredCategories();
-    latestIntervalSeconds = Math.max(1, Number(payload.settings?.intervalSeconds) || 15);
-    scheduleRefresh();
-    executionMode.textContent = autoRefreshEnabled ? "Auto refresh active" : "Manual mode";
-    lastCheck.textContent = `Last execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
+  latestCategories = payload.categories ?? groupResultsByCategory(payload.results ?? []);
+  renderSummary(payload.summary ?? createSummaryFromCategories(latestCategories));
+  renderFilteredCategories();
+  latestIntervalSeconds = Math.max(1, Number(payload.settings?.intervalSeconds) || 15);
+  scheduleRefresh();
+  executionMode.textContent = autoRefreshEnabled ? "Auto refresh active" : "Manual mode";
+  lastCheck.textContent = `Last execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
 }
 
-/**
- * Renders top-level metric cards from the backend summary.
- * @param {object} summary Aggregated device counts and availability percentage.
- * @returns {void}
- */
 function renderSummary(summary) {
   metricTotal.textContent = formatNumber(summary.totalDevices);
   metricOnline.textContent = formatNumber(summary.onlineDevices);
@@ -82,11 +104,6 @@ function renderSummary(summary) {
   metricAvailability.textContent = `${formatPercent(summary.availabilityPercentage)}%`;
 }
 
-/**
- * Creates a dashboard summary in the browser as a fallback when older API payloads omit summary.
- * @param {Array<object>} categories Category groups containing device results.
- * @returns {object} Summary with total, online, offline, degraded, healthy, and availability values.
- */
 function createSummaryFromCategories(categories) {
   const devices = categories.flatMap(category => category.devices ?? []);
   const totalDevices = devices.length;
@@ -108,19 +125,10 @@ function createSummaryFromCategories(categories) {
   };
 }
 
-/**
- * Applies current search and status filters, then renders the filtered categories.
- * @returns {void}
- */
 function renderFilteredCategories() {
-    renderCategories(filterCategories(latestCategories));
+  renderCategories(filterCategories(latestCategories));
 }
 
-/**
- * Filters category groups without mutating the cached API payload.
- * @param {Array<object>} categories Category groups from the latest monitor response.
- * @returns {Array<object>} Categories containing only matching devices.
- */
 function filterCategories(categories) {
   const search = activeSearch.trim().toLowerCase();
 
@@ -140,12 +148,6 @@ function filterCategories(categories) {
     .filter(category => category.devices.length > 0);
 }
 
-/**
- * Checks whether a device matches the current text search.
- * @param {object} device Device result to test.
- * @param {string} search Lowercase search text.
- * @returns {boolean} True when name or IP contains the search text.
- */
 function matchesSearch(device, search) {
   if (!search) {
     return true;
@@ -155,12 +157,6 @@ function matchesSearch(device, search) {
     || String(device.ip ?? "").toLowerCase().includes(search);
 }
 
-/**
- * Checks whether a device matches the selected status filter.
- * @param {object} device Device result to test.
- * @param {string} filter Selected filter: all, online, offline, or problems.
- * @returns {boolean} True when the device should be visible.
- */
 function matchesFilter(device, filter) {
   if (filter === "online") {
     return device.isOnline;
@@ -177,26 +173,6 @@ function matchesFilter(device, filter) {
   return true;
 }
 
-/**
- * Delays frequent UI callbacks such as search input to avoid unnecessary re-rendering.
- * @param {Function} callback Function to invoke after the user stops triggering events.
- * @param {number} delayMs Delay in milliseconds.
- * @returns {Function} Debounced wrapper function.
- */
-function debounce(callback, delayMs) {
-  let timeoutId;
-
-  return (...args) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => callback(...args), delayMs);
-  };
-}
-
-/**
- * Renders all visible category sections.
- * @param {Array<object>} categories Filtered category groups.
- * @returns {void}
- */
 function renderCategories(categories) {
   if (categories.length === 0) {
     resultsBody.innerHTML = `
@@ -209,12 +185,6 @@ function renderCategories(categories) {
   resultsBody.innerHTML = categories.map(renderCategory).join("");
 }
 
-/**
- * Renders one category section with summary badges and a device table.
- * @param {object} category Category result from the API or client fallback grouping.
- * @param {number} index Category index in the rendered list, used to create a stable DOM id.
- * @returns {string} HTML string for the category section.
- */
 function renderCategory(category, index) {
   const devices = category.devices ?? [];
   const totalDevices = category.totalDevices ?? devices.length;
@@ -255,31 +225,26 @@ function renderCategory(category, index) {
         id="${categoryId}"
         data-category-name="${escapeHtml(category.name)}">
         <div class="table-responsive border rounded-bottom">
-        <table class="table table-hover align-middle mb-0">
-          <thead class="table-light">
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">IP</th>
-              <th scope="col">Status</th>
-              <th scope="col">Ping status</th>
-              <th scope="col">Ports status</th>
-              <th scope="col">Checked</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${devices.map(renderRow).join("")}
-          </tbody>
-        </table>
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">IP</th>
+                <th scope="col">Status</th>
+                <th scope="col">Ping status</th>
+                <th scope="col">Ports status</th>
+                <th scope="col">Checked</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${devices.map(renderRow).join("")}
+            </tbody>
+          </table>
         </div>
       </div>
     </section>`;
 }
 
-/**
- * Renders one table row for a monitored device.
- * @param {object} result Device result from the API.
- * @returns {string} HTML string for the device row.
- */
 function renderRow(result) {
   const statusClass = result.isOnline ? "text-bg-success" : "text-bg-danger";
   const statusIcon = result.isOnline ? "fa-check" : "fa-xmark";
@@ -302,11 +267,6 @@ function renderRow(result) {
     </tr>`;
 }
 
-/**
- * Renders the final Healthy, Degraded, or Down badge.
- * @param {string} status Device status returned by the backend.
- * @returns {string} HTML string for the status badge.
- */
 function renderDeviceStatus(status) {
   const normalizedStatus = status || "Down";
   const statusMap = {
@@ -334,11 +294,6 @@ function renderDeviceStatus(status) {
     </span>`;
 }
 
-/**
- * Groups a flat result list by category for compatibility with older API payloads.
- * @param {Array<object>} results Flat device results.
- * @returns {Array<object>} Category groups sorted by name.
- */
 function groupResultsByCategory(results) {
   const groups = new Map();
 
@@ -363,26 +318,6 @@ function groupResultsByCategory(results) {
     }));
 }
 
-/**
- * Converts a category name into a safe id fragment for collapse targets.
- * @param {string} value Category name.
- * @returns {string} Lowercase id-safe string.
- */
-function slugify(value) {
-  const slug = String(value ?? "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return slug || "category";
-}
-
-/**
- * Renders TCP port badges for requested and open ports.
- * @param {Array<number>} requestedPorts Ports configured for the device.
- * @param {Array<number>} openPorts Ports that accepted TCP connections.
- * @returns {string} HTML string containing port badges.
- */
 function renderPorts(requestedPorts, openPorts) {
   if (requestedPorts.length === 0) {
     return `<span class="text-secondary">No ports configured</span>`;
@@ -404,10 +339,6 @@ function renderPorts(requestedPorts, openPorts) {
   }).join("");
 }
 
-/**
- * Reloads the editable JSON file from disk and then forces a fresh monitor execution.
- * @returns {Promise<void>} Completes when reload and execution finish.
- */
 async function reloadJson() {
   reloadButton.disabled = true;
 
@@ -427,10 +358,6 @@ async function reloadJson() {
   }
 }
 
-/**
- * Fetches the latest cached monitor payload without forcing network checks.
- * @returns {Promise<void>} Completes when the payload has been rendered.
- */
 async function refreshNow() {
   setButtonLoading(refreshNowButton, refreshNowSpinner, refreshNowIcon, true);
 
@@ -441,10 +368,6 @@ async function refreshNow() {
   }
 }
 
-/**
- * Forces a full execution of all configured checks.
- * @returns {Promise<void>} Completes when execution finishes or fails.
- */
 async function runFullCheck() {
   setButtonLoading(runFullCheckButton, runFullCheckSpinner, runFullCheckIcon, true);
 
@@ -455,11 +378,6 @@ async function runFullCheck() {
   }
 }
 
-/**
- * Toggles automatic refresh mode and starts or clears the refresh timer.
- * Auto refresh is disabled by default so operators control when recurring checks begin.
- * @returns {void}
- */
 function toggleAutoRefresh() {
   autoRefreshEnabled = !autoRefreshEnabled;
   autoRefreshToggle.classList.toggle("btn-success", autoRefreshEnabled);
@@ -477,25 +395,351 @@ function toggleAutoRefresh() {
   clearRefreshTimer();
 }
 
-/**
- * Sets a button's loading state by toggling disabled, spinner, and icon visibility.
- * @param {HTMLButtonElement} button Button to enable or disable.
- * @param {HTMLElement} spinner Inline Bootstrap spinner.
- * @param {HTMLElement} icon Button icon to hide while loading.
- * @param {boolean} isLoading True to show loading state.
- * @returns {void}
- */
+async function loadConfig() {
+  setConfigBusy(true);
+  clearConfigAlert();
+
+  try {
+    const response = await fetch("/api/config");
+
+    if (!response.ok) {
+      throw new Error(`Request failed with ${response.status}`);
+    }
+
+    configState = await response.json();
+    configState.devices ??= [];
+    configState.settings ??= {
+      intervalSeconds: 15,
+      timeoutMs: 1000,
+      maxParallelChecks: 50
+    };
+    hasLoadedConfig = true;
+    renderConfigDevices();
+    resetDeviceForm();
+  } catch (error) {
+    showConfigAlert("danger", "Unable to load configuration.");
+    console.error(error);
+  } finally {
+    setConfigBusy(false);
+  }
+}
+
+async function saveConfig() {
+  setConfigBusy(true);
+  clearConfigAlert();
+
+  try {
+    const response = await fetch("/api/config", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(configState)
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(payload.error || `Request failed with ${response.status}`);
+    }
+
+    configState = payload.configuration;
+    renderConfigDevices();
+    resetDeviceForm();
+    showConfigAlert("success", "Configuration saved. Previous config was backed up as config.backup.json.");
+    await loadConfig();
+  } catch (error) {
+    showConfigAlert("danger", error.message || "Unable to save configuration.");
+    console.error(error);
+  } finally {
+    setConfigBusy(false);
+  }
+}
+
+function renderConfigDevices() {
+  const devices = configState.devices ?? [];
+
+  if (devices.length === 0) {
+    configDevicesBody.innerHTML = `
+      <tr>
+        <td colspan="4" class="text-center text-secondary py-4">No devices configured.</td>
+      </tr>`;
+    return;
+  }
+
+  configDevicesBody.innerHTML = devices.map((device, index) => `
+    <tr>
+      <td>
+        <div class="fw-semibold">${escapeHtml(device.name)}</div>
+        <div class="text-secondary small">${escapeHtml(device.category || "Uncategorized")}</div>
+      </td>
+      <td><code>${escapeHtml(device.ip)}</code></td>
+      <td>${device.checks?.length ?? 0}</td>
+      <td class="text-end">
+        <button class="btn btn-outline-primary btn-sm" type="button" data-edit-device="${index}">
+          <i class="fa-solid fa-pen-to-square me-1"></i>Edit
+        </button>
+        <button class="btn btn-outline-danger btn-sm" type="button" data-delete-device="${index}">
+          <i class="fa-solid fa-trash me-1"></i>Delete
+        </button>
+      </td>
+    </tr>`).join("");
+}
+
+function startAddDevice() {
+  resetDeviceForm();
+  deviceNameInput.focus();
+}
+
+function editDevice(index) {
+  const device = configState.devices[index];
+
+  if (!device) {
+    return;
+  }
+
+  editingDeviceIndex.value = String(index);
+  deviceFormTitle.textContent = "Edit Device";
+  submitDeviceButton.textContent = "Update Device";
+  deviceNameInput.value = device.name ?? "";
+  deviceAddressInput.value = device.ip ?? "";
+  deviceCategoryInput.value = device.category ?? "";
+  deviceEnabledInput.checked = device.enabled ?? true;
+  checksList.innerHTML = "";
+
+  for (const check of device.checks ?? []) {
+    addCheckRow(check);
+  }
+
+  if (checksList.children.length === 0) {
+    addCheckRow({ type: "ping" });
+  }
+
+  deviceNameInput.focus();
+}
+
+function submitDevice(event) {
+  event.preventDefault();
+
+  const device = readDeviceForm();
+  const indexValue = editingDeviceIndex.value;
+
+  if (!device) {
+    return;
+  }
+
+  if (indexValue === "") {
+    configState.devices.push(device);
+    showConfigAlert("success", "Device added locally. Click Save Configuration to persist changes.");
+  } else {
+    configState.devices[Number(indexValue)] = device;
+    showConfigAlert("success", "Device updated locally. Click Save Configuration to persist changes.");
+  }
+
+  renderConfigDevices();
+  resetDeviceForm();
+}
+
+function readDeviceForm() {
+  const checks = readCheckRows();
+
+  if (checks === null) {
+    return null;
+  }
+
+  if (checks.length === 0) {
+    showConfigAlert("warning", "Add at least one check before saving the device.");
+    return null;
+  }
+
+  return {
+    name: deviceNameInput.value.trim(),
+    ip: deviceAddressInput.value.trim(),
+    category: deviceCategoryInput.value.trim() || "Uncategorized",
+    enabled: deviceEnabledInput.checked,
+    checks
+  };
+}
+
+function readCheckRows() {
+  const checks = [];
+
+  for (const row of checksList.querySelectorAll(".check-row")) {
+    const type = row.querySelector("[data-check-type]").value;
+    const portValue = Number(row.querySelector("[data-check-port]").value);
+
+    if (type === "ping") {
+      checks.push({ type: "ping" });
+      continue;
+    }
+
+    if (!Number.isInteger(portValue) || portValue < 1 || portValue > 65535) {
+      showConfigAlert("warning", "TCP checks require a port between 1 and 65535.");
+      return null;
+    }
+
+    checks.push({
+      type: "tcp",
+      port: portValue
+    });
+  }
+
+  return checks;
+}
+
+function resetDeviceForm() {
+  editingDeviceIndex.value = "";
+  deviceForm.reset();
+  deviceEnabledInput.checked = true;
+  deviceFormTitle.textContent = "Add Device";
+  submitDeviceButton.textContent = "Add Device";
+  checksList.innerHTML = "";
+  addCheckRow({ type: "ping" });
+}
+
+function addCheckRow(check = { type: "ping" }) {
+  const row = document.createElement("div");
+  row.className = "check-row";
+  row.innerHTML = `
+    <select class="form-select form-select-sm" data-check-type>
+      <option value="ping">Ping</option>
+      <option value="tcp">TCP</option>
+    </select>
+    <input class="form-control form-control-sm" type="number" min="1" max="65535" placeholder="Port" data-check-port>
+    <button class="btn btn-outline-danger btn-sm icon-button" type="button" data-remove-check aria-label="Remove check">
+      <i class="fa-solid fa-xmark"></i>
+    </button>`;
+
+  const typeSelect = row.querySelector("[data-check-type]");
+  const portInput = row.querySelector("[data-check-port]");
+
+  typeSelect.value = check.type === "tcp" ? "tcp" : "ping";
+  portInput.value = check.port ?? "";
+  updateCheckPortState(row);
+  checksList.append(row);
+}
+
+function updateCheckPortState(row) {
+  const typeSelect = row.querySelector("[data-check-type]");
+  const portInput = row.querySelector("[data-check-port]");
+  const isTcp = typeSelect.value === "tcp";
+
+  portInput.disabled = !isTcp;
+  portInput.required = isTcp;
+
+  if (!isTcp) {
+    portInput.value = "";
+  }
+}
+
+function requestDeleteDevice(index) {
+  const device = configState.devices[index];
+
+  if (!device) {
+    return;
+  }
+
+  pendingDeleteIndex = index;
+  deleteDeviceName.textContent = device.name;
+  deleteDeviceModal.show();
+}
+
+function confirmDeleteDevice() {
+  if (pendingDeleteIndex === null) {
+    return;
+  }
+
+  configState.devices.splice(pendingDeleteIndex, 1);
+  pendingDeleteIndex = null;
+  deleteDeviceModal.hide();
+  renderConfigDevices();
+  resetDeviceForm();
+  showConfigAlert("success", "Device deleted locally. Click Save Configuration to persist changes.");
+}
+
+function setConfigBusy(isBusy) {
+  saveConfigButton.disabled = isBusy;
+  reloadConfigButton.disabled = isBusy;
+  addDeviceButton.disabled = isBusy;
+  deviceForm.querySelectorAll("input, select, button").forEach(element => {
+    element.disabled = isBusy;
+  });
+  saveConfigSpinner.classList.toggle("d-none", !isBusy);
+  saveConfigIcon.classList.toggle("d-none", isBusy);
+}
+
+function showConfigAlert(type, message) {
+  configAlert.innerHTML = `
+    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+      ${escapeHtml(message)}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>`;
+}
+
+function clearConfigAlert() {
+  configAlert.innerHTML = "";
+}
+
+function createEmptyConfiguration() {
+  return {
+    settings: {
+      intervalSeconds: 15,
+      timeoutMs: 1000,
+      maxParallelChecks: 50
+    },
+    devices: []
+  };
+}
+
+function navigateTo(route, replace = false) {
+  const normalizedRoute = normalizeRoute(route);
+  currentRoute = normalizedRoute;
+
+  dashboardPage.hidden = normalizedRoute !== "/";
+  configPage.hidden = normalizedRoute !== "/config";
+  currentPageLabel.textContent = normalizedRoute === "/config" ? "Configuration" : "Dashboard";
+
+  navLinks.forEach(link => {
+    link.classList.toggle("active", link.dataset.route === normalizedRoute);
+  });
+
+  if (replace) {
+    history.replaceState({ route: normalizedRoute }, "", normalizedRoute);
+  } else if (location.pathname !== normalizedRoute) {
+    history.pushState({ route: normalizedRoute }, "", normalizedRoute);
+  }
+
+  closeSidebar();
+
+  if (normalizedRoute === "/" && !hasLoadedDashboard) {
+    loadResults();
+  }
+
+  if (normalizedRoute === "/config" && !hasLoadedConfig) {
+    loadConfig();
+  }
+}
+
+function normalizeRoute(pathname) {
+  return pathname === "/config" ? "/config" : "/";
+}
+
+function toggleSidebar() {
+  sidebar.classList.toggle("show");
+  sidebarBackdrop.classList.toggle("show");
+}
+
+function closeSidebar() {
+  sidebar.classList.remove("show");
+  sidebarBackdrop.classList.remove("show");
+}
+
 function setButtonLoading(button, spinner, icon, isLoading) {
   button.disabled = isLoading;
   spinner.classList.toggle("d-none", !isLoading);
   icon.classList.toggle("d-none", isLoading);
 }
 
-/**
- * Formats an ISO date string or Date-compatible value for the user's locale.
- * @param {string|Date} value Date value from the API.
- * @returns {string} Localized date and time string, or empty string for missing values.
- */
 function formatDate(value) {
   if (!value) {
     return "";
@@ -507,20 +751,10 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
-/**
- * Formats a number for display in metric cards.
- * @param {number|string} value Numeric value.
- * @returns {string} Localized integer string.
- */
 function formatNumber(value) {
   return new Intl.NumberFormat().format(Number(value) || 0);
 }
 
-/**
- * Formats availability percentage with one decimal place.
- * @param {number|string} value Percentage value from 0 to 100.
- * @returns {string} Localized percentage number without the percent sign.
- */
 function formatPercent(value) {
   return new Intl.NumberFormat(undefined, {
     minimumFractionDigits: 1,
@@ -528,11 +762,24 @@ function formatPercent(value) {
   }).format(Number(value) || 0);
 }
 
-/**
- * Escapes untrusted values before inserting them into HTML strings.
- * @param {unknown} value Value to escape.
- * @returns {string} HTML-safe string.
- */
+function debounce(callback, delayMs) {
+  let timeoutId;
+
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => callback(...args), delayMs);
+  };
+}
+
+function slugify(value) {
+  const slug = String(value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return slug || "category";
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -546,6 +793,14 @@ reloadButton.addEventListener("click", reloadJson);
 autoRefreshToggle.addEventListener("click", toggleAutoRefresh);
 refreshNowButton.addEventListener("click", refreshNow);
 runFullCheckButton.addEventListener("click", runFullCheck);
+sidebarToggle.addEventListener("click", toggleSidebar);
+sidebarBackdrop.addEventListener("click", closeSidebar);
+navLinks.forEach(link => {
+  link.addEventListener("click", event => {
+    event.preventDefault();
+    navigateTo(link.dataset.route);
+  });
+});
 resultsBody.addEventListener("hidden.bs.collapse", event => {
   const categoryName = event.target.dataset.categoryName;
 
@@ -570,12 +825,41 @@ filterInputs.forEach(input => {
     renderFilteredCategories();
   });
 });
-loadResults();
+reloadConfigButton.addEventListener("click", loadConfig);
+saveConfigButton.addEventListener("click", saveConfig);
+addDeviceButton.addEventListener("click", startAddDevice);
+deviceForm.addEventListener("submit", submitDevice);
+resetDeviceFormButton.addEventListener("click", resetDeviceForm);
+addCheckButton.addEventListener("click", () => addCheckRow({ type: "tcp", port: 80 }));
+checksList.addEventListener("change", event => {
+  if (event.target.matches("[data-check-type]")) {
+    updateCheckPortState(event.target.closest(".check-row"));
+  }
+});
+checksList.addEventListener("click", event => {
+  const removeButton = event.target.closest("[data-remove-check]");
 
-/**
- * Starts the automatic refresh timer when auto refresh is enabled by the user.
- * @returns {void}
- */
+  if (removeButton) {
+    removeButton.closest(".check-row").remove();
+  }
+});
+configDevicesBody.addEventListener("click", event => {
+  const editButton = event.target.closest("[data-edit-device]");
+  const deleteButton = event.target.closest("[data-delete-device]");
+
+  if (editButton) {
+    editDevice(Number(editButton.dataset.editDevice));
+  }
+
+  if (deleteButton) {
+    requestDeleteDevice(Number(deleteButton.dataset.deleteDevice));
+  }
+});
+confirmDeleteDeviceButton.addEventListener("click", confirmDeleteDevice);
+window.addEventListener("popstate", () => navigateTo(location.pathname, true));
+
+navigateTo(currentRoute, true);
+
 function scheduleRefresh() {
   clearRefreshTimer();
 
@@ -584,10 +868,6 @@ function scheduleRefresh() {
   }
 }
 
-/**
- * Clears any active automatic refresh timer.
- * @returns {void}
- */
 function clearRefreshTimer() {
   if (refreshTimer) {
     clearInterval(refreshTimer);

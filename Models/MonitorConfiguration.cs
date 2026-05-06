@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace NetWatch.Models;
 
 /// <summary>
-/// Root object of devices.json. Contains global monitor settings and the device inventory.
+/// Root object of config.json. Contains global monitor settings and the device inventory.
 /// </summary>
 public sealed class MonitorConfiguration
 {
@@ -14,7 +14,7 @@ public sealed class MonitorConfiguration
     public MonitorSettings Settings { get; init; } = new();
 
     /// <summary>
-    /// Device inventory loaded from devices.json.
+    /// Device inventory loaded from config.json.
     /// </summary>
     [JsonPropertyName("devices")]
     public List<Device> Devices { get; init; } = [];

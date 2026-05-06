@@ -8,7 +8,7 @@ Release notes and commit-level project history are summarized in [CHANGELOG.md](
 
 ## Features
 
-- Editable `devices.json` inventory.
+- Editable `config.json` inventory.
 - Device categories such as `Servers`, `Critical Workstations`, `IP Cameras`, and `UPS Units`.
 - Async ping checks with latency in milliseconds.
 - Async TCP port checks.
@@ -26,6 +26,9 @@ Release notes and commit-level project history are summarized in [CHANGELOG.md](
   - Availability percentage.
 - Search and client-side filters.
 - Category groups collapsed by default.
+- Hamburger sidebar navigation.
+- Configuration page at `/config`.
+- CRUD UI for devices and checks stored in `config.json`.
 - Manual mode by default.
 - Optional auto refresh toggle.
 - Manual refresh.
@@ -37,7 +40,7 @@ Release notes and commit-level project history are summarized in [CHANGELOG.md](
 ```text
 netwatch-lite/
 ├── Data/
-│   └── devices.json
+│   └── config.json
 ├── Models/
 │   ├── CategoryResult.cs
 │   ├── CheckResult.cs
@@ -73,12 +76,12 @@ The device JSON path is configured in `appsettings.json`.
 ```json
 {
   "NetworkMonitor": {
-    "DeviceFilePath": "devices.json"
+    "DeviceFilePath": "config.json"
   }
 }
 ```
 
-During local development, `Data/devices.json` is copied to the build output as `devices.json`. During portable publish, it is copied next to `NetWatch-Lite.exe`.
+During local development, `Data/config.json` is copied to the build output as `config.json`. During portable publish, it is copied next to `NetWatch-Lite.exe`.
 
 ## Device JSON Format
 
@@ -112,7 +115,9 @@ Use `category` to group devices in the UI. Use `enabled: false` to keep a device
 | Method | Endpoint | Purpose |
 |---|---|---|
 | `GET` | `/api/devices` | Returns normalized devices from the loaded JSON. |
-| `POST` | `/api/reload` | Reloads `devices.json` from disk. |
+| `POST` | `/api/reload` | Reloads `config.json` from disk. |
+| `GET` | `/api/config` | Returns the full editable configuration. |
+| `POST` | `/api/config` | Saves the full configuration, creates `config.backup.json`, and reloads memory. |
 | `GET` | `/api/results` | Backwards-compatible endpoint that forces a full check. |
 | `GET` | `/api/monitor/refresh` | Returns current cached results, running the first check if needed. |
 | `POST` | `/api/monitor/run` | Forces a full check and prevents overlapping executions. |
@@ -156,7 +161,7 @@ Expected output:
 ```text
 publish/win-x64-portable/
 ├── NetWatch-Lite.exe
-├── devices.json
+├── config.json
 ├── appsettings.json
 ├── wwwroot/
 └── runtime dependencies...
@@ -174,7 +179,7 @@ To run on Windows:
 .\NetWatch-Lite.exe
 ```
 
-Edit `devices.json` in the same folder as `NetWatch-Lite.exe`, then use the dashboard `Reload JSON` button.
+Edit `config.json` in the same folder as `NetWatch-Lite.exe`, or use the `/config` page. Saving through the UI creates `config.backup.json`.
 
 ## Operational Notes
 

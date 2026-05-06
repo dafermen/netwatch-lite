@@ -41,6 +41,14 @@ public sealed class MonitorExecutionService
     }
 
     /// <summary>
+    /// Clears cached monitor results after configuration changes.
+    /// </summary>
+    public void InvalidateCache()
+    {
+        _cachedResponse = null;
+    }
+
+    /// <summary>
     /// Runs a full monitor execution, waiting for any existing execution to finish first.
     /// </summary>
     /// <param name="cancellationToken">Token used to cancel waiting or execution.</param>
