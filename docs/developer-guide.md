@@ -272,6 +272,7 @@ Important configuration functions:
 - `renderConfigDevices`: paints the grouped device table.
 - `groupConfigDevicesByCategory`: groups devices by category while preserving their original JSON index.
 - `renderConfigDeviceRow`: renders one editable device row inside a category group.
+- `toggleConfigCategory`: expands or collapses all rows for one configuration category.
 - `startAddDevice`: opens the add form.
 - `editDevice`: opens the edit form.
 - `submitDevice`: updates local state.

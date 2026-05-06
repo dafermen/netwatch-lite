@@ -34,6 +34,7 @@ Release notes and commit-level project history are summarized in [CHANGELOG.md](
 - Configuration page at `/config`.
 - CRUD UI for devices and checks stored in `config.json`.
 - Configuration device table grouped by category for easier editing.
+- Configuration category groups collapsed by default.
 - Add/edit device form opens only when adding or editing a device.
 - Manual mode by default.
 - Optional auto refresh toggle that runs a full check every 60 seconds.
