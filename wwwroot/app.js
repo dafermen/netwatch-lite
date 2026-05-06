@@ -7,6 +7,8 @@ const currentPageLabel = document.querySelector("#current-page-label");
 
 const dashboardPage = document.querySelector("#dashboard-page");
 const configPage = document.querySelector("#config-page");
+const manualPage = document.querySelector("#manual-page");
+const aboutPage = document.querySelector("#about-page");
 const resultsBody = document.querySelector("#results-body");
 const lastCheck = document.querySelector("#last-check");
 const executionMode = document.querySelector("#execution-mode");
@@ -959,7 +961,9 @@ function navigateTo(route, replace = false) {
 
   dashboardPage.hidden = normalizedRoute !== "/";
   configPage.hidden = normalizedRoute !== "/config";
-  currentPageLabel.textContent = normalizedRoute === "/config" ? "Configuration" : "Dashboard";
+  manualPage.hidden = normalizedRoute !== "/manual";
+  aboutPage.hidden = normalizedRoute !== "/about";
+  currentPageLabel.textContent = getPageLabel(normalizedRoute);
 
   navLinks.forEach(link => {
     link.classList.toggle("active", link.dataset.route === normalizedRoute);
@@ -992,7 +996,19 @@ function navigateTo(route, replace = false) {
 }
 
 function normalizeRoute(pathname) {
-  return pathname === "/config" ? "/config" : "/";
+  const knownRoutes = new Set(["/", "/config", "/manual", "/about"]);
+  return knownRoutes.has(pathname) ? pathname : "/";
+}
+
+function getPageLabel(route) {
+  const labels = {
+    "/": "Dashboard",
+    "/config": "Configuration",
+    "/manual": "User Manual",
+    "/about": "About"
+  };
+
+  return labels[route] ?? "Dashboard";
 }
 
 function toggleSidebar() {

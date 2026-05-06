@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NetWatch-Lite Documentation</title>
+  <title>NetWatch Lite Documentation</title>
   <style>
     :root {
       color-scheme: light;
@@ -159,14 +159,14 @@
 </head>
 <body>
   <header>
-    <h1>NetWatch-Lite Documentation</h1>
+    <h1>NetWatch Lite Documentation</h1>
     <p>Documentacion tecnica y operativa del monitor de red ASP.NET Core + Bootstrap. Cubre arquitectura, JSON editable, endpoints, servicios, UI y publicacion portable para Windows.</p>
   </header>
 
   <main>
     <section>
       <h2>Resumen Del Proyecto</h2>
-      <p>NetWatch-Lite monitorea dispositivos desde un archivo JSON editable, ejecuta checks asincronos de ping y TCP, calcula estado agregado por dispositivo y muestra resultados en un dashboard web.</p>
+      <p>NetWatch Lite monitorea dispositivos desde un archivo JSON editable, ejecuta checks asincronos de ping y TCP, calcula estado agregado por dispositivo y muestra resultados en un dashboard web.</p>
       <p>La documentacion para programadores esta en <code>docs/developer-guide.md</code>. Ese archivo explica clases, metodos, servicios, endpoints, frontend y flujos internos.</p>
       <div class="grid">
         <div class="card">
@@ -342,6 +342,7 @@
       <h2>Frontend</h2>
       <p><code>wwwroot/index.html</code> define el layout compartido: sidebar hamburguesa, topbar, dashboard, pagina de configuracion, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto.</p>
       <p>La pagina <code>/config</code> agrupa los dispositivos por categoria y mantiene los grupos colapsados por defecto para facilitar la edicion de inventarios grandes sin perder las acciones de editar o eliminar cada dispositivo.</p>
+      <p>El sidebar tambien incluye <code>/manual</code> con un manual de usuario integrado y <code>/about</code> con informacion del proyecto, su caracter libre y notas operativas.</p>
       <p><code>wwwroot/app.js</code> contiene funciones JSDoc para:</p>
       <ul>
         <li>Consumir <code>/api/monitor/stream</code> para pintar resultados conforme termina cada dispositivo.</li>

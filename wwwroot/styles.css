@@ -29,13 +29,9 @@ body {
 }
 
 .brand-mark {
-  align-items: center;
-  background: #0d6efd;
   border-radius: 0.5rem;
-  color: #fff;
-  display: inline-flex;
   height: 2rem;
-  justify-content: center;
+  object-fit: contain;
   width: 2rem;
 }
 
@@ -228,6 +224,49 @@ body {
   padding: 1rem;
 }
 
+.doc-hero,
+.about-hero,
+.doc-panel {
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+}
+
+.doc-hero,
+.about-hero {
+  align-items: center;
+  display: flex;
+  gap: 1.25rem;
+  padding: 1.5rem;
+}
+
+.doc-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.doc-panel {
+  padding: 1.25rem;
+}
+
+.doc-panel h3 {
+  font-size: 1.05rem;
+  margin-bottom: 0.75rem;
+}
+
+.doc-panel p:last-child,
+.doc-panel ul:last-child {
+  margin-bottom: 0;
+}
+
+.about-logo {
+  border-radius: 1rem;
+  flex: 0 0 5rem;
+  height: 5rem;
+  width: 5rem;
+}
+
 .checks-list {
   display: grid;
   gap: 0.5rem;
@@ -265,6 +304,10 @@ body {
   .topbar-actions {
     justify-content: flex-start;
     width: 100%;
+  }
+
+  .doc-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -318,6 +361,13 @@ body {
 
   .metric-card .card-body {
     padding: 0.85rem;
+  }
+
+  .doc-hero,
+  .about-hero {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 1rem;
   }
 
   .check-row {
