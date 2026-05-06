@@ -18,6 +18,12 @@ const runFullCheckSpinner = document.querySelector("#run-full-check-spinner");
 const runFullCheckIcon = document.querySelector("#run-full-check-icon");
 const searchInput = document.querySelector("#device-search");
 const filterInputs = document.querySelectorAll("input[name='status-filter']");
+const monitorProgress = document.querySelector("#monitor-progress");
+const monitorProgressSpinner = document.querySelector("#monitor-progress-spinner");
+const monitorProgressLabel = document.querySelector("#monitor-progress-label");
+const monitorProgressPercent = document.querySelector("#monitor-progress-percent");
+const monitorProgressBar = document.querySelector("#monitor-progress-bar");
+const monitorProgressDetail = document.querySelector("#monitor-progress-detail");
 const metricTotal = document.querySelector("#metric-total");
 const metricOnline = document.querySelector("#metric-online");
 const metricOffline = document.querySelector("#metric-offline");
@@ -69,6 +75,13 @@ function loadResults({ showErrors = true } = {}) {
   return streamFullCheck({ showErrors });
 }
 
+/**
+ * Opens the Server-Sent Events monitoring stream and routes each event to the
+ * dashboard renderer. This keeps large inventories responsive because each
+ * device result is shown as soon as the backend finishes it.
+ * @param {{ showErrors?: boolean }} options Controls whether stream errors are displayed in the dashboard.
+ * @returns {Promise<void>} Resolves when the stream completes, reports busy, or fails.
+ */
 function streamFullCheck({ showErrors = true } = {}) {
   if (activeMonitorStream) {
     lastCheck.textContent = "A monitoring execution is already running.";
@@ -141,12 +154,18 @@ function renderMonitorPayload(payload) {
   scheduleRefresh();
   executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
   lastCheck.textContent = `Last execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
+  updateProgressPanel(payload.results?.length ?? 0, payload.results?.length ?? 0, "Completed", false);
 }
 
+/**
+ * Resets dashboard state when a new progressive monitoring run starts.
+ * @param {object} payload The started event received from /api/monitor/stream.
+ */
 function resetStreamingDashboard(payload) {
   latestResults = [];
   latestCategories = [];
   renderSummary(payload.summary ?? createProgressSummary([], payload.totalDevices ?? 0));
+  updateProgressPanel(0, Number(payload.totalDevices) || 0, "Checking devices...", true);
   resultsBody.innerHTML = `
     <div class="progress-panel text-secondary">
       <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
@@ -156,6 +175,11 @@ function resetStreamingDashboard(payload) {
   lastCheck.textContent = `Checking devices 0/${Number(payload.totalDevices) || 0}...`;
 }
 
+/**
+ * Adds one streamed device result to the dashboard and refreshes progress,
+ * summary cards, category sections, and the topbar status text.
+ * @param {object} payload The result event received from /api/monitor/stream.
+ */
 function renderStreamingResult(payload) {
   if (payload.result) {
     upsertLatestResult(payload.result);
@@ -163,10 +187,15 @@ function renderStreamingResult(payload) {
 
   latestCategories = groupResultsByCategory(latestResults);
   renderSummary(payload.summary ?? createProgressSummary(latestResults, payload.totalDevices ?? latestResults.length));
+  updateProgressPanel(payload.completedDevices, payload.totalDevices, "Checking devices...", true);
   renderFilteredCategories();
   lastCheck.textContent = `Checking devices ${payload.completedDevices}/${payload.totalDevices}...`;
 }
 
+/**
+ * Inserts or replaces a device result in the current dashboard state.
+ * @param {object} result Completed device result received from the backend stream.
+ */
 function upsertLatestResult(result) {
   const resultIndex = latestResults.findIndex(device =>
     device.name === result.name && device.ip === result.ip);
@@ -177,6 +206,30 @@ function upsertLatestResult(result) {
   }
 
   latestResults.push(result);
+}
+
+/**
+ * Updates the visible progress panel above the dashboard results.
+ * @param {number} completedDevices Number of devices already checked.
+ * @param {number} totalDevices Number of enabled devices expected in the run.
+ * @param {string} label Text shown next to the spinner/check icon.
+ * @param {boolean} isRunning Whether the progress bar should animate.
+ */
+function updateProgressPanel(completedDevices, totalDevices, label, isRunning) {
+  const total = Math.max(0, Number(totalDevices) || 0);
+  const completed = Math.min(total, Math.max(0, Number(completedDevices) || 0));
+  const percent = total === 0 ? 100 : Math.round((completed / total) * 100);
+
+  monitorProgress.hidden = false;
+  monitorProgressLabel.textContent = label;
+  monitorProgressPercent.textContent = `${percent}%`;
+  monitorProgressBar.style.width = `${percent}%`;
+  monitorProgressBar.textContent = `${percent}%`;
+  monitorProgressBar.parentElement.setAttribute("aria-valuenow", String(percent));
+  monitorProgressDetail.textContent = `${completed} of ${total} devices checked`;
+  monitorProgressSpinner.classList.toggle("d-none", !isRunning);
+  monitorProgressBar.classList.toggle("progress-bar-animated", isRunning);
+  monitorProgressBar.classList.toggle("progress-bar-striped", isRunning);
 }
 
 function renderSummary(summary) {

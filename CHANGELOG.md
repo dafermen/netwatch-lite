@@ -9,6 +9,7 @@ All notable changes to NetWatch-Lite are documented here.
 - Auto refresh now runs a full check every 60 seconds.
 - Removed the `Refresh Now` control and cached refresh endpoint.
 - Added progressive dashboard rendering with Server-Sent Events for full checks.
+- Added visible monitoring progress percentage, checked/total counter, and programmer documentation.
 - Device category groups now start collapsed by default.
 - Added hamburger sidebar navigation with Dashboard and Configuration routes.
 - Added `/config` CRUD UI for devices and checks.

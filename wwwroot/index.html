@@ -162,6 +162,20 @@
             </div>
           </div>
 
+          <div class="monitor-progress mb-3" id="monitor-progress" hidden>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+              <div class="d-flex align-items-center gap-2">
+                <span class="spinner-border spinner-border-sm" id="monitor-progress-spinner" aria-hidden="true"></span>
+                <span class="fw-semibold" id="monitor-progress-label">Checking devices...</span>
+              </div>
+              <span class="badge text-bg-primary" id="monitor-progress-percent">0%</span>
+            </div>
+            <div class="progress" role="progressbar" aria-label="Monitoring progress" aria-valuemin="0" aria-valuemax="100">
+              <div class="progress-bar progress-bar-striped progress-bar-animated" id="monitor-progress-bar" style="width: 0%">0%</div>
+            </div>
+            <div class="text-secondary small mt-2" id="monitor-progress-detail">0 of 0 devices checked</div>
+          </div>
+
           <div id="results-body">
             <div class="text-center text-secondary py-4">Loading...</div>
           </div>
