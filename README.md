@@ -33,8 +33,7 @@ Release notes and commit-level project history are summarized in [CHANGELOG.md](
 - CRUD UI for devices and checks stored in `config.json`.
 - Add/edit device form opens only when adding or editing a device.
 - Manual mode by default.
-- Optional auto refresh toggle.
-- Manual refresh.
+- Optional auto refresh toggle that runs a full check every 60 seconds.
 - Forced full check.
 - JSON reload without restarting.
 
@@ -124,7 +123,6 @@ Use `category` to group devices in the UI. Use `enabled: false` to keep a device
 | `GET` | `/api/config` | Returns the full editable configuration. |
 | `POST` | `/api/config` | Saves the full configuration, creates `config.backup.json`, and reloads memory. |
 | `GET` | `/api/results` | Backwards-compatible endpoint that forces a full check. |
-| `GET` | `/api/monitor/refresh` | Returns current cached results, running the first check if needed. |
 | `POST` | `/api/monitor/run` | Forces a full check and prevents overlapping executions. |
 
 ## Version Notes
@@ -189,9 +187,9 @@ Edit `config.json` in the same folder as `NetWatch-Lite.exe`, or use the `/confi
 ## Operational Notes
 
 - `Run Full Check` executes all configured checks immediately.
-- `Refresh Now` reads the current cached backend result.
 - NetWatch-Lite starts in manual mode by default.
-- `Auto Refresh` uses `settings.intervalSeconds` only after the operator turns it on.
+- `Auto Refresh` runs a full check every 60 seconds after the operator turns it on.
+- `settings.intervalSeconds` is retained for JSON compatibility but is not used by the current auto full-check timer.
 - `maxParallelChecks` should be adjusted carefully for large networks.
 - TCP checks verify that a connection can be opened; they do not validate application protocol behavior.
 - On small screens, wide device tables scroll horizontally while toolbars and forms stack vertically.

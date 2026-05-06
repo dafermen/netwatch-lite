@@ -6,6 +6,8 @@ All notable changes to NetWatch-Lite are documented here.
 
 - Default dashboard execution mode changed to manual.
 - Auto refresh now starts only when the operator enables `Auto Refresh: ON`.
+- Auto refresh now runs a full check every 60 seconds.
+- Removed the `Refresh Now` control and cached refresh endpoint.
 - Device category groups now start collapsed by default.
 - Added hamburger sidebar navigation with Dashboard and Configuration routes.
 - Added `/config` CRUD UI for devices and checks.

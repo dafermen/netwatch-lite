@@ -8,7 +8,8 @@ namespace NetWatch.Models;
 public sealed class MonitorSettings
 {
     /// <summary>
-    /// Number of seconds between automatic UI refreshes.
+    /// Legacy interval value retained in configuration for compatibility.
+    /// The current UI auto mode runs a full check every 60 seconds.
     /// </summary>
     [JsonPropertyName("intervalSeconds")]
     public int IntervalSeconds { get; init; } = 15;

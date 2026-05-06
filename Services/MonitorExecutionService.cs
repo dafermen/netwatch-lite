@@ -3,14 +3,13 @@ using NetWatch.Models;
 namespace NetWatch.Services;
 
 /// <summary>
-/// Coordinates full monitor executions, caches the latest payload, and prevents overlapping runs.
+/// Coordinates full monitor executions and prevents overlapping runs.
 /// </summary>
 public sealed class MonitorExecutionService
 {
     private readonly JsonDeviceRepository _deviceRepository;
     private readonly NetworkMonitorService _monitorService;
     private readonly SemaphoreSlim _executionLock = new(1, 1);
-    private MonitorResponse? _cachedResponse;
 
     /// <summary>
     /// Initializes the execution coordinator.
@@ -26,33 +25,10 @@ public sealed class MonitorExecutionService
     }
 
     /// <summary>
-    /// Returns the latest cached monitor response, running one full execution when no cache exists yet.
-    /// </summary>
-    /// <param name="cancellationToken">Token used to cancel the initial execution when the cache is empty.</param>
-    /// <returns>The cached or newly created monitor response.</returns>
-    public async Task<MonitorResponse> GetCachedResultsAsync(CancellationToken cancellationToken = default)
-    {
-        if (_cachedResponse is not null)
-        {
-            return _cachedResponse;
-        }
-
-        return await RunFullCheckAsync(cancellationToken);
-    }
-
-    /// <summary>
-    /// Clears cached monitor results after configuration changes.
-    /// </summary>
-    public void InvalidateCache()
-    {
-        _cachedResponse = null;
-    }
-
-    /// <summary>
     /// Runs a full monitor execution, waiting for any existing execution to finish first.
     /// </summary>
     /// <param name="cancellationToken">Token used to cancel waiting or execution.</param>
-    /// <returns>A fresh monitor response that also replaces the cached response.</returns>
+    /// <returns>A fresh monitor response.</returns>
     public async Task<MonitorResponse> RunFullCheckAsync(CancellationToken cancellationToken = default)
     {
         await _executionLock.WaitAsync(cancellationToken);
@@ -75,7 +51,7 @@ public sealed class MonitorExecutionService
     }
 
     /// <summary>
-    /// Performs the locked execution flow and updates the in-memory cache.
+    /// Performs the locked execution flow.
     /// </summary>
     /// <param name="cancellationToken">Token used by the network checks.</param>
     /// <returns>A completed monitor response.</returns>
@@ -87,7 +63,6 @@ public sealed class MonitorExecutionService
             var results = await _monitorService.CheckAllDevicesAsync(cancellationToken);
             var response = CreateResponse(configuration.Settings, results, "Completed");
 
-            _cachedResponse = response;
             return response;
         }
         finally
