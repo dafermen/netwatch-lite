@@ -28,6 +28,7 @@ Release notes and commit-level project history are summarized in [CHANGELOG.md](
 - Search and client-side filters.
 - Category groups collapsed by default.
 - Hamburger sidebar navigation.
+- Responsive layout for desktop, tablet, and mobile screens.
 - Configuration page at `/config`.
 - CRUD UI for devices and checks stored in `config.json`.
 - Add/edit device form opens only when adding or editing a device.
@@ -193,3 +194,4 @@ Edit `config.json` in the same folder as `NetWatch-Lite.exe`, or use the `/confi
 - `Auto Refresh` uses `settings.intervalSeconds` only after the operator turns it on.
 - `maxParallelChecks` should be adjusted carefully for large networks.
 - TCP checks verify that a connection can be opened; they do not validate application protocol behavior.
+- On small screens, wide device tables scroll horizontally while toolbars and forms stack vertically.
