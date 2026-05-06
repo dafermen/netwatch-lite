@@ -182,7 +182,7 @@
         </div>
         <div class="card">
           <h3>Portable</h3>
-          <p>Se publica como <code>win-x64</code> self-contained. El archivo <code>devices.json</code> queda junto a <code>NetWatch-Lite.exe</code> para editar inventario sin recompilar.</p>
+          <p>Se publica como <code>win-x64</code> self-contained. El archivo <code>config.json</code> queda junto a <code>NetWatch-Lite.exe</code> para editar inventario sin recompilar.</p>
         </div>
       </div>
     </section>
@@ -190,7 +190,7 @@
     <section>
       <h2>Estructura</h2>
       <pre>netwatch-lite/
-├── Data/devices.json
+├── Data/config.json
 ├── Models/
 ├── Services/
 ├── wwwroot/
@@ -205,7 +205,7 @@
       <h2>Flujo De Ejecucion</h2>
       <ol>
         <li>La aplicacion inicia en <code>Program.cs</code>.</li>
-        <li><code>JsonDeviceRepository.ReloadAsync</code> carga y normaliza <code>devices.json</code>.</li>
+        <li><code>JsonDeviceRepository.ReloadAsync</code> carga y normaliza <code>config.json</code>.</li>
         <li>La UI llama <code>GET /api/monitor/refresh</code> para obtener resultados cacheados.</li>
         <li>Si no hay cache, <code>MonitorExecutionService</code> ejecuta un full check inicial.</li>
         <li><code>NetworkMonitorService.CheckAllDevicesAsync</code> revisa dispositivos habilitados en paralelo.</li>
@@ -216,7 +216,7 @@
 
     <section>
       <h2>Configuracion JSON</h2>
-      <p>En desarrollo el archivo fuente vive en <code>Data/devices.json</code>. Al publicar portable se copia como <code>devices.json</code> junto al ejecutable.</p>
+      <p>En desarrollo el archivo fuente vive en <code>Data/config.json</code>. Al publicar portable se copia como <code>config.json</code> junto al ejecutable.</p>
       <pre>{
   "settings": {
     "intervalSeconds": 15,
@@ -275,7 +275,9 @@
         </thead>
         <tbody>
           <tr><td><span class="tag get">GET</span></td><td><code>/api/devices</code></td><td>Obtiene dispositivos normalizados.</td><td>Lista de <code>Device</code>.</td></tr>
-          <tr><td><span class="tag post">POST</span></td><td><code>/api/reload</code></td><td>Recarga <code>devices.json</code> desde disco.</td><td>Conteos y settings.</td></tr>
+          <tr><td><span class="tag post">POST</span></td><td><code>/api/reload</code></td><td>Recarga <code>config.json</code> desde disco.</td><td>Conteos y settings.</td></tr>
+          <tr><td><span class="tag get">GET</span></td><td><code>/api/config</code></td><td>Devuelve la configuracion completa editable.</td><td><code>MonitorConfiguration</code>.</td></tr>
+          <tr><td><span class="tag post">POST</span></td><td><code>/api/config</code></td><td>Guarda la configuracion completa, crea <code>config.backup.json</code> y recarga memoria.</td><td>Configuracion guardada.</td></tr>
           <tr><td><span class="tag get">GET</span></td><td><code>/api/results</code></td><td>Compatibilidad. Fuerza ejecucion completa.</td><td><code>MonitorResponse</code>.</td></tr>
           <tr><td><span class="tag get">GET</span></td><td><code>/api/monitor/refresh</code></td><td>Devuelve cache actual. Si no existe, ejecuta una vez.</td><td><code>MonitorResponse</code>.</td></tr>
           <tr><td><span class="tag post">POST</span></td><td><code>/api/monitor/run</code></td><td>Fuerza full check sin permitir solapamiento.</td><td><code>MonitorResponse</code> o HTTP 409.</td></tr>
@@ -331,13 +333,14 @@
 
     <section>
       <h2>Frontend</h2>
-      <p><code>wwwroot/index.html</code> define el layout: cabecera, controles de ejecucion, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto.</p>
+      <p><code>wwwroot/index.html</code> define el layout compartido: sidebar hamburguesa, topbar, dashboard, pagina de configuracion, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto.</p>
       <p><code>wwwroot/app.js</code> contiene funciones JSDoc para:</p>
       <ul>
         <li>Consumir <code>/api/monitor/refresh</code> y <code>/api/monitor/run</code>.</li>
         <li>Renderizar metricas, categorias, filas, badges de estado y puertos.</li>
         <li>Contraer y expandir grupos de categorias para navegar inventarios grandes; inician colapsados por defecto.</li>
         <li>Manejar modo manual por defecto, auto refresh ON/OFF, Refresh Now y Run Full Check.</li>
+        <li>Administrar dispositivos y checks desde la ruta <code>/config</code>.</li>
         <li>Filtrar por texto, online, offline y problemas.</li>
       </ul>
     </section>
@@ -372,7 +375,7 @@ dotnet run</pre>
       <p>Resultado esperado:</p>
       <pre>publish/win-x64-portable/
 ├── NetWatch-Lite.exe
-├── devices.json
+├── config.json
 ├── appsettings.json
 ├── wwwroot/
 └── runtime dependencies...</pre>
@@ -381,7 +384,7 @@ dotnet run</pre>
       <p>Uso en Windows:</p>
       <ol>
         <li>Descomprimir el ZIP.</li>
-        <li>Editar <code>devices.json</code> en la misma carpeta de <code>NetWatch-Lite.exe</code>.</li>
+        <li>Editar <code>config.json</code> en la misma carpeta de <code>NetWatch-Lite.exe</code> o usar la pagina <code>/config</code>.</li>
         <li>Ejecutar <code>NetWatch-Lite.exe</code>.</li>
         <li>Abrir la URL que muestra la consola.</li>
       </ol>
@@ -390,7 +393,7 @@ dotnet run</pre>
     <section>
       <h2>Notas Operativas</h2>
       <ul>
-        <li>El archivo <code>devices.json</code> puede recargarse desde el boton Reload JSON.</li>
+        <li>El archivo <code>config.json</code> puede recargarse desde el boton Reload JSON o administrarse desde <code>/config</code>.</li>
         <li>La aplicacion inicia en modo manual; el auto refresh solo empieza cuando el operador activa el boton.</li>
         <li>Los grupos de categorias inician colapsados para mejorar la visibilidad en inventarios grandes.</li>
         <li><code>Run Full Check</code> no permite ejecuciones solapadas; si una ya corre, el backend responde HTTP 409.</li>

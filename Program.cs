@@ -1,4 +1,5 @@
 using NetWatch.Services;
+using NetWatch.Models;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,18 +22,18 @@ var app = builder.Build();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-// Load devices.json at startup so configuration errors are visible immediately.
+// Load config.json at startup so configuration errors are visible immediately.
 var repository = app.Services.GetRequiredService<JsonDeviceRepository>();
 await repository.ReloadAsync();
 
-// Returns the normalized devices currently loaded from devices.json.
+// Returns the normalized devices currently loaded from config.json.
 app.MapGet("/api/devices", async (JsonDeviceRepository deviceRepository) =>
 {
     var devices = await deviceRepository.GetDevicesAsync();
     return Results.Ok(devices);
 });
 
-// Reloads devices.json from disk without restarting the application.
+// Reloads config.json from disk without restarting the application.
 app.MapPost("/api/reload", async (JsonDeviceRepository deviceRepository) =>
 {
     var configuration = await deviceRepository.ReloadAsync();
@@ -43,6 +44,38 @@ app.MapPost("/api/reload", async (JsonDeviceRepository deviceRepository) =>
         settings = configuration.Settings,
         reloadedAt = DateTimeOffset.Now
     });
+});
+
+// Returns the full editable monitor configuration used by the configuration page.
+app.MapGet("/api/config", async (JsonDeviceRepository deviceRepository) =>
+{
+    return Results.Ok(await deviceRepository.GetConfigurationAsync());
+});
+
+// Saves the full monitor configuration to config.json, creates config.backup.json, and reloads memory.
+app.MapPost("/api/config", async (
+    MonitorConfiguration configuration,
+    JsonDeviceRepository deviceRepository,
+    MonitorExecutionService executionService) =>
+{
+    try
+    {
+        var saved = await deviceRepository.SaveAsync(configuration);
+        executionService.InvalidateCache();
+
+        return Results.Ok(new
+        {
+            savedAt = DateTimeOffset.Now,
+            configuration = saved
+        });
+    }
+    catch (InvalidDataException ex)
+    {
+        return Results.BadRequest(new
+        {
+            error = ex.Message
+        });
+    }
 });
 
 // Backwards-compatible endpoint that forces a fresh full check and returns the monitor payload.
@@ -73,5 +106,7 @@ app.MapPost("/api/monitor/run", async (MonitorExecutionService executionService)
 
     return Results.Ok(response);
 });
+
+app.MapFallbackToFile("index.html");
 
 app.Run();

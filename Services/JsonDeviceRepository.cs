@@ -13,7 +13,8 @@ public sealed class JsonDeviceRepository
     {
         PropertyNameCaseInsensitive = true,
         ReadCommentHandling = JsonCommentHandling.Skip,
-        AllowTrailingCommas = true
+        AllowTrailingCommas = true,
+        WriteIndented = true
     };
 
     private readonly IWebHostEnvironment _environment;
@@ -37,7 +38,7 @@ public sealed class JsonDeviceRepository
     /// <summary>
     /// Returns the normalized device inventory currently loaded in memory.
     /// </summary>
-    /// <returns>A read-only list of devices loaded from devices.json.</returns>
+    /// <returns>A read-only list of devices loaded from config.json.</returns>
     public Task<IReadOnlyList<Device>> GetDevicesAsync()
     {
         return Task.FromResult<IReadOnlyList<Device>>(_configuration.Devices);
@@ -53,7 +54,7 @@ public sealed class JsonDeviceRepository
     }
 
     /// <summary>
-    /// Reloads devices.json from disk, validates supported fields, and replaces the in-memory configuration atomically.
+    /// Reloads config.json from disk, validates supported fields, and replaces the in-memory configuration atomically.
     /// </summary>
     /// <param name="cancellationToken">Token used to cancel the file read or JSON parse operation.</param>
     /// <returns>The normalized configuration loaded from disk.</returns>
@@ -87,9 +88,55 @@ public sealed class JsonDeviceRepository
     }
 
     /// <summary>
+    /// Saves a complete monitor configuration to disk, backs up the previous file, and reloads memory.
+    /// </summary>
+    /// <param name="configuration">Configuration object received from the configuration UI.</param>
+    /// <param name="cancellationToken">Token used to cancel file operations.</param>
+    /// <returns>The normalized configuration after it has been saved and loaded into memory.</returns>
+    /// <exception cref="InvalidDataException">Thrown when the submitted configuration is not valid.</exception>
+    public async Task<MonitorConfiguration> SaveAsync(
+        MonitorConfiguration configuration,
+        CancellationToken cancellationToken = default)
+    {
+        await _reloadLock.WaitAsync(cancellationToken);
+
+        try
+        {
+            Validate(configuration);
+
+            var filePath = ResolveDeviceFilePath();
+            var directory = Path.GetDirectoryName(filePath);
+
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            if (File.Exists(filePath))
+            {
+                var backupPath = Path.Combine(
+                    directory ?? string.Empty,
+                    $"{Path.GetFileNameWithoutExtension(filePath)}.backup{Path.GetExtension(filePath)}");
+                File.Copy(filePath, backupPath, true);
+            }
+
+            var normalized = Normalize(configuration);
+            await using var stream = File.Create(filePath);
+            await JsonSerializer.SerializeAsync(stream, normalized, JsonOptions, cancellationToken);
+
+            _configuration = normalized;
+            return _configuration;
+        }
+        finally
+        {
+            _reloadLock.Release();
+        }
+    }
+
+    /// <summary>
     /// Resolves the configured JSON path to an absolute filesystem path.
     /// </summary>
-    /// <returns>Absolute path to devices.json.</returns>
+    /// <returns>Absolute path to config.json.</returns>
     private string ResolveDeviceFilePath()
     {
         if (Path.IsPathRooted(_options.DeviceFilePath))
@@ -97,7 +144,18 @@ public sealed class JsonDeviceRepository
             return _options.DeviceFilePath;
         }
 
-        return Path.Combine(_environment.ContentRootPath, _options.DeviceFilePath);
+        var contentRootPath = Path.Combine(_environment.ContentRootPath, _options.DeviceFilePath);
+
+        if (File.Exists(contentRootPath))
+        {
+            return contentRootPath;
+        }
+
+        var developmentDataPath = Path.Combine(_environment.ContentRootPath, "Data", _options.DeviceFilePath);
+
+        return File.Exists(developmentDataPath)
+            ? developmentDataPath
+            : contentRootPath;
     }
 
     /// <summary>
@@ -131,7 +189,7 @@ public sealed class JsonDeviceRepository
                 Ip = device.Ip,
                 Category = NormalizeCategory(device.Category),
                 Enabled = device.Enabled,
-                Checks = device.Checks
+                Checks = (device.Checks ?? [])
                     .Where(IsValidCheck)
                     .ToList()
             })
@@ -139,9 +197,70 @@ public sealed class JsonDeviceRepository
 
         return new MonitorConfiguration
         {
-            Settings = configuration.Settings,
+            Settings = configuration.Settings ?? new MonitorSettings(),
             Devices = devices
         };
+    }
+
+    /// <summary>
+    /// Validates submitted configuration before writing it to disk.
+    /// </summary>
+    /// <param name="configuration">Configuration submitted by the CRUD UI.</param>
+    /// <exception cref="InvalidDataException">Thrown when required fields or checks are invalid.</exception>
+    private static void Validate(MonitorConfiguration? configuration)
+    {
+        if (configuration is null)
+        {
+            throw new InvalidDataException("Configuration body is required.");
+        }
+
+        if (configuration.Settings is null)
+        {
+            throw new InvalidDataException("settings is required.");
+        }
+
+        if (configuration.Settings.IntervalSeconds <= 0)
+        {
+            throw new InvalidDataException("intervalSeconds must be greater than zero.");
+        }
+
+        if (configuration.Settings.TimeoutMs <= 0)
+        {
+            throw new InvalidDataException("timeoutMs must be greater than zero.");
+        }
+
+        if (configuration.Settings.MaxParallelChecks <= 0)
+        {
+            throw new InvalidDataException("maxParallelChecks must be greater than zero.");
+        }
+
+        for (var deviceIndex = 0; deviceIndex < configuration.Devices.Count; deviceIndex++)
+        {
+            var device = configuration.Devices[deviceIndex];
+
+            if (string.IsNullOrWhiteSpace(device.Name))
+            {
+                throw new InvalidDataException($"Device #{deviceIndex + 1} requires a name.");
+            }
+
+            if (string.IsNullOrWhiteSpace(device.Ip))
+            {
+                throw new InvalidDataException($"Device '{device.Name}' requires an address.");
+            }
+
+            if (device.Checks is null || device.Checks.Count == 0)
+            {
+                throw new InvalidDataException($"Device '{device.Name}' requires at least one check.");
+            }
+
+            foreach (var check in device.Checks)
+            {
+                if (!IsValidCheck(check))
+                {
+                    throw new InvalidDataException($"Device '{device.Name}' has an invalid check.");
+                }
+            }
+        }
     }
 
     /// <summary>

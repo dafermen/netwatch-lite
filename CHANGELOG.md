@@ -7,6 +7,10 @@ All notable changes to NetWatch-Lite are documented here.
 - Default dashboard execution mode changed to manual.
 - Auto refresh now starts only when the operator enables `Auto Refresh: ON`.
 - Device category groups now start collapsed by default.
+- Added hamburger sidebar navigation with Dashboard and Configuration routes.
+- Added `/config` CRUD UI for devices and checks.
+- Added `GET /api/config` and `POST /api/config` with validation, backup, and in-memory reload.
+- Renamed the editable runtime inventory file to `config.json`.
 - Documentation updated to describe manual-first behavior.
 
 ## v0.2.0 - 2026-05-05
