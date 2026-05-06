@@ -13,9 +13,6 @@ const executionMode = document.querySelector("#execution-mode");
 const reloadButton = document.querySelector("#reload-json");
 const autoRefreshToggle = document.querySelector("#auto-refresh-toggle");
 const autoRefreshLabel = document.querySelector("#auto-refresh-label");
-const refreshNowButton = document.querySelector("#refresh-now");
-const refreshNowSpinner = document.querySelector("#refresh-now-spinner");
-const refreshNowIcon = document.querySelector("#refresh-now-icon");
 const runFullCheckButton = document.querySelector("#run-full-check");
 const runFullCheckSpinner = document.querySelector("#run-full-check-spinner");
 const runFullCheckIcon = document.querySelector("#run-full-check-icon");
@@ -57,7 +54,6 @@ let latestCategories = [];
 let activeFilter = "all";
 let activeSearch = "";
 let autoRefreshEnabled = false;
-let latestIntervalSeconds = 15;
 let currentRoute = normalizeRoute(location.pathname);
 let hasLoadedDashboard = false;
 let hasLoadedConfig = false;
@@ -65,15 +61,18 @@ let configState = createEmptyConfiguration();
 let pendingDeleteIndex = null;
 const expandedCategoryNames = new Set();
 const mobileSidebarQuery = window.matchMedia("(max-width: 991.98px)");
+const autoFullCheckIntervalMs = 60_000;
 
-async function loadResults(options = {}) {
-  const endpoint = options.forceRun ? "/api/monitor/run" : "/api/monitor/refresh";
-  const method = options.forceRun ? "POST" : "GET";
-
+async function loadResults({ showErrors = true } = {}) {
   try {
-    const response = await fetch(endpoint, { method });
+    const response = await fetch("/api/monitor/run", { method: "POST" });
 
     if (!response.ok) {
+      if (response.status === 409) {
+        console.info("A full check is already running.");
+        return;
+      }
+
       throw new Error(`Request failed with ${response.status}`);
     }
 
@@ -81,11 +80,14 @@ async function loadResults(options = {}) {
     renderMonitorPayload(payload);
     hasLoadedDashboard = true;
   } catch (error) {
-    resultsBody.innerHTML = `
-      <div class="text-center text-danger py-4">
-        Unable to load monitoring results.
-      </div>`;
-    lastCheck.textContent = "Last execution failed";
+    if (showErrors) {
+      resultsBody.innerHTML = `
+        <div class="text-center text-danger py-4">
+          Unable to run full monitoring check.
+        </div>`;
+      lastCheck.textContent = "Last execution failed";
+    }
+
     console.error(error);
   }
 }
@@ -94,9 +96,8 @@ function renderMonitorPayload(payload) {
   latestCategories = payload.categories ?? groupResultsByCategory(payload.results ?? []);
   renderSummary(payload.summary ?? createSummaryFromCategories(latestCategories));
   renderFilteredCategories();
-  latestIntervalSeconds = Math.max(1, Number(payload.settings?.intervalSeconds) || 15);
   scheduleRefresh();
-  executionMode.textContent = autoRefreshEnabled ? "Auto refresh active" : "Manual mode";
+  executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
   lastCheck.textContent = `Last execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
 }
 
@@ -366,21 +367,11 @@ async function reloadJson() {
   }
 }
 
-async function refreshNow() {
-  setButtonLoading(refreshNowButton, refreshNowSpinner, refreshNowIcon, true);
-
-  try {
-    await loadResults();
-  } finally {
-    setButtonLoading(refreshNowButton, refreshNowSpinner, refreshNowIcon, false);
-  }
-}
-
 async function runFullCheck() {
   setButtonLoading(runFullCheckButton, runFullCheckSpinner, runFullCheckIcon, true);
 
   try {
-    await loadResults({ forceRun: true });
+    await loadResults();
   } finally {
     setButtonLoading(runFullCheckButton, runFullCheckSpinner, runFullCheckIcon, false);
   }
@@ -393,7 +384,7 @@ function toggleAutoRefresh() {
   autoRefreshLabel.textContent = autoRefreshEnabled
     ? "Auto Refresh: ON"
     : "Auto Refresh: OFF";
-  executionMode.textContent = autoRefreshEnabled ? "Auto refresh active" : "Manual mode";
+  executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
 
   if (autoRefreshEnabled) {
     scheduleRefresh();
@@ -864,7 +855,6 @@ function escapeHtml(value) {
 
 reloadButton.addEventListener("click", reloadJson);
 autoRefreshToggle.addEventListener("click", toggleAutoRefresh);
-refreshNowButton.addEventListener("click", refreshNow);
 runFullCheckButton.addEventListener("click", runFullCheck);
 sidebarToggle.addEventListener("click", toggleSidebar);
 sidebarBackdrop.addEventListener("click", closeSidebar);
@@ -941,7 +931,7 @@ function scheduleRefresh() {
   clearRefreshTimer();
 
   if (autoRefreshEnabled) {
-    refreshTimer = setInterval(loadResults, latestIntervalSeconds * 1000);
+    refreshTimer = setInterval(() => loadResults({ showErrors: false }), autoFullCheckIntervalMs);
   }
 }
 

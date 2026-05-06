@@ -10,7 +10,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
-// Register configuration and singleton services. Singletons keep the loaded JSON and latest monitor cache in memory.
+// Register configuration and singleton services. Singletons keep the loaded JSON in memory.
 builder.Services.Configure<NetworkMonitorOptions>(
     builder.Configuration.GetSection(NetworkMonitorOptions.SectionName));
 builder.Services.AddSingleton<JsonDeviceRepository>();
@@ -55,13 +55,11 @@ app.MapGet("/api/config", async (JsonDeviceRepository deviceRepository) =>
 // Saves the full monitor configuration to config.json, creates config.backup.json, and reloads memory.
 app.MapPost("/api/config", async (
     MonitorConfiguration configuration,
-    JsonDeviceRepository deviceRepository,
-    MonitorExecutionService executionService) =>
+    JsonDeviceRepository deviceRepository) =>
 {
     try
     {
         var saved = await deviceRepository.SaveAsync(configuration);
-        executionService.InvalidateCache();
 
         return Results.Ok(new
         {
@@ -82,12 +80,6 @@ app.MapPost("/api/config", async (
 app.MapGet("/api/results", async (MonitorExecutionService executionService) =>
 {
     return Results.Ok(await executionService.RunFullCheckAsync());
-});
-
-// Returns the latest cached monitor payload. If no execution has happened yet, it runs one initial check.
-app.MapGet("/api/monitor/refresh", async (MonitorExecutionService executionService) =>
-{
-    return Results.Ok(await executionService.GetCachedResultsAsync());
 });
 
 // Starts a full monitoring execution immediately and rejects overlapping runs with HTTP 409.

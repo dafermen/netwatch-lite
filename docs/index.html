@@ -170,7 +170,7 @@
       <div class="grid">
         <div class="card">
           <h3>Backend</h3>
-          <p>ASP.NET Core minimal API en .NET 8. Expone endpoints para leer cache, forzar ejecuciones, recargar JSON y consultar dispositivos.</p>
+          <p>ASP.NET Core minimal API en .NET 8. Expone endpoints para forzar ejecuciones, recargar JSON y consultar dispositivos.</p>
         </div>
         <div class="card">
           <h3>Monitor</h3>
@@ -206,8 +206,8 @@
       <ol>
         <li>La aplicacion inicia en <code>Program.cs</code>.</li>
         <li><code>JsonDeviceRepository.ReloadAsync</code> carga y normaliza <code>config.json</code>.</li>
-        <li>La UI llama <code>GET /api/monitor/refresh</code> para obtener resultados cacheados.</li>
-        <li>Si no hay cache, <code>MonitorExecutionService</code> ejecuta un full check inicial.</li>
+        <li>La UI llama <code>POST /api/monitor/run</code> para ejecutar un full check.</li>
+        <li>El modo automatico ejecuta un full check cada 60 segundos.</li>
         <li><code>NetworkMonitorService.CheckAllDevicesAsync</code> revisa dispositivos habilitados en paralelo.</li>
         <li>Se calcula <span class="healthy">Healthy</span>, <span class="degraded">Degraded</span> o <span class="down">Down</span>.</li>
         <li>El backend agrupa resultados por categoria y genera metricas del dashboard.</li>
@@ -244,7 +244,7 @@
           <tr><th>Campo</th><th>Descripcion</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>intervalSeconds</code></td><td>Intervalo de auto refresh en la UI.</td></tr>
+          <tr><td><code>intervalSeconds</code></td><td>Valor heredado conservado por compatibilidad. El auto full check actual usa 60 segundos fijos.</td></tr>
           <tr><td><code>timeoutMs</code></td><td>Timeout de ping y TCP en milisegundos.</td></tr>
           <tr><td><code>maxParallelChecks</code></td><td>Limite global de checks concurrentes.</td></tr>
           <tr><td><code>useHostnameForPing</code></td><td>Cuando esta activo, el ping usa <code>hostname</code> si el dispositivo lo tiene; si no, usa <code>ip</code>.</td></tr>
@@ -283,7 +283,6 @@
           <tr><td><span class="tag get">GET</span></td><td><code>/api/config</code></td><td>Devuelve la configuracion completa editable.</td><td><code>MonitorConfiguration</code>.</td></tr>
           <tr><td><span class="tag post">POST</span></td><td><code>/api/config</code></td><td>Guarda la configuracion completa, crea <code>config.backup.json</code> y recarga memoria.</td><td>Configuracion guardada.</td></tr>
           <tr><td><span class="tag get">GET</span></td><td><code>/api/results</code></td><td>Compatibilidad. Fuerza ejecucion completa.</td><td><code>MonitorResponse</code>.</td></tr>
-          <tr><td><span class="tag get">GET</span></td><td><code>/api/monitor/refresh</code></td><td>Devuelve cache actual. Si no existe, ejecuta una vez.</td><td><code>MonitorResponse</code>.</td></tr>
           <tr><td><span class="tag post">POST</span></td><td><code>/api/monitor/run</code></td><td>Fuerza full check sin permitir solapamiento.</td><td><code>MonitorResponse</code> o HTTP 409.</td></tr>
         </tbody>
       </table>
@@ -328,8 +327,8 @@
           </tr>
           <tr>
             <td><code>MonitorExecutionService</code></td>
-            <td><code>GetCachedResultsAsync</code>, <code>RunFullCheckAsync</code>, <code>TryRunFullCheckAsync</code></td>
-            <td>Coordina cache, full checks y bloqueo contra ejecuciones simultaneas.</td>
+            <td><code>RunFullCheckAsync</code>, <code>TryRunFullCheckAsync</code></td>
+            <td>Coordina full checks y bloqueo contra ejecuciones simultaneas.</td>
           </tr>
         </tbody>
       </table>
@@ -340,10 +339,10 @@
       <p><code>wwwroot/index.html</code> define el layout compartido: sidebar hamburguesa, topbar, dashboard, pagina de configuracion, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto.</p>
       <p><code>wwwroot/app.js</code> contiene funciones JSDoc para:</p>
       <ul>
-        <li>Consumir <code>/api/monitor/refresh</code> y <code>/api/monitor/run</code>.</li>
+        <li>Consumir <code>/api/monitor/run</code>.</li>
         <li>Renderizar metricas, categorias, filas, badges de estado y puertos.</li>
         <li>Contraer y expandir grupos de categorias para navegar inventarios grandes; inician colapsados por defecto.</li>
-        <li>Manejar modo manual por defecto, auto refresh ON/OFF, Refresh Now y Run Full Check.</li>
+        <li>Manejar modo manual por defecto, auto refresh ON/OFF y Run Full Check.</li>
         <li>Administrar dispositivos y checks desde la ruta <code>/config</code>.</li>
         <li>Filtrar por texto, online, offline y problemas.</li>
       </ul>
@@ -365,7 +364,7 @@ dotnet run</pre>
           <tr><th>Version</th><th>Resumen</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>Unreleased</code></td><td>Modo manual por defecto; auto refresh inicia solo cuando el operador lo activa; categorias colapsadas por defecto; formulario de dispositivo bajo demanda; ping opcional por hostname.</td></tr>
+          <tr><td><code>Unreleased</code></td><td>Modo manual por defecto; auto refresh ejecuta full check cada 60 segundos cuando el operador lo activa; categorias colapsadas por defecto; formulario de dispositivo bajo demanda; ping opcional por hostname.</td></tr>
           <tr><td><code>v0.2.0</code></td><td>Grupos de categorias colapsables.</td></tr>
           <tr><td><code>v0.1.0</code></td><td>Version inicial con dashboard, checks, metricas, filtros, controles y portable.</td></tr>
         </tbody>
@@ -398,7 +397,7 @@ dotnet run</pre>
       <h2>Notas Operativas</h2>
       <ul>
         <li>El archivo <code>config.json</code> puede recargarse desde el boton Reload JSON o administrarse desde <code>/config</code>.</li>
-        <li>La aplicacion inicia en modo manual; el auto refresh solo empieza cuando el operador activa el boton.</li>
+        <li>La aplicacion inicia en modo manual; el auto refresh solo empieza cuando el operador activa el boton y ejecuta full check cada 60 segundos.</li>
         <li>Los grupos de categorias inician colapsados para mejorar la visibilidad en inventarios grandes.</li>
         <li>En pantallas pequenas, los controles se apilan y las tablas anchas usan scroll horizontal para conservar legibilidad.</li>
         <li><code>Run Full Check</code> no permite ejecuciones solapadas; si una ya corre, el backend responde HTTP 409.</li>
