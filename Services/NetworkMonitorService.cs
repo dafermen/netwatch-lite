@@ -207,6 +207,7 @@ public sealed class NetworkMonitorService
         }
         catch (Exception ex) when (
             ex is PingException
+                or SocketException
                 or InvalidOperationException
                 or ArgumentException)
         {
@@ -255,7 +256,11 @@ public sealed class NetworkMonitorService
             ex is SocketException
                 or TimeoutException
                 or OperationCanceledException
-                or ArgumentOutOfRangeException)
+                or ArgumentOutOfRangeException
+                or ArgumentException
+                or InvalidOperationException
+                or IOException
+                or ObjectDisposedException)
         {
             _logger.LogDebug(ex, "Port check failed for {Ip}:{Port}", ip, port);
             return false;

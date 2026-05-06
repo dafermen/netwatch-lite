@@ -190,6 +190,7 @@ Edit `config.json` in the same folder as `NetWatch-Lite.exe`, or use the `/confi
 - NetWatch-Lite starts in manual mode by default.
 - `Auto Refresh` runs a full check every 60 seconds after the operator turns it on.
 - `settings.intervalSeconds` is retained for JSON compatibility but is not used by the current auto full-check timer.
+- Invalid or corrupt `config.json` content is reported through the API/UI instead of crashing silently.
 - `maxParallelChecks` should be adjusted carefully for large networks.
-- TCP checks verify that a connection can be opened; they do not validate application protocol behavior.
+- TCP checks treat timeouts, refused connections, invalid targets, and unexpected socket failures as unavailable ports; they do not validate application protocol behavior.
 - On small screens, wide device tables scroll horizontally while toolbars and forms stack vertically.

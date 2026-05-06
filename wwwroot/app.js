@@ -66,6 +66,7 @@ const autoFullCheckIntervalMs = 60_000;
 async function loadResults({ showErrors = true } = {}) {
   try {
     const response = await fetch("/api/monitor/run", { method: "POST" });
+    const payload = await readJsonResponse(response);
 
     if (!response.ok) {
       if (response.status === 409) {
@@ -73,10 +74,9 @@ async function loadResults({ showErrors = true } = {}) {
         return;
       }
 
-      throw new Error(`Request failed with ${response.status}`);
+      throw new Error(payload.detail || payload.error || `Request failed with ${response.status}`);
     }
 
-    const payload = await response.json();
     renderMonitorPayload(payload);
     hasLoadedDashboard = true;
   } catch (error) {
@@ -353,14 +353,15 @@ async function reloadJson() {
 
   try {
     const response = await fetch("/api/reload", { method: "POST" });
+    const payload = await readJsonResponse(response);
 
     if (!response.ok) {
-      throw new Error(`Reload failed with ${response.status}`);
+      throw new Error(payload.error || payload.detail || `Reload failed with ${response.status}`);
     }
 
     await runFullCheck();
   } catch (error) {
-    lastCheck.textContent = "JSON reload failed";
+    lastCheck.textContent = `JSON reload failed: ${error.message}`;
     console.error(error);
   } finally {
     reloadButton.disabled = false;

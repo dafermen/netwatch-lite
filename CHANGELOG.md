@@ -17,6 +17,7 @@ All notable changes to NetWatch-Lite are documented here.
 - Added optional `hostname` per device and `useHostnameForPing` setting for hostname-based ping checks.
 - Fixed hamburger sidebar collapse behavior and reset the configuration form when leaving the configuration page.
 - Improved responsive behavior for mobile toolbars, filters, forms, and wide device tables.
+- Hardened invalid JSON handling, monitoring API errors, and unexpected TCP failure handling.
 - Documentation updated to describe manual-first behavior.
 
 ## v0.2.0 - 2026-05-05

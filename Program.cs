@@ -24,7 +24,18 @@ app.UseStaticFiles();
 
 // Load config.json at startup so configuration errors are visible immediately.
 var repository = app.Services.GetRequiredService<JsonDeviceRepository>();
-await repository.ReloadAsync();
+try
+{
+    await repository.ReloadAsync();
+}
+catch (Exception ex) when (
+    ex is InvalidDataException
+        or FileNotFoundException
+        or IOException
+        or UnauthorizedAccessException)
+{
+    app.Logger.LogError(ex, "Unable to load config.json at startup. The configuration page can still be used to repair it.");
+}
 
 // Returns the normalized devices currently loaded from config.json.
 app.MapGet("/api/devices", async (JsonDeviceRepository deviceRepository) =>
@@ -36,14 +47,28 @@ app.MapGet("/api/devices", async (JsonDeviceRepository deviceRepository) =>
 // Reloads config.json from disk without restarting the application.
 app.MapPost("/api/reload", async (JsonDeviceRepository deviceRepository) =>
 {
-    var configuration = await deviceRepository.ReloadAsync();
-    return Results.Ok(new
+    try
     {
-        count = configuration.Devices.Count,
-        enabledCount = configuration.Devices.Count(device => device.Enabled),
-        settings = configuration.Settings,
-        reloadedAt = DateTimeOffset.Now
-    });
+        var configuration = await deviceRepository.ReloadAsync();
+        return Results.Ok(new
+        {
+            count = configuration.Devices.Count,
+            enabledCount = configuration.Devices.Count(device => device.Enabled),
+            settings = configuration.Settings,
+            reloadedAt = DateTimeOffset.Now
+        });
+    }
+    catch (Exception ex) when (
+        ex is InvalidDataException
+            or FileNotFoundException
+            or IOException
+            or UnauthorizedAccessException)
+    {
+        return Results.BadRequest(new
+        {
+            error = ex.Message
+        });
+    }
 });
 
 // Returns the full editable monitor configuration used by the configuration page.
@@ -79,24 +104,44 @@ app.MapPost("/api/config", async (
 // Backwards-compatible endpoint that forces a fresh full check and returns the monitor payload.
 app.MapGet("/api/results", async (MonitorExecutionService executionService) =>
 {
-    return Results.Ok(await executionService.RunFullCheckAsync());
+    try
+    {
+        return Results.Ok(await executionService.RunFullCheckAsync());
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Monitoring execution failed.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
 });
 
 // Starts a full monitoring execution immediately and rejects overlapping runs with HTTP 409.
 app.MapPost("/api/monitor/run", async (MonitorExecutionService executionService) =>
 {
-    var response = await executionService.TryRunFullCheckAsync();
-
-    if (response is null)
+    try
     {
-        return Results.Conflict(new
-        {
-            executionStatus = "Running",
-            message = "A monitoring execution is already in progress."
-        });
-    }
+        var response = await executionService.TryRunFullCheckAsync();
 
-    return Results.Ok(response);
+        if (response is null)
+        {
+            return Results.Conflict(new
+            {
+                executionStatus = "Running",
+                message = "A monitoring execution is already in progress."
+            });
+        }
+
+        return Results.Ok(response);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Monitoring execution failed.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
 });
 
 app.MapFallbackToFile("index.html");

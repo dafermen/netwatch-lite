@@ -80,8 +80,13 @@ public sealed class JsonDeviceRepository
                 JsonOptions,
                 cancellationToken);
 
+            Validate(configuration);
             _configuration = Normalize(configuration);
             return _configuration;
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException("config.json contains invalid JSON.", ex);
         }
         finally
         {
@@ -220,6 +225,11 @@ public sealed class JsonDeviceRepository
         if (configuration.Settings is null)
         {
             throw new InvalidDataException("settings is required.");
+        }
+
+        if (configuration.Devices is null)
+        {
+            throw new InvalidDataException("devices is required.");
         }
 
         if (configuration.Settings.IntervalSeconds <= 0)

@@ -401,9 +401,10 @@ dotnet run</pre>
         <li>Los grupos de categorias inician colapsados para mejorar la visibilidad en inventarios grandes.</li>
         <li>En pantallas pequenas, los controles se apilan y las tablas anchas usan scroll horizontal para conservar legibilidad.</li>
         <li><code>Run Full Check</code> no permite ejecuciones solapadas; si una ya corre, el backend responde HTTP 409.</li>
+        <li>JSON corrupto o invalido se reporta por API/UI para poder corregir la configuracion sin un cierre silencioso.</li>
         <li>Para redes grandes, ajustar <code>maxParallelChecks</code> segun capacidad de red y equipo.</li>
         <li>El ping puede requerir permisos o reglas de firewall dependiendo del sistema operativo y la red.</li>
-        <li>Los checks TCP indican si el puerto acepta conexion, no validan el protocolo de aplicacion.</li>
+        <li>Los checks TCP tratan timeouts, rechazos, destinos invalidos y fallos de socket como puertos no disponibles; no validan el protocolo de aplicacion.</li>
       </ul>
     </section>
   </main>
