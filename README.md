@@ -8,6 +8,8 @@ Programmer documentation is available at [docs/developer-guide.md](docs/develope
 
 Release notes and commit-level project history are summarized in [CHANGELOG.md](CHANGELOG.md).
 
+GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.com/dafermen/netwatch-lite).
+
 ## Features
 
 - Editable `config.json` inventory.
