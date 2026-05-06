@@ -187,6 +187,7 @@ public sealed class JsonDeviceRepository
             {
                 Name = device.Name,
                 Ip = device.Ip,
+                Hostname = NormalizeOptionalText(device.Hostname),
                 Category = NormalizeCategory(device.Category),
                 Enabled = device.Enabled,
                 Checks = (device.Checks ?? [])
@@ -289,5 +290,17 @@ public sealed class JsonDeviceRepository
         return string.IsNullOrWhiteSpace(category)
             ? "Uncategorized"
             : category.Trim();
+    }
+
+    /// <summary>
+    /// Converts optional text fields to null when no usable value was supplied.
+    /// </summary>
+    /// <param name="value">Raw optional value from JSON or the configuration UI.</param>
+    /// <returns>A trimmed string, or null when the value is empty.</returns>
+    private static string? NormalizeOptionalText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? null
+            : value.Trim();
     }
 }

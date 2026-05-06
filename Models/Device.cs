@@ -20,6 +20,12 @@ public sealed class Device
     public required string Ip { get; init; }
 
     /// <summary>
+    /// Optional DNS host name used for ping checks when hostname mode is enabled in settings.
+    /// </summary>
+    [JsonPropertyName("hostname")]
+    public string? Hostname { get; init; }
+
+    /// <summary>
     /// Logical dashboard group, for example Servers, IP Cameras, UPS Units, or Critical Workstations.
     /// </summary>
     [JsonPropertyName("category")]

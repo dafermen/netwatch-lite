@@ -24,4 +24,10 @@ public sealed class MonitorSettings
     /// </summary>
     [JsonPropertyName("maxParallelChecks")]
     public int MaxParallelChecks { get; init; } = 50;
+
+    /// <summary>
+    /// When true, ping checks use the device hostname when available; otherwise they use the configured IP address.
+    /// </summary>
+    [JsonPropertyName("useHostnameForPing")]
+    public bool UseHostnameForPing { get; init; }
 }

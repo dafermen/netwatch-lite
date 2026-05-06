@@ -179,6 +179,10 @@
               <p class="text-secondary mb-0">Manage devices stored in config.json.</p>
             </div>
             <div class="d-flex align-items-center gap-2">
+              <div class="form-check form-switch config-ping-mode mb-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="use-hostname-for-ping">
+                <label class="form-check-label" for="use-hostname-for-ping">Ping by hostname</label>
+              </div>
               <button class="btn btn-outline-secondary btn-sm" type="button" id="reload-config">
                 <i class="fa-solid fa-download me-1"></i>
                 Reload
@@ -194,7 +198,7 @@
           <div id="config-alert"></div>
 
           <div class="row g-3">
-            <div class="col-12 col-xl-7">
+            <div class="col-12">
               <div class="card config-card">
                 <div class="card-header d-flex align-items-center justify-content-between">
                   <span class="fw-semibold">Devices</span>
@@ -209,13 +213,14 @@
                       <tr>
                         <th>Name</th>
                         <th>Address</th>
+                        <th>Hostname</th>
                         <th>Checks</th>
                         <th class="text-end">Actions</th>
                       </tr>
                     </thead>
                     <tbody id="config-devices-body">
                       <tr>
-                        <td colspan="4" class="text-center text-secondary py-4">Loading configuration...</td>
+                        <td colspan="5" class="text-center text-secondary py-4">Loading configuration...</td>
                       </tr>
                     </tbody>
                   </table>
@@ -223,8 +228,8 @@
               </div>
             </div>
 
-            <div class="col-12 col-xl-5">
-              <form class="card config-card" id="device-form">
+            <div class="col-12">
+              <form class="card config-card d-none" id="device-form">
                 <div class="card-header fw-semibold" id="device-form-title">Add Device</div>
                 <div class="card-body">
                   <input type="hidden" id="editing-device-index">
@@ -235,6 +240,10 @@
                   <div class="mb-3">
                     <label class="form-label" for="device-address">Address</label>
                     <input class="form-control" type="text" id="device-address" autocomplete="off" required>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label" for="device-hostname">Hostname</label>
+                    <input class="form-control" type="text" id="device-hostname" autocomplete="off" placeholder="Optional DNS name">
                   </div>
                   <div class="mb-3">
                     <label class="form-label" for="device-category">Category</label>

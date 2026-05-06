@@ -221,12 +221,14 @@
   "settings": {
     "intervalSeconds": 15,
     "timeoutMs": 1000,
-    "maxParallelChecks": 50
+    "maxParallelChecks": 50,
+    "useHostnameForPing": false
   },
   "devices": [
     {
       "name": "Web Server",
       "ip": "192.168.4.10",
+      "hostname": "web-server.local",
       "category": "Servers",
       "enabled": true,
       "checks": [
@@ -245,6 +247,8 @@
           <tr><td><code>intervalSeconds</code></td><td>Intervalo de auto refresh en la UI.</td></tr>
           <tr><td><code>timeoutMs</code></td><td>Timeout de ping y TCP en milisegundos.</td></tr>
           <tr><td><code>maxParallelChecks</code></td><td>Limite global de checks concurrentes.</td></tr>
+          <tr><td><code>useHostnameForPing</code></td><td>Cuando esta activo, el ping usa <code>hostname</code> si el dispositivo lo tiene; si no, usa <code>ip</code>.</td></tr>
+          <tr><td><code>hostname</code></td><td>Nombre DNS opcional para ping en redes donde la IP puede cambiar.</td></tr>
           <tr><td><code>category</code></td><td>Grupo visual del dashboard.</td></tr>
           <tr><td><code>enabled</code></td><td>Permite conservar dispositivos sin monitorearlos.</td></tr>
           <tr><td><code>checks</code></td><td>Lista de checks. Soporta <code>ping</code> y <code>tcp</code>.</td></tr>
@@ -361,7 +365,7 @@ dotnet run</pre>
           <tr><th>Version</th><th>Resumen</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>Unreleased</code></td><td>Modo manual por defecto; auto refresh inicia solo cuando el operador lo activa; categorias colapsadas por defecto.</td></tr>
+          <tr><td><code>Unreleased</code></td><td>Modo manual por defecto; auto refresh inicia solo cuando el operador lo activa; categorias colapsadas por defecto; formulario de dispositivo bajo demanda; ping opcional por hostname.</td></tr>
           <tr><td><code>v0.2.0</code></td><td>Grupos de categorias colapsables.</td></tr>
           <tr><td><code>v0.1.0</code></td><td>Version inicial con dashboard, checks, metricas, filtros, controles y portable.</td></tr>
         </tbody>

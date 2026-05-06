@@ -2,12 +2,14 @@
   "settings": {
     "intervalSeconds": 15,
     "timeoutMs": 1000,
-    "maxParallelChecks": 50
+    "maxParallelChecks": 50,
+    "useHostnameForPing": false
   },
   "devices": [
     {
       "name": "Web Server",
       "ip": "192.168.4.10",
+      "hostname": "web-server.local",
       "category": "Servers",
       "enabled": true,
       "checks": [
@@ -27,6 +29,7 @@
     {
       "name": "Database Server",
       "ip": "192.168.4.20",
+      "hostname": "db-server.local",
       "category": "Servers",
       "enabled": true,
       "checks": [
@@ -42,6 +45,7 @@
     {
       "name": "Example DNS",
       "ip": "8.8.8.8",
+      "hostname": "dns.google",
       "category": "Servers",
       "enabled": true,
       "checks": [
@@ -57,6 +61,7 @@
     {
       "name": "Accounting Workstation",
       "ip": "192.168.4.31",
+      "hostname": "accounting-ws.local",
       "category": "Critical Workstations",
       "enabled": true,
       "checks": [
@@ -72,6 +77,7 @@
     {
       "name": "Security Desk Workstation",
       "ip": "192.168.4.32",
+      "hostname": "security-desk.local",
       "category": "Critical Workstations",
       "enabled": true,
       "checks": [
@@ -83,6 +89,7 @@
     {
       "name": "Front Entrance Camera",
       "ip": "192.168.4.61",
+      "hostname": "front-camera.local",
       "category": "IP Cameras",
       "enabled": true,
       "checks": [
@@ -102,6 +109,7 @@
     {
       "name": "Warehouse Camera",
       "ip": "192.168.4.62",
+      "hostname": "warehouse-camera.local",
       "category": "IP Cameras",
       "enabled": true,
       "checks": [
@@ -121,6 +129,7 @@
     {
       "name": "Main Rack UPS",
       "ip": "192.168.4.80",
+      "hostname": "main-ups.local",
       "category": "UPS Units",
       "enabled": true,
       "checks": [
@@ -140,6 +149,7 @@
     {
       "name": "Gateway",
       "ip": "192.168.4.1",
+      "hostname": "gateway.local",
       "category": "Network Infrastructure",
       "enabled": true,
       "checks": [
@@ -155,6 +165,7 @@
     {
       "name": "Localhost",
       "ip": "127.0.0.1",
+      "hostname": "localhost",
       "category": "Development",
       "enabled": true,
       "checks": [

@@ -59,8 +59,9 @@ public sealed class NetworkMonitorService
         SemaphoreSlim checkLimiter,
         CancellationToken cancellationToken)
     {
+        var pingTarget = ResolvePingTarget(device, settings);
         var checkTasks = device.Checks.Select(check =>
-            RunLimitedCheckAsync(device.Ip, check, settings.TimeoutMs, checkLimiter, cancellationToken));
+            RunLimitedCheckAsync(device.Ip, pingTarget, check, settings.TimeoutMs, checkLimiter, cancellationToken));
         var checkResults = await Task.WhenAll(checkTasks);
 
         var isOnline = checkResults.Any(result =>
@@ -87,6 +88,8 @@ public sealed class NetworkMonitorService
         {
             Name = device.Name,
             Ip = device.Ip,
+            Hostname = device.Hostname,
+            PingTarget = pingTarget,
             Category = device.Category,
             IsOnline = isOnline,
             Status = status,
@@ -97,6 +100,19 @@ public sealed class NetworkMonitorService
             Checks = checkResults,
             LastCheck = DateTimeOffset.Now
         };
+    }
+
+    /// <summary>
+    /// Selects the network target used for ping checks based on global settings and device data.
+    /// </summary>
+    /// <param name="device">Device being checked.</param>
+    /// <param name="settings">Global monitor settings.</param>
+    /// <returns>The hostname when hostname mode is enabled and available; otherwise the IP address.</returns>
+    private static string ResolvePingTarget(Device device, MonitorSettings settings)
+    {
+        return settings.UseHostnameForPing && !string.IsNullOrWhiteSpace(device.Hostname)
+            ? device.Hostname
+            : device.Ip;
     }
 
     /// <summary>
@@ -124,7 +140,8 @@ public sealed class NetworkMonitorService
     /// <summary>
     /// Runs one check while respecting the global concurrent-check limiter.
     /// </summary>
-    /// <param name="ip">Device IP address to check.</param>
+    /// <param name="ip">Device IP address used for TCP checks.</param>
+    /// <param name="pingTarget">IP address or hostname used for ping checks.</param>
     /// <param name="check">Check definition from the device configuration.</param>
     /// <param name="timeoutMs">Network timeout in milliseconds.</param>
     /// <param name="checkLimiter">Shared semaphore limiting total concurrent checks.</param>
@@ -132,6 +149,7 @@ public sealed class NetworkMonitorService
     /// <returns>The raw check result for ping or TCP.</returns>
     private async Task<CheckResult> RunLimitedCheckAsync(
         string ip,
+        string pingTarget,
         DeviceCheck check,
         int timeoutMs,
         SemaphoreSlim checkLimiter,
@@ -143,7 +161,7 @@ public sealed class NetworkMonitorService
         {
             if (string.Equals(check.Type, "ping", StringComparison.OrdinalIgnoreCase))
             {
-                var pingResult = await PingAsync(ip, timeoutMs);
+                var pingResult = await PingAsync(pingTarget, timeoutMs);
                 return new CheckResult
                 {
                     Type = "ping",

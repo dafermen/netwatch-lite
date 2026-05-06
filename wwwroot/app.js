@@ -32,12 +32,14 @@ const reloadConfigButton = document.querySelector("#reload-config");
 const saveConfigButton = document.querySelector("#save-config");
 const saveConfigSpinner = document.querySelector("#save-config-spinner");
 const saveConfigIcon = document.querySelector("#save-config-icon");
+const useHostnameForPingInput = document.querySelector("#use-hostname-for-ping");
 const addDeviceButton = document.querySelector("#add-device");
 const deviceForm = document.querySelector("#device-form");
 const deviceFormTitle = document.querySelector("#device-form-title");
 const editingDeviceIndex = document.querySelector("#editing-device-index");
 const deviceNameInput = document.querySelector("#device-name");
 const deviceAddressInput = document.querySelector("#device-address");
+const deviceHostnameInput = document.querySelector("#device-hostname");
 const deviceCategoryInput = document.querySelector("#device-category");
 const deviceEnabledInput = document.querySelector("#device-enabled");
 const checksList = document.querySelector("#checks-list");
@@ -154,7 +156,8 @@ function matchesSearch(device, search) {
   }
 
   return String(device.name ?? "").toLowerCase().includes(search)
-    || String(device.ip ?? "").toLowerCase().includes(search);
+    || String(device.ip ?? "").toLowerCase().includes(search)
+    || String(device.hostname ?? "").toLowerCase().includes(search);
 }
 
 function matchesFilter(device, filter) {
@@ -229,7 +232,7 @@ function renderCategory(category, index) {
             <thead class="table-light">
               <tr>
                 <th scope="col">Name</th>
-                <th scope="col">IP</th>
+                <th scope="col">Address</th>
                 <th scope="col">Status</th>
                 <th scope="col">Ping status</th>
                 <th scope="col">Ports status</th>
@@ -255,7 +258,10 @@ function renderRow(result) {
   return `
     <tr>
       <td class="fw-semibold">${escapeHtml(result.name)}</td>
-      <td><code>${escapeHtml(result.ip)}</code></td>
+      <td>
+        <code>${escapeHtml(result.ip)}</code>
+        ${result.hostname ? `<div class="text-secondary small">${escapeHtml(result.hostname)}</div>` : ""}
+      </td>
       <td>${renderDeviceStatus(result.status)}</td>
       <td>
         <span class="badge ${statusClass} status-badge">
@@ -412,8 +418,11 @@ async function loadConfig() {
     configState.settings ??= {
       intervalSeconds: 15,
       timeoutMs: 1000,
-      maxParallelChecks: 50
+      maxParallelChecks: 50,
+      useHostnameForPing: false
     };
+    configState.settings.useHostnameForPing ??= false;
+    useHostnameForPingInput.checked = Boolean(configState.settings.useHostnameForPing);
     hasLoadedConfig = true;
     renderConfigDevices();
     resetDeviceForm();
@@ -430,6 +439,7 @@ async function saveConfig() {
   clearConfigAlert();
 
   try {
+    syncConfigSettingsFromUi();
     const response = await fetch("/api/config", {
       method: "POST",
       headers: {
@@ -477,7 +487,7 @@ function renderConfigDevices() {
   if (devices.length === 0) {
     configDevicesBody.innerHTML = `
       <tr>
-        <td colspan="4" class="text-center text-secondary py-4">No devices configured.</td>
+        <td colspan="5" class="text-center text-secondary py-4">No devices configured.</td>
       </tr>`;
     return;
   }
@@ -489,6 +499,7 @@ function renderConfigDevices() {
         <div class="text-secondary small">${escapeHtml(device.category || "Uncategorized")}</div>
       </td>
       <td><code>${escapeHtml(device.ip)}</code></td>
+      <td>${device.hostname ? `<code>${escapeHtml(device.hostname)}</code>` : `<span class="text-secondary">Not set</span>`}</td>
       <td>${device.checks?.length ?? 0}</td>
       <td class="text-end">
         <button class="btn btn-outline-primary btn-sm" type="button" data-edit-device="${index}">
@@ -503,6 +514,7 @@ function renderConfigDevices() {
 
 function startAddDevice() {
   resetDeviceForm();
+  showDeviceForm();
   deviceNameInput.focus();
 }
 
@@ -514,10 +526,12 @@ function editDevice(index) {
   }
 
   editingDeviceIndex.value = String(index);
+  showDeviceForm();
   deviceFormTitle.textContent = "Edit Device";
   submitDeviceButton.textContent = "Update Device";
   deviceNameInput.value = device.name ?? "";
   deviceAddressInput.value = device.ip ?? "";
+  deviceHostnameInput.value = device.hostname ?? "";
   deviceCategoryInput.value = device.category ?? "";
   deviceEnabledInput.checked = device.enabled ?? true;
   checksList.innerHTML = "";
@@ -570,6 +584,7 @@ function readDeviceForm() {
   return {
     name: deviceNameInput.value.trim(),
     ip: deviceAddressInput.value.trim(),
+    hostname: deviceHostnameInput.value.trim() || null,
     category: deviceCategoryInput.value.trim() || "Uncategorized",
     enabled: deviceEnabledInput.checked,
     checks
@@ -610,6 +625,25 @@ function resetDeviceForm() {
   submitDeviceButton.textContent = "Add Device";
   checksList.innerHTML = "";
   addCheckRow({ type: "ping" });
+  hideDeviceForm();
+}
+
+function showDeviceForm() {
+  deviceForm.classList.remove("d-none");
+}
+
+function hideDeviceForm() {
+  deviceForm.classList.add("d-none");
+}
+
+function syncConfigSettingsFromUi() {
+  configState.settings ??= {
+    intervalSeconds: 15,
+    timeoutMs: 1000,
+    maxParallelChecks: 50,
+    useHostnameForPing: false
+  };
+  configState.settings.useHostnameForPing = useHostnameForPingInput.checked;
 }
 
 function addCheckRow(check = { type: "ping" }) {
@@ -676,6 +710,7 @@ function setConfigBusy(isBusy) {
   saveConfigButton.disabled = isBusy;
   reloadConfigButton.disabled = isBusy;
   addDeviceButton.disabled = isBusy;
+  useHostnameForPingInput.disabled = isBusy;
   deviceForm.querySelectorAll("input, select, button").forEach(element => {
     element.disabled = isBusy;
   });
@@ -842,6 +877,10 @@ filterInputs.forEach(input => {
 });
 reloadConfigButton.addEventListener("click", loadConfig);
 saveConfigButton.addEventListener("click", saveConfig);
+useHostnameForPingInput.addEventListener("change", () => {
+  syncConfigSettingsFromUi();
+  showConfigAlert("info", "Ping mode changed locally. Click Save Configuration to persist changes.");
+});
 addDeviceButton.addEventListener("click", startAddDevice);
 deviceForm.addEventListener("submit", submitDevice);
 resetDeviceFormButton.addEventListener("click", resetDeviceForm);

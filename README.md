@@ -11,6 +11,7 @@ Release notes and commit-level project history are summarized in [CHANGELOG.md](
 - Editable `config.json` inventory.
 - Device categories such as `Servers`, `Critical Workstations`, `IP Cameras`, and `UPS Units`.
 - Async ping checks with latency in milliseconds.
+- Optional hostname-based ping mode for networks where IP addresses can change.
 - Async TCP port checks.
 - Parallel execution with `Task.WhenAll`.
 - Global concurrency limit with `maxParallelChecks`.
@@ -29,6 +30,7 @@ Release notes and commit-level project history are summarized in [CHANGELOG.md](
 - Hamburger sidebar navigation.
 - Configuration page at `/config`.
 - CRUD UI for devices and checks stored in `config.json`.
+- Add/edit device form opens only when adding or editing a device.
 - Manual mode by default.
 - Optional auto refresh toggle.
 - Manual refresh.
@@ -90,12 +92,14 @@ During local development, `Data/config.json` is copied to the build output as `c
   "settings": {
     "intervalSeconds": 15,
     "timeoutMs": 1000,
-    "maxParallelChecks": 50
+    "maxParallelChecks": 50,
+    "useHostnameForPing": false
   },
   "devices": [
     {
       "name": "Web Server",
       "ip": "192.168.4.10",
+      "hostname": "web-server.local",
       "category": "Servers",
       "enabled": true,
       "checks": [
@@ -108,7 +112,7 @@ During local development, `Data/config.json` is copied to the build output as `c
 }
 ```
 
-Use `category` to group devices in the UI. Use `enabled: false` to keep a device in the file without monitoring it.
+Use `category` to group devices in the UI. Use `enabled: false` to keep a device in the file without monitoring it. When `settings.useHostnameForPing` is `true`, ping checks use `hostname` when a device has one; otherwise they use `ip`. TCP checks continue to use `ip`.
 
 ## API Endpoints
 
