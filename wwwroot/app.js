@@ -621,11 +621,60 @@ function renderConfigDevices() {
     return;
   }
 
-  configDevicesBody.innerHTML = devices.map((device, index) => `
+  configDevicesBody.innerHTML = groupConfigDevicesByCategory(devices)
+    .map(group => `
+      <tr class="config-category-row">
+        <td colspan="5">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <span class="fw-semibold">${escapeHtml(group.name)}</span>
+            <span class="badge text-bg-secondary">${group.devices.length} devices</span>
+          </div>
+        </td>
+      </tr>
+      ${group.devices.map(({ device, index }) => renderConfigDeviceRow(device, index)).join("")}`)
+    .join("");
+}
+
+/**
+ * Groups configuration devices by category while preserving their original
+ * array index so edit/delete actions still target the correct JSON entry.
+ * @param {Array<object>} devices Devices from the editable configuration state.
+ * @returns {Array<{name: string, devices: Array<{device: object, index: number}>}>} Sorted category groups.
+ */
+function groupConfigDevicesByCategory(devices) {
+  const groups = new Map();
+
+  devices.forEach((device, index) => {
+    const categoryName = device.category || "Uncategorized";
+
+    if (!groups.has(categoryName)) {
+      groups.set(categoryName, []);
+    }
+
+    groups.get(categoryName).push({ device, index });
+  });
+
+  return Array.from(groups.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, groupedDevices]) => ({
+      name,
+      devices: groupedDevices.sort((left, right) =>
+        String(left.device.name ?? "").localeCompare(String(right.device.name ?? "")))
+    }));
+}
+
+/**
+ * Renders one editable device row inside its category group.
+ * @param {object} device Device configuration object.
+ * @param {number} index Original index in configState.devices.
+ * @returns {string} Table row markup.
+ */
+function renderConfigDeviceRow(device, index) {
+  return `
     <tr>
       <td>
         <div class="fw-semibold">${escapeHtml(device.name)}</div>
-        <div class="text-secondary small">${escapeHtml(device.category || "Uncategorized")}</div>
+        <div class="text-secondary small">${device.enabled === false ? "Disabled" : "Enabled"}</div>
       </td>
       <td><code>${escapeHtml(device.ip)}</code></td>
       <td>${device.hostname ? `<code>${escapeHtml(device.hostname)}</code>` : `<span class="text-secondary">Not set</span>`}</td>
@@ -638,7 +687,7 @@ function renderConfigDevices() {
           <i class="fa-solid fa-trash me-1"></i>Delete
         </button>
       </td>
-    </tr>`).join("");
+    </tr>`;
 }
 
 function startAddDevice() {
