@@ -13,6 +13,7 @@ All notable changes to NetWatch-Lite are documented here.
 - Renamed the editable runtime inventory file to `config.json`.
 - Configuration device form now opens only when adding or editing a device.
 - Added optional `hostname` per device and `useHostnameForPing` setting for hostname-based ping checks.
+- Fixed hamburger sidebar collapse behavior and reset the configuration form when leaving the configuration page.
 - Documentation updated to describe manual-first behavior.
 
 ## v0.2.0 - 2026-05-05
