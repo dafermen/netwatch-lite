@@ -4,7 +4,9 @@ All notable changes to NetWatch-Lite are documented here.
 
 ## Unreleased
 
-- No changes yet.
+- Rebranded visible app text to NetWatch Lite.
+- Added a custom SVG logo and favicon.
+- Added built-in User Manual and About pages.
 
 ## v0.3.0 - 2026-05-06
 

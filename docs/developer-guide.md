@@ -1,10 +1,10 @@
-# NetWatch-Lite Developer Guide
+# NetWatch Lite Developer Guide
 
 This guide explains how the source code is organized, how the main classes relate to each other, and how a monitoring execution flows from the browser to the network checks and back.
 
 ## Runtime Overview
 
-NetWatch-Lite is an ASP.NET Core Minimal API application with a static Bootstrap frontend.
+NetWatch Lite is an ASP.NET Core Minimal API application with a static Bootstrap frontend.
 
 The backend owns configuration, validation, file persistence, network checks, execution locking, and API responses. The frontend owns navigation, dashboard rendering, configuration CRUD, filters, and progressive rendering through Server-Sent Events.
 
@@ -241,6 +241,8 @@ Routes:
 
 - `/`: dashboard.
 - `/config`: configuration CRUD page.
+- `/manual`: built-in user manual.
+- `/about`: project information and open-project notes.
 
 ### wwwroot/app.js
 

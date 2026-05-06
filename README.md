@@ -30,6 +30,8 @@ Release notes and commit-level project history are summarized in [CHANGELOG.md](
 - Search and client-side filters.
 - Category groups collapsed by default.
 - Hamburger sidebar navigation.
+- Branded NetWatch Lite logo and favicon.
+- Built-in User Manual and About pages.
 - Responsive layout for desktop, tablet, and mobile screens.
 - Configuration page at `/config`.
 - CRUD UI for devices and checks stored in `config.json`.
@@ -69,6 +71,7 @@ netwatch-lite/
 ├── wwwroot/
 │   ├── app.js
 │   ├── index.html
+│   ├── netwatch-lite.svg
 │   └── styles.css
 ├── docs/
 │   ├── developer-guide.md
@@ -197,7 +200,7 @@ Edit `config.json` in the same folder as `NetWatch-Lite.exe`, or use the `/confi
 
 - `Run Full Check` executes all configured checks immediately.
 - Dashboard startup and full checks stream results progressively, so devices appear as they finish instead of waiting for the whole execution.
-- NetWatch-Lite starts in manual mode by default.
+- NetWatch Lite starts in manual mode by default.
 - `Auto Refresh` runs a full check every 60 seconds after the operator turns it on.
 - `settings.intervalSeconds` is retained for JSON compatibility but is not used by the current auto full-check timer.
 - Invalid or corrupt `config.json` content is reported through the API/UI instead of crashing silently.
