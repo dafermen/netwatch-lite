@@ -10,6 +10,16 @@ Release notes and commit-level project history are summarized in [CHANGELOG.md](
 
 GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.com/dafermen/netwatch-lite).
 
+## Screenshots
+
+### Dashboard
+
+![NetWatch Lite dashboard](docs/assets/netwatch-lite-dashboard.png)
+
+### Configuration
+
+![NetWatch Lite configuration](docs/assets/netwatch-lite-configuration.png)
+
 ## Features
 
 - Editable `config.json` inventory.

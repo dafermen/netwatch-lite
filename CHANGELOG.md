@@ -8,6 +8,7 @@ All notable changes to NetWatch-Lite are documented here.
 - Added a custom SVG logo and favicon.
 - Added built-in User Manual and About pages.
 - Added GitHub repository link to About and documentation.
+- Added dashboard and configuration screenshots to the README.
 
 ## v0.3.0 - 2026-05-06
 
