@@ -1,4 +1,5 @@
 const sidebar = document.querySelector("#sidebar");
+const appShell = document.querySelector(".app-shell");
 const sidebarBackdrop = document.querySelector("#sidebar-backdrop");
 const sidebarToggle = document.querySelector("#sidebar-toggle");
 const navLinks = document.querySelectorAll("[data-route]");
@@ -63,6 +64,7 @@ let hasLoadedConfig = false;
 let configState = createEmptyConfiguration();
 let pendingDeleteIndex = null;
 const expandedCategoryNames = new Set();
+const mobileSidebarQuery = window.matchMedia("(max-width: 991.98px)");
 
 async function loadResults(options = {}) {
   const endpoint = options.forceRun ? "/api/monitor/run" : "/api/monitor/refresh";
@@ -735,7 +737,8 @@ function createEmptyConfiguration() {
     settings: {
       intervalSeconds: 15,
       timeoutMs: 1000,
-      maxParallelChecks: 50
+      maxParallelChecks: 50,
+      useHostnameForPing: false
     },
     devices: []
   };
@@ -743,6 +746,7 @@ function createEmptyConfiguration() {
 
 function navigateTo(route, replace = false) {
   const normalizedRoute = normalizeRoute(route);
+  const previousRoute = currentRoute;
   currentRoute = normalizedRoute;
 
   dashboardPage.hidden = normalizedRoute !== "/";
@@ -761,6 +765,15 @@ function navigateTo(route, replace = false) {
 
   closeSidebar();
 
+  if (previousRoute === "/config" && normalizedRoute !== "/config") {
+    resetDeviceForm();
+    clearConfigAlert();
+  }
+
+  if (normalizedRoute === "/config" && previousRoute !== "/config") {
+    resetDeviceForm();
+  }
+
   if (normalizedRoute === "/" && !hasLoadedDashboard) {
     loadResults();
   }
@@ -775,13 +788,23 @@ function normalizeRoute(pathname) {
 }
 
 function toggleSidebar() {
-  sidebar.classList.toggle("show");
-  sidebarBackdrop.classList.toggle("show");
+  if (mobileSidebarQuery.matches) {
+    const isOpen = sidebar.classList.toggle("show");
+    sidebarBackdrop.classList.toggle("show", isOpen);
+    sidebarToggle.setAttribute("aria-expanded", String(isOpen));
+    return;
+  }
+
+  const isCollapsed = appShell.classList.toggle("sidebar-collapsed");
+  sidebarToggle.setAttribute("aria-expanded", String(!isCollapsed));
 }
 
 function closeSidebar() {
   sidebar.classList.remove("show");
   sidebarBackdrop.classList.remove("show");
+  sidebarToggle.setAttribute(
+    "aria-expanded",
+    String(!appShell.classList.contains("sidebar-collapsed")));
 }
 
 function setButtonLoading(button, spinner, icon, isLoading) {

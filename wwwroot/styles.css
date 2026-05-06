@@ -13,6 +13,7 @@ body {
   left: 0;
   position: fixed;
   top: 0;
+  transition: transform 0.2s ease-in-out;
   width: 16rem;
   z-index: 1040;
 }
@@ -67,6 +68,15 @@ body {
 .app-main {
   margin-left: 16rem;
   min-height: 100vh;
+  transition: margin-left 0.2s ease-in-out;
+}
+
+.sidebar-collapsed .sidebar {
+  transform: translateX(-100%);
+}
+
+.sidebar-collapsed .app-main {
+  margin-left: 0;
 }
 
 .topbar {
@@ -176,7 +186,6 @@ body {
 @media (max-width: 991.98px) {
   .sidebar {
     transform: translateX(-100%);
-    transition: transform 0.2s ease-in-out;
   }
 
   .sidebar.show {
