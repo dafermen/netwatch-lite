@@ -193,6 +193,14 @@ dotnet run
 
 Open the URL printed by `dotnet run`, usually `http://localhost:5000`, `https://localhost:5001`, or another available local port.
 
+## Portable Download
+
+A Windows x64 portable ZIP is available in the repository:
+
+[releases/NetWatch-Lite-win-x64-portable-2026-05-07-e33028b.zip](releases/NetWatch-Lite-win-x64-portable-2026-05-07-e33028b.zip)
+
+Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The editable `config.json` file is included beside the executable.
+
 ## Create Windows Portable Build
 
 Publish a self-contained Windows x64 package:

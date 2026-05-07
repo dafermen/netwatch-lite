@@ -18,6 +18,7 @@ All notable changes to NetWatch-Lite are documented here.
 - Removed the iframe-based web wallboard so wallboard usage is handled by the Windows WebView2 executable only.
 - Moved WebView2 wallboard source and sample assets out of the web dashboard repository into the sibling wallboard repository.
 - Replaced public sample device references with neutral names.
+- Added a downloadable Windows x64 portable ZIP under `releases/`.
 
 ## v0.3.0 - 2026-05-06
 
