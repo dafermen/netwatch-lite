@@ -6,7 +6,7 @@ namespace NetWatch.Models;
 public sealed class CategoryResult
 {
     /// <summary>
-    /// Category name, for example Servers or UPS Units.
+    /// Category name, for example Servers or Power Devices.
     /// </summary>
     public required string Name { get; init; }
 

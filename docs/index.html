@@ -264,23 +264,9 @@
     </section>
 
     <section>
-      <h2>Configuracion Wallboard</h2>
-      <p>El modo NOC vive en el ejecutable Windows WebView2 y lee <code>Data/wallboard.json</code> en desarrollo. Al publicar portable se copia como <code>wallboard.json</code> junto a <code>NetWatch-Lite-Wallboard.exe</code>.</p>
-      <pre>{
-  "appTitle": "GTSG Monitoring",
-  "rotationEnabled": true,
-  "rotationSeconds": 20,
-  "defaultLayout": 4,
-  "panels": [
-    {
-      "name": "NGSS NYELF",
-      "url": "https://example.com/health",
-      "refreshSeconds": 10
-    }
-  ]
-}</pre>
-      <p>Atajos: <code>F</code> alterna fullscreen, <code>R</code> refresca paneles visibles y <code>ESC</code> sale de fullscreen. Los layouts soportados son 2 y 4 paneles.</p>
-      <p>WebView2 carga cada panel como navegador nativo, no como iframe, por eso es el modo recomendado para paginas que bloquean embedding en navegador.</p>
+      <h2>Proyecto Wallboard Hermano</h2>
+      <p>El modo NOC WebView2 vive ahora en un repositorio separado: <code>netwatch-lite-wallboard</code>. Esa separacion mantiene este dashboard web enfocado en monitoreo de red y permite evolucionar el Wallboard como ejecutable Windows independiente.</p>
+      <p>WebView2 carga cada panel como navegador nativo, no como iframe, por eso es el modo recomendado para paginas operativas que bloquean embedding en navegador.</p>
     </section>
 
     <section>

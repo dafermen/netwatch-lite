@@ -26,7 +26,7 @@ public sealed class Device
     public string? Hostname { get; init; }
 
     /// <summary>
-    /// Logical dashboard group, for example Servers, IP Cameras, UPS Units, or Critical Workstations.
+    /// Logical dashboard group, for example Servers, IP Cameras, Power Devices, or Critical Workstations.
     /// </summary>
     [JsonPropertyName("category")]
     public string Category { get; init; } = "Uncategorized";

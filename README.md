@@ -23,7 +23,7 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 ## Features
 
 - Editable `config.json` inventory.
-- Device categories such as `Servers`, `Critical Workstations`, `IP Cameras`, and `UPS Units`.
+- Device categories such as `Servers`, `Critical Workstations`, `IP Cameras`, and `Power Devices`.
 - Async ping checks with latency in milliseconds.
 - Optional hostname-based ping mode for networks where IP addresses can change.
 - Async TCP port checks.
@@ -43,8 +43,9 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 - Category groups collapsed by default.
 - Hamburger sidebar navigation.
 - Branded NetWatch Lite logo and favicon.
+- Embedded Windows executable icon for portable builds.
 - Built-in User Manual and About pages.
-- Windows WebView2 wallboard executable for monitoring pages that block iframe embedding.
+- Companion Windows WebView2 wallboard is maintained in the sibling `netwatch-lite-wallboard` repository.
 - Responsive layout for desktop, tablet, and mobile screens.
 - Configuration page at `/config`.
 - CRUD UI for devices and checks stored in `config.json`.
@@ -62,6 +63,8 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 
 ```text
 netwatch-lite/
+├── Assets/
+│   └── netwatch-lite.ico
 ├── Data/
 │   └── config.json
 ├── Models/
@@ -85,17 +88,12 @@ netwatch-lite/
 │   ├── app.js
 │   ├── index.html
 │   ├── netwatch-lite.svg
-│   ├── styles.css
-│   └── wallboard-sample.html
+│   └── styles.css
 ├── docs/
 │   ├── developer-guide.md
 │   └── index.html
-├── src/
-│   └── NetWatchLite.Wallboard.WebView2/
-│       ├── NetWatchLite.Wallboard.WebView2.csproj
-│       ├── WallboardForm.cs
-│       └── WebViewPanelControl.cs
 ├── appsettings.json
+├── LICENSE
 ├── NetWatch.csproj
 ├── netwatch.sln
 ├── Program.cs
@@ -145,57 +143,13 @@ During local development, `Data/config.json` is copied to the build output as `c
 
 Use `category` to group devices in the UI. Use `enabled: false` to keep a device in the file without monitoring it. When `settings.useHostnameForPing` is `true`, ping checks use `hostname` when a device has one; otherwise they use `ip`. TCP checks continue to use `ip`.
 
-## Wallboard JSON Format
+## Companion Wallboard Project
 
-The Windows WebView2 wallboard reads `wallboard.json`. During local development, the source file is `Data/wallboard.json`. During WebView2 portable publish, it is copied next to `NetWatch-Lite-Wallboard.exe`.
+The Windows WebView2 wallboard is maintained as a separate sibling project:
 
-```json
-{
-  "appTitle": "GTSG Monitoring",
-  "rotationEnabled": true,
-  "rotationSeconds": 20,
-  "defaultLayout": 4,
-  "panels": [
-    {
-      "name": "NGSS NYELF",
-      "url": "/wallboard-sample.html?panel=NGSS%20NYELF",
-      "refreshSeconds": 10
-    }
-  ]
-}
-```
+[https://github.com/dafermen/netwatch-lite-wallboard](https://github.com/dafermen/netwatch-lite-wallboard)
 
-It supports 2-panel and 4-panel layouts, independent panel refresh intervals, page rotation, fullscreen mode, and keyboard shortcuts: `F` fullscreen, `R` refresh visible panels, and `ESC` exit fullscreen.
-
-Panel URLs can be absolute HTTP/HTTPS URLs or root-relative local sample URLs. WebView2 loads each panel as a native browser view, which is the right approach for required monitoring pages that block iframe embedding.
-
-## Windows WebView2 Wallboard
-
-The project includes a Windows-only desktop wallboard at `src/NetWatchLite.Wallboard.WebView2`. It reads `wallboard.json` and renders each panel with a native Microsoft Edge WebView2 control.
-
-Run or publish it on Windows:
-
-```powershell
-dotnet run --project .\src\NetWatchLite.Wallboard.WebView2\NetWatchLite.Wallboard.WebView2.csproj
-```
-
-Publish a portable Windows x64 build:
-
-```bash
-dotnet publish src/NetWatchLite.Wallboard.WebView2/NetWatchLite.Wallboard.WebView2.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o publish/wallboard-webview2-win-x64
-```
-
-Expected output:
-
-```text
-publish/wallboard-webview2-win-x64/
-├── NetWatch-Lite-Wallboard.exe
-├── wallboard.json
-├── wwwroot/
-└── runtime dependencies...
-```
-
-The target Windows machine must have the Microsoft Edge WebView2 Runtime installed. Most modern Windows systems already include it; otherwise install the Evergreen WebView2 Runtime from Microsoft.
+That project renders operational monitoring pages in native WebView2 panels for pages that block iframe embedding.
 
 ## API Endpoints
 
@@ -212,6 +166,10 @@ The target Windows machine must have the Microsoft Edge WebView2 Runtime install
 ## Version Notes
 
 Changes are documented in [CHANGELOG.md](CHANGELOG.md). Each Git commit should keep a concise message describing the change, and user-facing changes should also be added to the changelog.
+
+## License
+
+NetWatch Lite is released under the [MIT License](LICENSE). You can use, copy, modify, merge, publish, distribute, sublicense, and sell copies of the software under the license terms.
 
 ## Source Documentation
 

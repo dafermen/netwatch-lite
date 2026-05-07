@@ -3,7 +3,7 @@
     "intervalSeconds": 15,
     "timeoutMs": 1000,
     "maxParallelChecks": 50,
-    "useHostnameForPing": false
+    "useHostnameForPing": true
   },
   "devices": [
     {
@@ -14,7 +14,8 @@
       "enabled": true,
       "checks": [
         {
-          "type": "ping"
+          "type": "ping",
+          "port": null
         },
         {
           "type": "tcp",
@@ -34,7 +35,8 @@
       "enabled": true,
       "checks": [
         {
-          "type": "ping"
+          "type": "ping",
+          "port": null
         },
         {
           "type": "tcp",
@@ -50,7 +52,8 @@
       "enabled": true,
       "checks": [
         {
-          "type": "ping"
+          "type": "ping",
+          "port": null
         },
         {
           "type": "tcp",
@@ -66,7 +69,8 @@
       "enabled": true,
       "checks": [
         {
-          "type": "ping"
+          "type": "ping",
+          "port": null
         },
         {
           "type": "tcp",
@@ -82,7 +86,8 @@
       "enabled": true,
       "checks": [
         {
-          "type": "ping"
+          "type": "ping",
+          "port": null
         }
       ]
     },
@@ -94,7 +99,8 @@
       "enabled": true,
       "checks": [
         {
-          "type": "ping"
+          "type": "ping",
+          "port": null
         },
         {
           "type": "tcp",
@@ -114,7 +120,8 @@
       "enabled": true,
       "checks": [
         {
-          "type": "ping"
+          "type": "ping",
+          "port": null
         },
         {
           "type": "tcp",
@@ -127,14 +134,15 @@
       ]
     },
     {
-      "name": "Main Rack UPS",
+      "name": "Main Rack Power Backup",
       "ip": "192.168.4.80",
-      "hostname": "main-ups.local",
-      "category": "UPS Units",
+      "hostname": "main-power-backup.local",
+      "category": "Power Devices",
       "enabled": true,
       "checks": [
         {
-          "type": "ping"
+          "type": "ping",
+          "port": null
         },
         {
           "type": "tcp",
@@ -154,7 +162,8 @@
       "enabled": true,
       "checks": [
         {
-          "type": "ping"
+          "type": "ping",
+          "port": null
         },
         {
           "type": "tcp",
@@ -170,7 +179,8 @@
       "enabled": true,
       "checks": [
         {
-          "type": "ping"
+          "type": "ping",
+          "port": null
         },
         {
           "type": "tcp",
