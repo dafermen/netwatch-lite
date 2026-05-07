@@ -1,0 +1,28 @@
+{
+  "appTitle": "GTSG Monitoring",
+  "rotationEnabled": true,
+  "rotationSeconds": 20,
+  "defaultLayout": 4,
+  "panels": [
+    {
+      "name": "NGSS NYELF",
+      "url": "https://nyelfstat01.linux.us.ups.com/ngss/health.php",
+      "refreshSeconds": 10
+    },
+    {
+      "name": "NGSS NYFOS",
+      "url": "https://nyfosstat01.linux.us.ups.com/ngss/health.php",
+      "refreshSeconds": 12
+    },
+    {
+      "name": "NGSS NYMNS",
+      "url": "https://nymnsstat01.linux.us.ups.com/ngss/health.php",
+      "refreshSeconds": 14
+    },
+    {
+      "name": "NGSS NYYON",
+      "url": "https://nyyonstat01.linux.us.ups.com/ngss/health.php",
+      "refreshSeconds": 16
+    }
+  ]
+}

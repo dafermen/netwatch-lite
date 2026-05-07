@@ -44,6 +44,7 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 - Hamburger sidebar navigation.
 - Branded NetWatch Lite logo and favicon.
 - Built-in User Manual and About pages.
+- NOC-style wallboard mode at `/wallboard` for fullscreen iframe monitoring panels.
 - Responsive layout for desktop, tablet, and mobile screens.
 - Configuration page at `/config`.
 - CRUD UI for devices and checks stored in `config.json`.
@@ -74,17 +75,23 @@ netwatch-lite/
 │   ├── MonitorConfiguration.cs
 │   ├── MonitorResponse.cs
 │   ├── MonitorStreamEvent.cs
+│   ├── WallboardConfiguration.cs
+│   ├── WallboardPanel.cs
 │   └── MonitorSettings.cs
 ├── Services/
 │   ├── JsonDeviceRepository.cs
 │   ├── MonitorExecutionService.cs
 │   ├── NetworkMonitorOptions.cs
-│   └── NetworkMonitorService.cs
+│   ├── NetworkMonitorService.cs
+│   └── WallboardConfigService.cs
 ├── wwwroot/
 │   ├── app.js
 │   ├── index.html
 │   ├── netwatch-lite.svg
-│   └── styles.css
+│   ├── styles.css
+│   ├── wallboard.css
+│   ├── wallboard.html
+│   └── wallboard.js
 ├── docs/
 │   ├── developer-guide.md
 │   └── index.html
@@ -137,6 +144,28 @@ During local development, `Data/config.json` is copied to the build output as `c
 
 Use `category` to group devices in the UI. Use `enabled: false` to keep a device in the file without monitoring it. When `settings.useHostnameForPing` is `true`, ping checks use `hostname` when a device has one; otherwise they use `ip`. TCP checks continue to use `ip`.
 
+## Wallboard JSON Format
+
+The fullscreen operations wallboard reads `wallboard.json`. During local development, `Data/wallboard.json` is copied to the build output as `wallboard.json`. During portable publish, it is copied next to `NetWatch-Lite.exe`.
+
+```json
+{
+  "appTitle": "GTSG Monitoring",
+  "rotationEnabled": true,
+  "rotationSeconds": 20,
+  "defaultLayout": 4,
+  "panels": [
+    {
+      "name": "NGSS NYELF",
+      "url": "https://example.com/health",
+      "refreshSeconds": 10
+    }
+  ]
+}
+```
+
+Open `/wallboard` for the NOC-style display. It supports 2-panel and 4-panel layouts, independent iframe refresh intervals, page rotation, fullscreen mode, and keyboard shortcuts: `F` fullscreen, `R` refresh visible panels, and `ESC` exit fullscreen.
+
 ## API Endpoints
 
 | Method | Endpoint | Purpose |
@@ -148,6 +177,8 @@ Use `category` to group devices in the UI. Use `enabled: false` to keep a device
 | `GET` | `/api/results` | Backwards-compatible endpoint that forces a full check. |
 | `POST` | `/api/monitor/run` | Forces a full check and prevents overlapping executions. |
 | `GET` | `/api/monitor/stream` | Streams a full check progressively with `started`, `result`, `completed`, and `busy` events. |
+| `GET` | `/api/wallboard/config` | Returns the wallboard configuration. |
+| `POST` | `/api/wallboard/reload` | Reloads `wallboard.json` from disk. |
 
 ## Version Notes
 

@@ -10,6 +10,8 @@ NetWatch Lite is an ASP.NET Core Minimal API application with a static Bootstrap
 
 The backend owns configuration, validation, file persistence, network checks, execution locking, and API responses. The frontend owns navigation, dashboard rendering, configuration CRUD, filters, and progressive rendering through Server-Sent Events.
 
+The wallboard mode at `/wallboard` is a standalone static page for NOC screens. It reads `wallboard.json`, renders external monitoring pages in iframes, supports 2-panel and 4-panel layouts, rotates pages, and provides fullscreen keyboard shortcuts.
+
 ```text
 Browser
   |
@@ -42,7 +44,9 @@ Important responsibilities:
   - `JsonDeviceRepository`
   - `NetworkMonitorService`
   - `MonitorExecutionService`
+  - `WallboardConfigService`
 - Attempts to load `config.json` at startup.
+- Attempts to load `wallboard.json` at startup and falls back to defaults if it is invalid.
 - Keeps the app alive if `config.json` is invalid so `/config` can be used to repair it.
 - Maps configuration endpoints.
 - Maps monitoring endpoints.
@@ -59,6 +63,8 @@ Important endpoints:
 | `GET /api/results` | Backwards-compatible full-check endpoint. |
 | `POST /api/monitor/run` | Runs a full check and returns one final payload. |
 | `GET /api/monitor/stream` | Runs a full check and streams progressive events. |
+| `GET /api/wallboard/config` | Returns the normalized wallboard configuration. |
+| `POST /api/wallboard/reload` | Reloads `wallboard.json` from disk. |
 
 ## Models
 
@@ -156,6 +162,24 @@ Event types:
 - `completed`: carries final summary, categories, and flat results.
 - `busy`: tells the UI another run is already in progress.
 
+### WallboardConfiguration
+
+Root JSON object for `/wallboard`:
+
+- `AppTitle`: centered title in the wallboard top bar.
+- `RotationEnabled`: default auto-rotation state.
+- `RotationSeconds`: seconds between page rotations.
+- `DefaultLayout`: either 2 or 4 visible panels.
+- `Panels`: iframe panel declarations.
+
+### WallboardPanel
+
+One iframe panel:
+
+- `Name`: title shown above the iframe.
+- `Url`: absolute HTTP or HTTPS URL loaded by the iframe.
+- `RefreshSeconds`: independent refresh interval for that iframe.
+
 ## Services
 
 ### JsonDeviceRepository
@@ -217,6 +241,21 @@ Key methods:
 - `RunFullCheckAsync`: waits for any existing execution and returns a final `MonitorResponse`.
 - `TryRunFullCheckAsync`: starts only if no run is active; otherwise returns null.
 - `TryStreamFullCheckAsync`: starts only if no run is active and writes `MonitorStreamEvent` objects as devices complete.
+
+### WallboardConfigService
+
+Owns wallboard file access.
+
+Key methods:
+
+- `ReloadAsync`: reads `wallboard.json`, validates it, normalizes values, and updates memory. Invalid or missing files fall back to default values.
+- `GetConfigurationAsync`: returns the current normalized wallboard configuration.
+
+Important internal helpers:
+
+- `ResolveWallboardFilePath`: finds `wallboard.json` in the executable folder or `Data/wallboard.json` during development.
+- `Normalize`: trims title/panel names, normalizes layout and rotation, and removes invalid panels.
+- `IsValidPanel`: accepts only absolute HTTP or HTTPS iframe URLs.
 
 Internal helpers:
 

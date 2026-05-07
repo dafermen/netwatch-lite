@@ -9,6 +9,7 @@ All notable changes to NetWatch-Lite are documented here.
 - Added built-in User Manual and About pages.
 - Added GitHub repository link to About and documentation.
 - Added dashboard and configuration screenshots to the README.
+- Added `/wallboard` fullscreen NOC mode with iframe panels, layout controls, rotation, keyboard shortcuts, and `wallboard.json`.
 
 ## v0.3.0 - 2026-05-06
 
