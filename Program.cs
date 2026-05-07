@@ -20,7 +20,6 @@ builder.Services.Configure<NetworkMonitorOptions>(
 builder.Services.AddSingleton<JsonDeviceRepository>();
 builder.Services.AddSingleton<NetworkMonitorService>();
 builder.Services.AddSingleton<MonitorExecutionService>();
-builder.Services.AddSingleton<WallboardConfigService>();
 
 var app = builder.Build();
 
@@ -29,7 +28,6 @@ app.UseStaticFiles();
 
 // Load config.json at startup so configuration errors are visible immediately.
 var repository = app.Services.GetRequiredService<JsonDeviceRepository>();
-var wallboardConfigService = app.Services.GetRequiredService<WallboardConfigService>();
 try
 {
     await repository.ReloadAsync();
@@ -41,27 +39,6 @@ catch (Exception ex) when (
         or UnauthorizedAccessException)
 {
     app.Logger.LogError(ex, "Unable to load config.json at startup. The configuration page can still be used to repair it.");
-}
-
-await wallboardConfigService.ReloadAsync();
-
-// Serves the NOC-style iframe wallboard directly so /wallboard works without relying on browser redirects.
-app.MapGet("/wallboard", ReadWallboardHtmlAsync);
-app.MapGet("/wallboard/", ReadWallboardHtmlAsync);
-
-static async Task<IResult> ReadWallboardHtmlAsync(
-    IWebHostEnvironment environment,
-    CancellationToken cancellationToken)
-{
-    var filePath = Path.Combine(environment.WebRootPath, "wallboard.html");
-
-    if (!File.Exists(filePath))
-    {
-        return Results.NotFound("wallboard.html was not found.");
-    }
-
-    var html = await File.ReadAllTextAsync(filePath, cancellationToken);
-    return Results.Content(html, "text/html");
 }
 
 // Returns the normalized devices currently loaded from config.json.
@@ -126,25 +103,6 @@ app.MapPost("/api/config", async (
             error = ex.Message
         });
     }
-});
-
-// Returns the full wallboard configuration used by /wallboard.
-app.MapGet("/api/wallboard/config", async (WallboardConfigService service) =>
-{
-    return Results.Ok(await service.GetConfigurationAsync());
-});
-
-// Reloads wallboard.json from disk without restarting the application.
-app.MapPost("/api/wallboard/reload", async (WallboardConfigService service) =>
-{
-    var configuration = await service.ReloadAsync();
-
-    return Results.Ok(new
-    {
-        reloadedAt = DateTimeOffset.Now,
-        panelCount = configuration.Panels.Count,
-        configuration
-    });
 });
 
 // Backwards-compatible endpoint that forces a fresh full check and returns the monitor payload.
