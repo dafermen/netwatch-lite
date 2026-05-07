@@ -157,7 +157,7 @@ The fullscreen operations wallboard reads `wallboard.json`. During local develop
   "panels": [
     {
       "name": "NGSS NYELF",
-      "url": "https://example.com/health",
+      "url": "/wallboard-sample.html?panel=NGSS%20NYELF",
       "refreshSeconds": 10
     }
   ]
@@ -166,7 +166,7 @@ The fullscreen operations wallboard reads `wallboard.json`. During local develop
 
 Open `/wallboard` for the NOC-style display. It supports 2-panel and 4-panel layouts, independent iframe refresh intervals, page rotation, fullscreen mode, and keyboard shortcuts: `F` fullscreen, `R` refresh visible panels, and `ESC` exit fullscreen.
 
-Some external websites block iframe embedding with headers such as `X-Frame-Options` or `Content-Security-Policy`. When that happens, the browser may show messages like "refused to connect". Use URLs that allow iframe embedding, internal wallboard pages, or monitoring pages designed for NOC display.
+Panel URLs can be absolute HTTP/HTTPS URLs or root-relative local URLs. Some external websites block iframe embedding with headers such as `X-Frame-Options` or `Content-Security-Policy`. When that happens, the browser may show messages like "refused to connect". Use URLs that allow iframe embedding, internal wallboard pages, or monitoring pages designed for NOC display. If a required monitoring site blocks iframes, use a Windows WebView2 wallboard where each panel is loaded as a top-level WebView instead of an iframe.
 
 ## API Endpoints
 

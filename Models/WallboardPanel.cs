@@ -11,7 +11,7 @@ public sealed class WallboardPanel
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// Absolute HTTP or HTTPS URL loaded by the iframe.
+    /// Absolute HTTP/HTTPS URL or root-relative local URL loaded by the iframe.
     /// </summary>
     public string Url { get; set; } = string.Empty;
 

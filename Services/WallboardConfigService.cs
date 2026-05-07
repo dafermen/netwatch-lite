@@ -143,7 +143,7 @@ public sealed class WallboardConfigService
     }
 
     /// <summary>
-    /// Determines whether a wallboard panel has a usable absolute HTTP or HTTPS URL.
+    /// Determines whether a wallboard panel has a usable absolute HTTP/HTTPS URL or root-relative local URL.
     /// </summary>
     /// <param name="panel">Panel read from JSON.</param>
     /// <returns>True when the panel can be rendered by an iframe.</returns>
@@ -154,7 +154,14 @@ public sealed class WallboardConfigService
             return false;
         }
 
-        return Uri.TryCreate(panel.Url, UriKind.Absolute, out var uri)
+        var url = panel.Url.Trim();
+
+        if (url.StartsWith('/'))
+        {
+            return true;
+        }
+
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri)
             && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
     }
 
