@@ -17,6 +17,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Remove="Data/config.backup.json" />
+    <None Remove="Data/config.backup.json" />
     <Content Update="Data/config.json" Link="config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
