@@ -197,9 +197,9 @@ Open the URL printed by `dotnet run`, usually `http://localhost:5000`, `https://
 
 A Windows x64 portable ZIP is available in the repository:
 
-[releases/NetWatch-Lite-win-x64-portable-2026-05-07-e33028b.zip](releases/NetWatch-Lite-win-x64-portable-2026-05-07-e33028b.zip)
+[Download NetWatch Lite portable ZIP](https://github.com/dafermen/netwatch-lite/raw/refs/heads/main/releases/NetWatch-Lite-win-x64-portable-2026-05-07-e33028b.zip)
 
-Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The editable `config.json` file is included beside the executable.
+Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The editable `config.json` file is included beside the executable. Use the direct download link above instead of saving the GitHub preview page as a ZIP file.
 
 ## Create Windows Portable Build
 
