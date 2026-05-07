@@ -166,6 +166,8 @@ The fullscreen operations wallboard reads `wallboard.json`. During local develop
 
 Open `/wallboard` for the NOC-style display. It supports 2-panel and 4-panel layouts, independent iframe refresh intervals, page rotation, fullscreen mode, and keyboard shortcuts: `F` fullscreen, `R` refresh visible panels, and `ESC` exit fullscreen.
 
+Some external websites block iframe embedding with headers such as `X-Frame-Options` or `Content-Security-Policy`. When that happens, the browser may show messages like "refused to connect". Use URLs that allow iframe embedding, internal wallboard pages, or monitoring pages designed for NOC display.
+
 ## API Endpoints
 
 | Method | Endpoint | Purpose |

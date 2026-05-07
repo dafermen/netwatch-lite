@@ -6,22 +6,22 @@
   "panels": [
     {
       "name": "NGSS NYELF",
-      "url": "https://nyelfstat01.linux.us.ups.com/ngss/health.php",
+      "url": "https://example.com",
       "refreshSeconds": 10
     },
     {
       "name": "NGSS NYFOS",
-      "url": "https://nyfosstat01.linux.us.ups.com/ngss/health.php",
+      "url": "https://example.org",
       "refreshSeconds": 12
     },
     {
       "name": "NGSS NYMNS",
-      "url": "https://nymnsstat01.linux.us.ups.com/ngss/health.php",
+      "url": "https://example.net",
       "refreshSeconds": 14
     },
     {
       "name": "NGSS NYYON",
-      "url": "https://nyyonstat01.linux.us.ups.com/ngss/health.php",
+      "url": "https://www.iana.org",
       "refreshSeconds": 16
     }
   ]
