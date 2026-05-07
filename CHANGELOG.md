@@ -6,6 +6,8 @@ All notable changes to NetWatch-Lite are documented here.
 
 - Rebranded visible app text to NetWatch Lite.
 - Added a custom SVG logo and favicon.
+- Added a Windows executable icon for portable builds.
+- Added MIT license file and license notes.
 - Added built-in User Manual and About pages.
 - Added GitHub repository link to About and documentation.
 - Added dashboard and configuration screenshots to the README.
@@ -14,6 +16,8 @@ All notable changes to NetWatch-Lite are documented here.
 - Added local wallboard sample panels and support for root-relative wallboard URLs.
 - Added a Windows WebView2 wallboard project that renders each panel as a native WebView for sites that block iframes.
 - Removed the iframe-based web wallboard so wallboard usage is handled by the Windows WebView2 executable only.
+- Moved WebView2 wallboard source and sample assets out of the web dashboard repository into the sibling wallboard repository.
+- Replaced public sample device references with neutral names.
 
 ## v0.3.0 - 2026-05-06
 
