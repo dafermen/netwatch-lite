@@ -46,8 +46,8 @@ catch (Exception ex) when (
 await wallboardConfigService.ReloadAsync();
 
 // Serves the NOC-style iframe wallboard through the static file middleware.
-app.MapGet("/wallboard", () => Results.Redirect("/wallboard.html"));
-app.MapGet("/wallboard/", () => Results.Redirect("/wallboard.html"));
+app.MapGet("/wallboard", () => Results.LocalRedirect("/wallboard.html"));
+app.MapGet("/wallboard/", () => Results.LocalRedirect("/wallboard.html"));
 
 // Returns the normalized devices currently loaded from config.json.
 app.MapGet("/api/devices", async (JsonDeviceRepository deviceRepository) =>
