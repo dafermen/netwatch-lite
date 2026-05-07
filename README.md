@@ -44,7 +44,6 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 - Hamburger sidebar navigation.
 - Branded NetWatch Lite logo and favicon.
 - Built-in User Manual and About pages.
-- NOC-style wallboard mode at `/wallboard` for fullscreen iframe monitoring panels.
 - Windows WebView2 wallboard executable for monitoring pages that block iframe embedding.
 - Responsive layout for desktop, tablet, and mobile screens.
 - Configuration page at `/config`.
@@ -76,23 +75,18 @@ netwatch-lite/
 │   ├── MonitorConfiguration.cs
 │   ├── MonitorResponse.cs
 │   ├── MonitorStreamEvent.cs
-│   ├── WallboardConfiguration.cs
-│   ├── WallboardPanel.cs
 │   └── MonitorSettings.cs
 ├── Services/
 │   ├── JsonDeviceRepository.cs
 │   ├── MonitorExecutionService.cs
 │   ├── NetworkMonitorOptions.cs
-│   ├── NetworkMonitorService.cs
-│   └── WallboardConfigService.cs
+│   └── NetworkMonitorService.cs
 ├── wwwroot/
 │   ├── app.js
 │   ├── index.html
 │   ├── netwatch-lite.svg
 │   ├── styles.css
-│   ├── wallboard.css
-│   ├── wallboard.html
-│   └── wallboard.js
+│   └── wallboard-sample.html
 ├── docs/
 │   ├── developer-guide.md
 │   └── index.html
@@ -153,7 +147,7 @@ Use `category` to group devices in the UI. Use `enabled: false` to keep a device
 
 ## Wallboard JSON Format
 
-The fullscreen operations wallboard reads `wallboard.json`. During local development, `Data/wallboard.json` is copied to the build output as `wallboard.json`. During portable publish, it is copied next to `NetWatch-Lite.exe`.
+The Windows WebView2 wallboard reads `wallboard.json`. During local development, the source file is `Data/wallboard.json`. During WebView2 portable publish, it is copied next to `NetWatch-Lite-Wallboard.exe`.
 
 ```json
 {
@@ -171,13 +165,13 @@ The fullscreen operations wallboard reads `wallboard.json`. During local develop
 }
 ```
 
-Open `/wallboard` for the NOC-style display. It supports 2-panel and 4-panel layouts, independent iframe refresh intervals, page rotation, fullscreen mode, and keyboard shortcuts: `F` fullscreen, `R` refresh visible panels, and `ESC` exit fullscreen.
+It supports 2-panel and 4-panel layouts, independent panel refresh intervals, page rotation, fullscreen mode, and keyboard shortcuts: `F` fullscreen, `R` refresh visible panels, and `ESC` exit fullscreen.
 
-Panel URLs can be absolute HTTP/HTTPS URLs or root-relative local URLs. Some external websites block iframe embedding with headers such as `X-Frame-Options` or `Content-Security-Policy`. When that happens, the browser may show messages like "refused to connect". Use URLs that allow iframe embedding, internal wallboard pages, or monitoring pages designed for NOC display. If a required monitoring site blocks iframes, use a Windows WebView2 wallboard where each panel is loaded as a top-level WebView instead of an iframe.
+Panel URLs can be absolute HTTP/HTTPS URLs or root-relative local sample URLs. WebView2 loads each panel as a native browser view, which is the right approach for required monitoring pages that block iframe embedding.
 
 ## Windows WebView2 Wallboard
 
-The project includes a Windows-only desktop wallboard at `src/NetWatchLite.Wallboard.WebView2`. It reads the same `wallboard.json` format but renders each panel with a native Microsoft Edge WebView2 control instead of an iframe. This is the right mode for monitoring pages that show browser errors such as "refused to connect" inside the web wallboard.
+The project includes a Windows-only desktop wallboard at `src/NetWatchLite.Wallboard.WebView2`. It reads `wallboard.json` and renders each panel with a native Microsoft Edge WebView2 control.
 
 Run or publish it on Windows:
 
@@ -214,8 +208,6 @@ The target Windows machine must have the Microsoft Edge WebView2 Runtime install
 | `GET` | `/api/results` | Backwards-compatible endpoint that forces a full check. |
 | `POST` | `/api/monitor/run` | Forces a full check and prevents overlapping executions. |
 | `GET` | `/api/monitor/stream` | Streams a full check progressively with `started`, `result`, `completed`, and `busy` events. |
-| `GET` | `/api/wallboard/config` | Returns the wallboard configuration. |
-| `POST` | `/api/wallboard/reload` | Reloads `wallboard.json` from disk. |
 
 ## Version Notes
 

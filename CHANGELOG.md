@@ -13,6 +13,7 @@ All notable changes to NetWatch-Lite are documented here.
 - Improved `/wallboard` routing and documented iframe embedding restrictions.
 - Added local wallboard sample panels and support for root-relative wallboard URLs.
 - Added a Windows WebView2 wallboard project that renders each panel as a native WebView for sites that block iframes.
+- Removed the iframe-based web wallboard so wallboard usage is handled by the Windows WebView2 executable only.
 
 ## v0.3.0 - 2026-05-06
 

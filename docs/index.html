@@ -187,10 +187,6 @@
           <p>Se publica como <code>win-x64</code> self-contained. El archivo <code>config.json</code> queda junto a <code>NetWatch-Lite.exe</code> para editar inventario sin recompilar.</p>
         </div>
         <div class="card">
-          <h3>Wallboard</h3>
-          <p>Ruta <code>/wallboard</code> para pantallas NOC. Lee <code>wallboard.json</code>, muestra iframes en modo oscuro, rota paginas y soporta fullscreen.</p>
-        </div>
-        <div class="card">
           <h3>WebView2</h3>
           <p>Proyecto Windows en <code>src/NetWatchLite.Wallboard.WebView2</code>. Usa controles WebView2 nativos para paginas que bloquean iframes.</p>
         </div>
@@ -269,7 +265,7 @@
 
     <section>
       <h2>Configuracion Wallboard</h2>
-      <p>El modo NOC vive en <code>/wallboard</code> y lee <code>Data/wallboard.json</code> en desarrollo. Al publicar portable se copia como <code>wallboard.json</code> junto al ejecutable.</p>
+      <p>El modo NOC vive en el ejecutable Windows WebView2 y lee <code>Data/wallboard.json</code> en desarrollo. Al publicar portable se copia como <code>wallboard.json</code> junto a <code>NetWatch-Lite-Wallboard.exe</code>.</p>
       <pre>{
   "appTitle": "GTSG Monitoring",
   "rotationEnabled": true,
@@ -284,7 +280,7 @@
   ]
 }</pre>
       <p>Atajos: <code>F</code> alterna fullscreen, <code>R</code> refresca paneles visibles y <code>ESC</code> sale de fullscreen. Los layouts soportados son 2 y 4 paneles.</p>
-      <p>Si una pagina muestra <code>refused to connect</code> dentro del wallboard web, use el ejecutable Windows WebView2. WebView2 carga cada panel como navegador nativo, no como iframe.</p>
+      <p>WebView2 carga cada panel como navegador nativo, no como iframe, por eso es el modo recomendado para paginas que bloquean embedding en navegador.</p>
     </section>
 
     <section>
@@ -316,8 +312,6 @@
           <tr><td><span class="tag get">GET</span></td><td><code>/api/results</code></td><td>Compatibilidad. Fuerza ejecucion completa.</td><td><code>MonitorResponse</code>.</td></tr>
           <tr><td><span class="tag post">POST</span></td><td><code>/api/monitor/run</code></td><td>Fuerza full check sin permitir solapamiento.</td><td><code>MonitorResponse</code> o HTTP 409.</td></tr>
           <tr><td><span class="tag get">GET</span></td><td><code>/api/monitor/stream</code></td><td>Ejecuta full check y envia resultados progresivos por Server-Sent Events.</td><td>Eventos <code>started</code>, <code>result</code>, <code>completed</code> o <code>busy</code>.</td></tr>
-          <tr><td><span class="tag get">GET</span></td><td><code>/api/wallboard/config</code></td><td>Devuelve la configuracion del wallboard.</td><td><code>WallboardConfiguration</code>.</td></tr>
-          <tr><td><span class="tag post">POST</span></td><td><code>/api/wallboard/reload</code></td><td>Recarga <code>wallboard.json</code> desde disco.</td><td>Configuracion normalizada y conteo de paneles.</td></tr>
         </tbody>
       </table>
     </section>
@@ -341,8 +335,6 @@
           <tr><td><code>CategoryResult.cs</code></td><td>Resultados agrupados por categoria.</td></tr>
           <tr><td><code>MonitorResponse.cs</code></td><td>Payload completo consumido por la UI.</td></tr>
           <tr><td><code>MonitorStreamEvent.cs</code></td><td>Evento incremental para pintar resultados mientras un full check sigue corriendo.</td></tr>
-          <tr><td><code>WallboardConfiguration.cs</code></td><td>Objeto raiz del JSON del wallboard.</td></tr>
-          <tr><td><code>WallboardPanel.cs</code></td><td>Panel externo que se renderiza dentro de un iframe.</td></tr>
         </tbody>
       </table>
 
@@ -367,11 +359,6 @@
             <td><code>RunFullCheckAsync</code>, <code>TryRunFullCheckAsync</code>, <code>TryStreamFullCheckAsync</code></td>
             <td>Coordina full checks, streaming progresivo y bloqueo contra ejecuciones simultaneas.</td>
           </tr>
-          <tr>
-            <td><code>WallboardConfigService</code></td>
-            <td><code>ReloadAsync</code>, <code>GetConfigurationAsync</code></td>
-            <td>Lee <code>wallboard.json</code>, valida URLs, normaliza layout/rotacion y usa defaults si el JSON es invalido.</td>
-          </tr>
         </tbody>
       </table>
     </section>
@@ -381,7 +368,6 @@
       <p><code>wwwroot/index.html</code> define el layout compartido: sidebar hamburguesa, topbar, dashboard, pagina de configuracion, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto.</p>
       <p>La pagina <code>/config</code> agrupa los dispositivos por categoria y mantiene los grupos colapsados por defecto para facilitar la edicion de inventarios grandes sin perder las acciones de editar o eliminar cada dispositivo.</p>
       <p>El sidebar tambien incluye <code>/manual</code> con un manual de usuario integrado y <code>/about</code> con informacion del proyecto, su caracter libre y notas operativas.</p>
-      <p><code>wwwroot/wallboard.html</code>, <code>wwwroot/wallboard.css</code> y <code>wwwroot/wallboard.js</code> implementan el wallboard independiente con tema oscuro, iframes, refresco por panel y rotacion automatica.</p>
       <p><code>wwwroot/app.js</code> contiene funciones JSDoc para:</p>
       <ul>
         <li>Consumir <code>/api/monitor/stream</code> para pintar resultados conforme termina cada dispositivo.</li>
