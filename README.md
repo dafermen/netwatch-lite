@@ -45,6 +45,7 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 - Branded NetWatch Lite logo and favicon.
 - Built-in User Manual and About pages.
 - NOC-style wallboard mode at `/wallboard` for fullscreen iframe monitoring panels.
+- Windows WebView2 wallboard executable for monitoring pages that block iframe embedding.
 - Responsive layout for desktop, tablet, and mobile screens.
 - Configuration page at `/config`.
 - CRUD UI for devices and checks stored in `config.json`.
@@ -95,8 +96,14 @@ netwatch-lite/
 ├── docs/
 │   ├── developer-guide.md
 │   └── index.html
+├── src/
+│   └── NetWatchLite.Wallboard.WebView2/
+│       ├── NetWatchLite.Wallboard.WebView2.csproj
+│       ├── WallboardForm.cs
+│       └── WebViewPanelControl.cs
 ├── appsettings.json
 ├── NetWatch.csproj
+├── netwatch.sln
 ├── Program.cs
 └── README.md
 ```
@@ -167,6 +174,34 @@ The fullscreen operations wallboard reads `wallboard.json`. During local develop
 Open `/wallboard` for the NOC-style display. It supports 2-panel and 4-panel layouts, independent iframe refresh intervals, page rotation, fullscreen mode, and keyboard shortcuts: `F` fullscreen, `R` refresh visible panels, and `ESC` exit fullscreen.
 
 Panel URLs can be absolute HTTP/HTTPS URLs or root-relative local URLs. Some external websites block iframe embedding with headers such as `X-Frame-Options` or `Content-Security-Policy`. When that happens, the browser may show messages like "refused to connect". Use URLs that allow iframe embedding, internal wallboard pages, or monitoring pages designed for NOC display. If a required monitoring site blocks iframes, use a Windows WebView2 wallboard where each panel is loaded as a top-level WebView instead of an iframe.
+
+## Windows WebView2 Wallboard
+
+The project includes a Windows-only desktop wallboard at `src/NetWatchLite.Wallboard.WebView2`. It reads the same `wallboard.json` format but renders each panel with a native Microsoft Edge WebView2 control instead of an iframe. This is the right mode for monitoring pages that show browser errors such as "refused to connect" inside the web wallboard.
+
+Run or publish it on Windows:
+
+```powershell
+dotnet run --project .\src\NetWatchLite.Wallboard.WebView2\NetWatchLite.Wallboard.WebView2.csproj
+```
+
+Publish a portable Windows x64 build:
+
+```bash
+dotnet publish src/NetWatchLite.Wallboard.WebView2/NetWatchLite.Wallboard.WebView2.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o publish/wallboard-webview2-win-x64
+```
+
+Expected output:
+
+```text
+publish/wallboard-webview2-win-x64/
+├── NetWatch-Lite-Wallboard.exe
+├── wallboard.json
+├── wwwroot/
+└── runtime dependencies...
+```
+
+The target Windows machine must have the Microsoft Edge WebView2 Runtime installed. Most modern Windows systems already include it; otherwise install the Evergreen WebView2 Runtime from Microsoft.
 
 ## API Endpoints
 

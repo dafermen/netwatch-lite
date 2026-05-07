@@ -12,6 +12,7 @@ All notable changes to NetWatch-Lite are documented here.
 - Added `/wallboard` fullscreen NOC mode with iframe panels, layout controls, rotation, keyboard shortcuts, and `wallboard.json`.
 - Improved `/wallboard` routing and documented iframe embedding restrictions.
 - Added local wallboard sample panels and support for root-relative wallboard URLs.
+- Added a Windows WebView2 wallboard project that renders each panel as a native WebView for sites that block iframes.
 
 ## v0.3.0 - 2026-05-06
 

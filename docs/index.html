@@ -190,6 +190,10 @@
           <h3>Wallboard</h3>
           <p>Ruta <code>/wallboard</code> para pantallas NOC. Lee <code>wallboard.json</code>, muestra iframes en modo oscuro, rota paginas y soporta fullscreen.</p>
         </div>
+        <div class="card">
+          <h3>WebView2</h3>
+          <p>Proyecto Windows en <code>src/NetWatchLite.Wallboard.WebView2</code>. Usa controles WebView2 nativos para paginas que bloquean iframes.</p>
+        </div>
       </div>
     </section>
 
@@ -280,6 +284,7 @@
   ]
 }</pre>
       <p>Atajos: <code>F</code> alterna fullscreen, <code>R</code> refresca paneles visibles y <code>ESC</code> sale de fullscreen. Los layouts soportados son 2 y 4 paneles.</p>
+      <p>Si una pagina muestra <code>refused to connect</code> dentro del wallboard web, use el ejecutable Windows WebView2. WebView2 carga cada panel como navegador nativo, no como iframe.</p>
     </section>
 
     <section>

@@ -9,6 +9,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="src/**" />
+    <EmbeddedResource Remove="src/**" />
+    <None Remove="src/**" />
+    <Content Remove="src/**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Update="Data/config.json" Link="config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>

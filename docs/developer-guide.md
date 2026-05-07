@@ -12,6 +12,8 @@ The backend owns configuration, validation, file persistence, network checks, ex
 
 The wallboard mode at `/wallboard` is a standalone static page for NOC screens. It reads `wallboard.json`, renders external monitoring pages in iframes, supports 2-panel and 4-panel layouts, rotates pages, and provides fullscreen keyboard shortcuts.
 
+The Windows-only project `src/NetWatchLite.Wallboard.WebView2` reads the same `wallboard.json` file and renders each panel with a native WebView2 control. Use that executable when required monitoring pages block iframe embedding.
+
 ```text
 Browser
   |
@@ -65,6 +67,25 @@ Important endpoints:
 | `GET /api/monitor/stream` | Runs a full check and streams progressive events. |
 | `GET /api/wallboard/config` | Returns the normalized wallboard configuration. |
 | `POST /api/wallboard/reload` | Reloads `wallboard.json` from disk. |
+
+## Windows WebView2 Wallboard
+
+`src/NetWatchLite.Wallboard.WebView2` is a WinForms executable targeting `net8.0-windows`.
+
+Important files:
+
+- `WallboardConfigReader.cs`: reads and normalizes `wallboard.json`.
+- `WallboardForm.cs`: owns layout buttons, page rotation, fullscreen mode, keyboard shortcuts, and the panel grid.
+- `WebViewPanelControl.cs`: wraps one WebView2 control, panel title bar, independent refresh timer, and navigation error handling.
+- `NetWatchLite.Wallboard.WebView2.csproj`: references `Microsoft.Web.WebView2` and copies `wallboard.json` beside the executable.
+
+It supports:
+
+- 2-panel and 4-panel layouts.
+- Automatic rotation.
+- Per-panel refresh.
+- `F` fullscreen, `R` refresh visible panels, and `ESC` exit fullscreen.
+- Absolute HTTP/HTTPS URLs and root-relative local sample URLs.
 
 ## Models
 
