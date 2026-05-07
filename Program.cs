@@ -20,6 +20,7 @@ builder.Services.Configure<NetworkMonitorOptions>(
 builder.Services.AddSingleton<JsonDeviceRepository>();
 builder.Services.AddSingleton<NetworkMonitorService>();
 builder.Services.AddSingleton<MonitorExecutionService>();
+builder.Services.AddSingleton<WallboardConfigService>();
 
 var app = builder.Build();
 
@@ -28,6 +29,7 @@ app.UseStaticFiles();
 
 // Load config.json at startup so configuration errors are visible immediately.
 var repository = app.Services.GetRequiredService<JsonDeviceRepository>();
+var wallboardConfigService = app.Services.GetRequiredService<WallboardConfigService>();
 try
 {
     await repository.ReloadAsync();
@@ -40,6 +42,16 @@ catch (Exception ex) when (
 {
     app.Logger.LogError(ex, "Unable to load config.json at startup. The configuration page can still be used to repair it.");
 }
+
+await wallboardConfigService.ReloadAsync();
+
+// Serves the NOC-style iframe wallboard as a standalone operations page.
+app.MapGet("/wallboard", () => Results.File(
+    Path.Combine(app.Environment.WebRootPath, "wallboard.html"),
+    "text/html"));
+app.MapGet("/wallboard/", () => Results.File(
+    Path.Combine(app.Environment.WebRootPath, "wallboard.html"),
+    "text/html"));
 
 // Returns the normalized devices currently loaded from config.json.
 app.MapGet("/api/devices", async (JsonDeviceRepository deviceRepository) =>
@@ -103,6 +115,25 @@ app.MapPost("/api/config", async (
             error = ex.Message
         });
     }
+});
+
+// Returns the full wallboard configuration used by /wallboard.
+app.MapGet("/api/wallboard/config", async (WallboardConfigService service) =>
+{
+    return Results.Ok(await service.GetConfigurationAsync());
+});
+
+// Reloads wallboard.json from disk without restarting the application.
+app.MapPost("/api/wallboard/reload", async (WallboardConfigService service) =>
+{
+    var configuration = await service.ReloadAsync();
+
+    return Results.Ok(new
+    {
+        reloadedAt = DateTimeOffset.Now,
+        panelCount = configuration.Panels.Count,
+        configuration
+    });
 });
 
 // Backwards-compatible endpoint that forces a fresh full check and returns the monitor payload.
