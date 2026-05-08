@@ -289,7 +289,7 @@ Important dashboard functions:
 - `renderStreamingResult`: adds one finished device and updates metrics.
 - `updateProgressPanel`: updates percentage, progress bar, and checked/total text.
 - `renderMonitorPayload`: renders final payload after completion.
-- `renderCategories`: renders grouped device tables.
+- `renderCategories`: renders grouped device tables and category health bars.
 - `renderRow`: renders one device row.
 
 Important configuration functions:
@@ -302,11 +302,11 @@ Important configuration functions:
 - `toggleConfigCategory`: expands or collapses all rows for one configuration category.
 - `startAddDevice`: opens the add form.
 - `editDevice`: opens the edit form.
-- `submitDevice`: updates local state.
+- `submitDevice`: updates device state and immediately persists the full configuration.
 - `readDeviceForm`: builds a device object from form fields.
 - `readCheckRows`: validates check rows.
 - `requestDeleteDevice`: opens confirmation modal.
-- `confirmDeleteDevice`: deletes local device state.
+- `confirmDeleteDevice`: deletes device state and immediately persists the full configuration.
 
 Safety:
 
@@ -359,10 +359,12 @@ The dashboard updates:
 - Category tables.
 - Last execution text.
 
+After the `completed` event, the UI clears expanded category state so all dashboard groups collapse. Each category header shows the final category health as a compact bar: green when every device is `Healthy`, red when at least one device is `Down` or `Degraded`. The progress panel is hidden once the full run is complete.
+
 ### Configuration Save Flow
 
 ```text
-User edits /config
+User edits settings or saves a device change from /config
   |
   v
 app.js POST /api/config
@@ -379,6 +381,8 @@ config.json is written
   v
 memory configuration is replaced
 ```
+
+Device add, update, and delete actions call the same save path immediately after the local state changes, so the user does not need a second Save Configuration click for device CRUD. The Save Configuration button remains useful for global settings such as hostname-based ping mode.
 
 ## Operational Notes For Developers
 

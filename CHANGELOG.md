@@ -4,6 +4,9 @@ All notable changes to NetWatch-Lite are documented here.
 
 ## Unreleased
 
+- Dashboard category groups now collapse after a completed full check and show green or red health bars.
+- Monitoring progress now hides after a full check completes.
+- Device add, update, and delete actions in `/config` now persist immediately to `config.json`.
 - Rebranded visible app text to NetWatch Lite.
 - Added a custom SVG logo and favicon.
 - Added a Windows executable icon for portable builds.

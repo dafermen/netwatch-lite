@@ -40,7 +40,7 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
   - Degraded devices.
   - Availability percentage.
 - Search and client-side filters.
-- Category groups collapsed by default.
+- Category groups collapse after a full check and show green or red health bars by category.
 - Hamburger sidebar navigation.
 - Branded NetWatch Lite logo and favicon.
 - Embedded Windows executable icon for portable builds.
@@ -49,6 +49,7 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 - Responsive layout for desktop, tablet, and mobile screens.
 - Configuration page at `/config`.
 - CRUD UI for devices and checks stored in `config.json`.
+- Add, update, and delete device actions save immediately to `config.json`.
 - Configuration device table grouped by category for easier editing.
 - Configuration category groups collapsed by default.
 - Add/edit device form opens only when adding or editing a device.
@@ -56,7 +57,7 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 - Optional auto refresh toggle that runs a full check every 60 seconds.
 - Forced full check.
 - Progressive dashboard rendering through Server-Sent Events while checks are still running.
-- Visible monitoring progress with percentage, checked/total count, and completion state.
+- Visible monitoring progress with percentage and checked/total count while a run is active.
 - JSON reload without restarting.
 
 ## Project Structure
@@ -232,12 +233,14 @@ To run on Windows:
 .\NetWatch-Lite.exe
 ```
 
-Edit `config.json` in the same folder as `NetWatch-Lite.exe`, or use the `/config` page. Saving through the UI creates `config.backup.json`.
+Edit `config.json` in the same folder as `NetWatch-Lite.exe`, or use the `/config` page. Device add, update, and delete actions save immediately; saving through the UI creates `config.backup.json`.
 
 ## Operational Notes
 
 - `Run Full Check` executes all configured checks immediately.
 - Dashboard startup and full checks stream results progressively, so devices appear as they finish instead of waiting for the whole execution.
+- When a full check finishes, category groups collapse and show a green bar when every device is healthy or a red bar when attention is needed.
+- The monitoring progress bar is visible only while a full check is running.
 - NetWatch Lite starts in manual mode by default.
 - `Auto Refresh` runs a full check every 60 seconds after the operator turns it on.
 - `settings.intervalSeconds` is retained for JSON compatibility but is not used by the current auto full-check timer.

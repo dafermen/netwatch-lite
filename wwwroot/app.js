@@ -64,6 +64,7 @@ let latestCategories = [];
 let activeFilter = "all";
 let activeSearch = "";
 let autoRefreshEnabled = false;
+let hasCompletedFullCheck = false;
 let currentRoute = normalizeRoute(location.pathname);
 let hasLoadedDashboard = false;
 let hasLoadedConfig = false;
@@ -108,6 +109,8 @@ function streamFullCheck({ showErrors = true } = {}) {
     source.addEventListener("completed", event => {
       const payload = JSON.parse(event.data);
       closeMonitorStream();
+      hasCompletedFullCheck = true;
+      expandedCategoryNames.clear();
       renderMonitorPayload({
         settings: payload.settings,
         summary: payload.summary,
@@ -151,6 +154,7 @@ function streamFullCheck({ showErrors = true } = {}) {
 function renderMonitorPayload(payload) {
   latestResults = payload.results ?? [];
   latestCategories = payload.categories ?? groupResultsByCategory(payload.results ?? []);
+  hasCompletedFullCheck = payload.executionStatus === "Completed" || hasCompletedFullCheck;
   renderSummary(payload.summary ?? createSummaryFromCategories(latestCategories));
   renderFilteredCategories();
   scheduleRefresh();
@@ -164,6 +168,7 @@ function renderMonitorPayload(payload) {
  * @param {object} payload The started event received from /api/monitor/stream.
  */
 function resetStreamingDashboard(payload) {
+  hasCompletedFullCheck = false;
   latestResults = [];
   latestCategories = [];
   renderSummary(payload.summary ?? createProgressSummary([], payload.totalDevices ?? 0));
@@ -221,6 +226,12 @@ function updateProgressPanel(completedDevices, totalDevices, label, isRunning) {
   const total = Math.max(0, Number(totalDevices) || 0);
   const completed = Math.min(total, Math.max(0, Number(completedDevices) || 0));
   const percent = total === 0 ? 100 : Math.round((completed / total) * 100);
+  const isComplete = !isRunning && completed >= total;
+
+  monitorProgress.hidden = isComplete;
+  if (isComplete) {
+    return;
+  }
 
   monitorProgress.hidden = false;
   monitorProgressLabel.textContent = label;
@@ -282,6 +293,7 @@ function filterCategories(categories) {
       return {
         ...category,
         devices,
+        stateDevices: category.devices ?? [],
         totalDevices: devices.length,
         onlineDevices: devices.filter(device => device.isOnline).length,
         offlineDevices: devices.filter(device => !device.isOnline).length
@@ -333,11 +345,27 @@ function renderCategory(category, index) {
   const totalDevices = category.totalDevices ?? devices.length;
   const onlineDevices = category.onlineDevices ?? devices.filter(device => device.isOnline).length;
   const offlineDevices = category.offlineDevices ?? totalDevices - onlineDevices;
+  const stateDevices = category.stateDevices ?? devices;
+  const stateTotalDevices = stateDevices.length;
+  const healthyDevices = stateDevices.filter(device => device.status === "Healthy").length;
+  const problemDevices = stateDevices.filter(device => device.status === "Degraded" || device.status === "Down").length;
+  const categoryPercent = stateTotalDevices === 0 ? 100 : Math.round((healthyDevices / stateTotalDevices) * 100);
+  const isHealthyCategory = stateTotalDevices > 0 && problemDevices === 0 && healthyDevices === stateTotalDevices;
+  const stateClass = hasCompletedFullCheck
+    ? isHealthyCategory ? "category-section-healthy" : "category-section-problem"
+    : "category-section-running";
+  const stateIcon = hasCompletedFullCheck
+    ? isHealthyCategory ? "fa-circle-check" : "fa-circle-xmark"
+    : "fa-spinner fa-spin";
+  const stateLabel = hasCompletedFullCheck
+    ? isHealthyCategory ? "Healthy" : "Needs attention"
+    : "Checking";
   const categoryId = `category-${index}-${slugify(category.name)}`;
   const isExpanded = expandedCategoryNames.has(category.name);
+  const expandedClass = isExpanded ? "category-section-expanded" : "";
 
   return `
-    <section class="category-section mb-4">
+    <section class="category-section ${stateClass} ${expandedClass} mb-3">
       <div class="category-header d-flex flex-wrap align-items-center justify-content-between gap-2">
         <div class="d-flex align-items-center gap-2">
           <button
@@ -351,15 +379,16 @@ function renderCategory(category, index) {
           </button>
           <div>
             <h2 class="h5 mb-0">${escapeHtml(category.name)}</h2>
-            <span class="text-secondary small">${totalDevices} devices monitored</span>
+            <span class="category-subtitle small">${totalDevices} devices monitored</span>
           </div>
         </div>
-        <div class="d-flex align-items-center gap-2">
-          <span class="badge text-bg-success">
-            <i class="fa-solid fa-check me-1"></i>${onlineDevices} online
+        <div class="category-status-strip d-flex align-items-center gap-2">
+          <span class="category-percent">${categoryPercent}%</span>
+          <span class="category-state">
+            <i class="fa-solid ${stateIcon} me-1"></i>${stateLabel}
           </span>
-          <span class="badge text-bg-danger">
-            <i class="fa-solid fa-xmark me-1"></i>${offlineDevices} offline
+          <span class="category-counts">
+            ${onlineDevices} online / ${offlineDevices} offline
           </span>
         </div>
       </div>
@@ -565,7 +594,7 @@ async function loadConfig() {
   }
 }
 
-async function saveConfig() {
+async function saveConfig(successMessage = "Configuration saved. Previous config was backed up as config.backup.json.") {
   setConfigBusy(true);
   clearConfigAlert();
 
@@ -588,7 +617,7 @@ async function saveConfig() {
     configState = payload.configuration;
     renderConfigDevices();
     resetDeviceForm();
-    showConfigAlert("success", "Configuration saved. Previous config was backed up as config.backup.json.");
+    showConfigAlert("success", successMessage);
     await loadConfig();
   } catch (error) {
     showConfigAlert("danger", error.message || "Unable to save configuration.");
@@ -759,7 +788,7 @@ function editDevice(index) {
   deviceNameInput.focus();
 }
 
-function submitDevice(event) {
+async function submitDevice(event) {
   event.preventDefault();
 
   const device = readDeviceForm();
@@ -771,14 +800,11 @@ function submitDevice(event) {
 
   if (indexValue === "") {
     configState.devices.push(device);
-    showConfigAlert("success", "Device added locally. Click Save Configuration to persist changes.");
+    await saveConfig("Device added and saved to config.json.");
   } else {
     configState.devices[Number(indexValue)] = device;
-    showConfigAlert("success", "Device updated locally. Click Save Configuration to persist changes.");
+    await saveConfig("Device updated and saved to config.json.");
   }
-
-  renderConfigDevices();
-  resetDeviceForm();
 }
 
 function readDeviceForm() {
@@ -905,7 +931,7 @@ function requestDeleteDevice(index) {
   deleteDeviceModal.show();
 }
 
-function confirmDeleteDevice() {
+async function confirmDeleteDevice() {
   if (pendingDeleteIndex === null) {
     return;
   }
@@ -913,9 +939,7 @@ function confirmDeleteDevice() {
   configState.devices.splice(pendingDeleteIndex, 1);
   pendingDeleteIndex = null;
   deleteDeviceModal.hide();
-  renderConfigDevices();
-  resetDeviceForm();
-  showConfigAlert("success", "Device deleted locally. Click Save Configuration to persist changes.");
+  await saveConfig("Device deleted and saved to config.json.");
 }
 
 function setConfigBusy(isBusy) {
