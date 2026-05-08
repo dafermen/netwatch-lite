@@ -352,13 +352,13 @@
     <section>
       <h2>Frontend</h2>
       <p><code>wwwroot/index.html</code> define el layout compartido: sidebar hamburguesa, topbar, dashboard, pagina de configuracion, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto.</p>
-      <p>La pagina <code>/config</code> agrupa los dispositivos por categoria y mantiene los grupos colapsados por defecto para facilitar la edicion de inventarios grandes sin perder las acciones de editar o eliminar cada dispositivo.</p>
+      <p>La pagina <code>/config</code> agrupa los dispositivos por categoria y mantiene los grupos colapsados por defecto para facilitar la edicion de inventarios grandes sin perder las acciones de editar o eliminar cada dispositivo. Las acciones de agregar, actualizar y eliminar dispositivos guardan inmediatamente en <code>config.json</code>.</p>
       <p>El sidebar tambien incluye <code>/manual</code> con un manual de usuario integrado y <code>/about</code> con informacion del proyecto, su caracter libre y notas operativas.</p>
       <p><code>wwwroot/app.js</code> contiene funciones JSDoc para:</p>
       <ul>
         <li>Consumir <code>/api/monitor/stream</code> para pintar resultados conforme termina cada dispositivo.</li>
         <li>Renderizar metricas, categorias, filas, badges de estado y puertos.</li>
-        <li>Contraer y expandir grupos de categorias para navegar inventarios grandes; inician colapsados por defecto.</li>
+        <li>Contraer y expandir grupos de categorias para navegar inventarios grandes; al completar un full check, los grupos se contraen y quedan en verde o rojo segun la salud final.</li>
         <li>Manejar modo manual por defecto, auto refresh ON/OFF y Run Full Check.</li>
         <li>Administrar dispositivos y checks desde la ruta <code>/config</code>.</li>
         <li>Filtrar por texto, online, offline y problemas.</li>
@@ -404,7 +404,7 @@ dotnet run</pre>
       <p>Uso en Windows:</p>
       <ol>
         <li>Descomprimir el ZIP.</li>
-        <li>Editar <code>config.json</code> en la misma carpeta de <code>NetWatch-Lite.exe</code> o usar la pagina <code>/config</code>.</li>
+        <li>Editar <code>config.json</code> en la misma carpeta de <code>NetWatch-Lite.exe</code> o usar la pagina <code>/config</code>; los cambios de dispositivos se guardan inmediatamente.</li>
         <li>Ejecutar <code>NetWatch-Lite.exe</code>.</li>
         <li>Abrir la URL que muestra la consola.</li>
       </ol>
@@ -415,7 +415,8 @@ dotnet run</pre>
       <ul>
         <li>El archivo <code>config.json</code> puede recargarse desde el boton Reload JSON o administrarse desde <code>/config</code>.</li>
         <li>La aplicacion inicia en modo manual; el auto refresh solo empieza cuando el operador activa el boton y ejecuta full check cada 60 segundos.</li>
-        <li>Los grupos de categorias inician colapsados para mejorar la visibilidad en inventarios grandes.</li>
+        <li>Los grupos de categorias se contraen al finalizar un recorrido y muestran una barra verde si todo esta sano o roja si hay problemas.</li>
+        <li>La barra de progreso del monitoreo se muestra solo mientras corre un full check.</li>
         <li>En pantallas pequenas, los controles se apilan y las tablas anchas usan scroll horizontal para conservar legibilidad.</li>
         <li><code>Run Full Check</code> no permite ejecuciones solapadas; si una ya corre, el backend responde HTTP 409.</li>
         <li>JSON corrupto o invalido se reporta por API/UI para poder corregir la configuracion sin un cierre silencioso.</li>
