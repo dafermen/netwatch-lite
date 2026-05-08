@@ -199,14 +199,14 @@
                 <input class="form-check-input" type="checkbox" role="switch" id="use-hostname-for-ping">
                 <label class="form-check-label" for="use-hostname-for-ping">Ping by hostname</label>
               </div>
-              <button class="btn btn-outline-secondary btn-sm" type="button" id="reload-config">
-                <i class="fa-solid fa-download me-1"></i>
-                Reload
-              </button>
               <button class="btn btn-success btn-sm" type="button" id="save-config">
                 <span class="spinner-border spinner-border-sm me-1 d-none" id="save-config-spinner" aria-hidden="true"></span>
                 <i class="fa-solid fa-floppy-disk me-1" id="save-config-icon"></i>
-                Save Configuration
+                Save
+              </button>
+              <button class="btn btn-outline-secondary btn-sm" type="button" id="reload-config">
+                <i class="fa-solid fa-download me-1"></i>
+                Reload
               </button>
             </div>
           </div>
@@ -325,7 +325,7 @@
                 <li>Devices are grouped by category and collapsed by default.</li>
                 <li>Add or edit name, address, hostname, category, enabled state, and checks.</li>
                 <li>Use <strong>Ping by hostname</strong> when device IPs change but DNS names stay stable.</li>
-                <li>Click <strong>Save Configuration</strong> to persist changes and create <code>config.backup.json</code>.</li>
+                <li>Click <strong>Save</strong> to persist settings and create <code>config.backup.json</code>.</li>
               </ul>
             </section>
 

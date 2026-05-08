@@ -382,7 +382,7 @@ config.json is written
 memory configuration is replaced
 ```
 
-Device add, update, and delete actions call the same save path immediately after the local state changes, so the user does not need a second Save Configuration click for device CRUD. The Save Configuration button remains useful for global settings such as hostname-based ping mode.
+Device add, update, and delete actions call the same save path immediately after the local state changes, so the user does not need a second Save click for device CRUD. The Save button remains useful for global settings such as hostname-based ping mode.
 
 ## Operational Notes For Developers
 

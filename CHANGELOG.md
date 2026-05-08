@@ -4,6 +4,7 @@ All notable changes to NetWatch-Lite are documented here.
 
 ## Unreleased
 
+- Renamed the configuration toolbar save action to `Save` and moved `Reload` to the right of it.
 - Updated the repository Windows x64 portable ZIP and README download link.
 - Dashboard category groups now collapse after a completed full check and show green or red health bars.
 - Monitoring progress now hides after a full check completes.

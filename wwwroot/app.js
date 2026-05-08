@@ -1149,7 +1149,7 @@ reloadConfigButton.addEventListener("click", loadConfig);
 saveConfigButton.addEventListener("click", saveConfig);
 useHostnameForPingInput.addEventListener("change", () => {
   syncConfigSettingsFromUi();
-  showConfigAlert("info", "Ping mode changed locally. Click Save Configuration to persist changes.");
+  showConfigAlert("info", "Ping mode changed locally. Click Save to persist changes.");
 });
 addDeviceButton.addEventListener("click", startAddDevice);
 deviceForm.addEventListener("submit", submitDevice);
