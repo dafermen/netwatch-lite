@@ -2,9 +2,23 @@
 
 All notable changes to NetWatch-Lite are documented here.
 
-## Unreleased
+## v0.4.0 - 2026-06-06
 
-- Renamed the configuration toolbar save action to `Save` and moved `Reload` to the right of it.
+- Changed device health calculation so a device with a failed ping but an open TCP port is `Degraded` instead of `Down`.
+- Added dashboard links for HTTP and HTTPS port badges so users can open device web interfaces in a new tab.
+- Added optional per-device `websiteUrl` links for opening associated web pages from the dashboard.
+- Added per-device ping target mode so each device can choose hostname or IP ping independently.
+- Moved `Reload JSON` to the configuration page and kept the dashboard empty until a full check or auto refresh starts.
+- Added editable configuration settings for timeout and max parallel checks.
+- Auto refresh now uses the editable `settings.intervalSeconds` value from Configuration.
+- Auto refresh now keeps existing dashboard groups visible while a new full check updates devices progressively.
+- Added configuration device filtering by name, address, or hostname and stabilized configuration table column widths.
+- Added configuration JSON export and import actions with client and server validation.
+- Added first-run starter configuration creation when `config.json` is missing.
+- Moved the add/edit device form into a modal so large category lists no longer push the editor out of view.
+- Added dashboard group checks so operators can run monitoring for one category instead of the full inventory.
+- Hardened configuration and monitoring stream error handling, including controlled SSE `error` events and preserving existing dashboard results when a group run fails.
+- Moved the settings save action into the Settings card and renamed it `Save Settings` to distinguish it from device add/edit saves.
 - Updated the repository Windows x64 portable ZIP and README download link.
 - Dashboard category groups now collapse after a completed full check and show green or red health bars.
 - Monitoring progress now hides after a full check completes.

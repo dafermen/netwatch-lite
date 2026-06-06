@@ -6,17 +6,17 @@ namespace NetWatch.Models;
 public enum DeviceStatus
 {
     /// <summary>
-    /// Ping succeeded and every configured TCP port is open.
+    /// Every configured ping and TCP check succeeded.
     /// </summary>
     Healthy,
 
     /// <summary>
-    /// Ping succeeded, but at least one configured TCP port is closed or unreachable.
+    /// At least one configured check succeeded, but one or more checks failed.
     /// </summary>
     Degraded,
 
     /// <summary>
-    /// Ping failed. Port results may still exist, but the device is considered unavailable.
+    /// No configured checks succeeded.
     /// </summary>
     Down
 }

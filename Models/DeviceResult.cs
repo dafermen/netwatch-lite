@@ -21,6 +21,11 @@ public sealed class DeviceResult
     public string? Hostname { get; init; }
 
     /// <summary>
+    /// Optional web page copied from configuration and shown as a dashboard link.
+    /// </summary>
+    public string? WebsiteUrl { get; init; }
+
+    /// <summary>
     /// Network target used by the ping check for this execution.
     /// </summary>
     public required string PingTarget { get; init; }
@@ -31,7 +36,7 @@ public sealed class DeviceResult
     public required string Category { get; init; }
 
     /// <summary>
-    /// True when the configured ping check succeeds.
+    /// True when at least one configured check succeeds.
     /// </summary>
     public required bool IsOnline { get; init; }
 

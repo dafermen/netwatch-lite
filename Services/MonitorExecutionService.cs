@@ -54,10 +54,12 @@ public sealed class MonitorExecutionService
     /// Attempts to stream a full monitor execution, sending each device result as it completes.
     /// </summary>
     /// <param name="writeEventAsync">Callback used to send stream events to the client.</param>
+    /// <param name="categoryName">Optional category name used to limit the execution to one group.</param>
     /// <param name="cancellationToken">Token used to cancel waiting, checks, or writes.</param>
     /// <returns>True when streaming started; false when another execution is already running.</returns>
     public async Task<bool> TryStreamFullCheckAsync(
         Func<MonitorStreamEvent, CancellationToken, Task> writeEventAsync,
+        string? categoryName = null,
         CancellationToken cancellationToken = default)
     {
         if (!await _executionLock.WaitAsync(0, cancellationToken))
@@ -67,7 +69,8 @@ public sealed class MonitorExecutionService
 
         try
         {
-            var configuration = await _deviceRepository.GetConfigurationAsync();
+            var loadedConfiguration = await _deviceRepository.GetConfigurationAsync();
+            var configuration = FilterConfigurationByCategory(loadedConfiguration, categoryName);
             var settings = configuration.Settings;
             var totalDevices = configuration.Devices.Count(device => device.Enabled);
             var results = new List<DeviceResult>();
@@ -141,6 +144,30 @@ public sealed class MonitorExecutionService
         {
             _executionLock.Release();
         }
+    }
+
+    /// <summary>
+    /// Creates a configuration snapshot limited to one category when a category filter was requested.
+    /// </summary>
+    /// <param name="configuration">Loaded monitor configuration.</param>
+    /// <param name="categoryName">Optional category name to execute.</param>
+    /// <returns>The original configuration, or a category-filtered configuration snapshot.</returns>
+    private static MonitorConfiguration FilterConfigurationByCategory(
+        MonitorConfiguration configuration,
+        string? categoryName)
+    {
+        if (string.IsNullOrWhiteSpace(categoryName))
+        {
+            return configuration;
+        }
+
+        return new MonitorConfiguration
+        {
+            Settings = configuration.Settings,
+            Devices = configuration.Devices
+                .Where(device => string.Equals(device.Category, categoryName, StringComparison.OrdinalIgnoreCase))
+                .ToList()
+        };
     }
 
     /// <summary>

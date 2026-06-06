@@ -16,7 +16,7 @@ public sealed class DashboardSummary
     public required int HealthyDevices { get; init; }
 
     /// <summary>
-    /// Number of devices with a successful ping response.
+    /// Number of devices with at least one successful check response.
     /// </summary>
     public required int OnlineDevices { get; init; }
 

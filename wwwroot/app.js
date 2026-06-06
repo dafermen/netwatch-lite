@@ -12,12 +12,15 @@ const aboutPage = document.querySelector("#about-page");
 const resultsBody = document.querySelector("#results-body");
 const lastCheck = document.querySelector("#last-check");
 const executionMode = document.querySelector("#execution-mode");
-const reloadButton = document.querySelector("#reload-json");
 const autoRefreshToggle = document.querySelector("#auto-refresh-toggle");
 const autoRefreshLabel = document.querySelector("#auto-refresh-label");
 const runFullCheckButton = document.querySelector("#run-full-check");
 const runFullCheckSpinner = document.querySelector("#run-full-check-spinner");
 const runFullCheckIcon = document.querySelector("#run-full-check-icon");
+const groupCheckSelect = document.querySelector("#group-check-select");
+const runGroupCheckButton = document.querySelector("#run-group-check");
+const runGroupCheckSpinner = document.querySelector("#run-group-check-spinner");
+const runGroupCheckIcon = document.querySelector("#run-group-check-icon");
 const searchInput = document.querySelector("#device-search");
 const filterInputs = document.querySelectorAll("input[name='status-filter']");
 const monitorProgress = document.querySelector("#monitor-progress");
@@ -35,17 +38,29 @@ const metricAvailability = document.querySelector("#metric-availability");
 const configAlert = document.querySelector("#config-alert");
 const configDevicesBody = document.querySelector("#config-devices-body");
 const reloadConfigButton = document.querySelector("#reload-config");
+const exportConfigButton = document.querySelector("#export-config");
+const importConfigButton = document.querySelector("#import-config");
+const importConfigFileInput = document.querySelector("#import-config-file");
 const saveConfigButton = document.querySelector("#save-config");
 const saveConfigSpinner = document.querySelector("#save-config-spinner");
 const saveConfigIcon = document.querySelector("#save-config-icon");
-const useHostnameForPingInput = document.querySelector("#use-hostname-for-ping");
+const intervalSecondsInput = document.querySelector("#interval-seconds");
+const timeoutMsInput = document.querySelector("#timeout-ms");
+const maxParallelChecksInput = document.querySelector("#max-parallel-checks");
+const configDeviceSearchInput = document.querySelector("#config-device-search");
 const addDeviceButton = document.querySelector("#add-device");
+const deviceFormModalElement = document.querySelector("#device-form-modal");
+const deviceFormModal = typeof bootstrap !== "undefined" && deviceFormModalElement
+  ? new bootstrap.Modal(deviceFormModalElement)
+  : null;
 const deviceForm = document.querySelector("#device-form");
 const deviceFormTitle = document.querySelector("#device-form-title");
 const editingDeviceIndex = document.querySelector("#editing-device-index");
 const deviceNameInput = document.querySelector("#device-name");
 const deviceAddressInput = document.querySelector("#device-address");
 const deviceHostnameInput = document.querySelector("#device-hostname");
+const deviceUseHostnameForPingInput = document.querySelector("#device-use-hostname-for-ping");
+const deviceWebsiteUrlInput = document.querySelector("#device-website-url");
 const deviceCategoryInput = document.querySelector("#device-category");
 const deviceEnabledInput = document.querySelector("#device-enabled");
 const checksList = document.querySelector("#checks-list");
@@ -53,7 +68,9 @@ const addCheckButton = document.querySelector("#add-check");
 const resetDeviceFormButton = document.querySelector("#reset-device-form");
 const submitDeviceButton = document.querySelector("#submit-device");
 const deleteDeviceModalElement = document.querySelector("#delete-device-modal");
-const deleteDeviceModal = new bootstrap.Modal(deleteDeviceModalElement);
+const deleteDeviceModal = typeof bootstrap !== "undefined" && deleteDeviceModalElement
+  ? new bootstrap.Modal(deleteDeviceModalElement)
+  : null;
 const deleteDeviceName = document.querySelector("#delete-device-name");
 const confirmDeleteDeviceButton = document.querySelector("#confirm-delete-device");
 
@@ -65,27 +82,32 @@ let activeFilter = "all";
 let activeSearch = "";
 let autoRefreshEnabled = false;
 let hasCompletedFullCheck = false;
+let activeRunCategory = "";
+let activeRunKeepsDashboardStable = false;
+let activeRunPreservesDashboard = false;
 let currentRoute = normalizeRoute(location.pathname);
-let hasLoadedDashboard = false;
+let hasLoadedDashboardGroups = false;
 let hasLoadedConfig = false;
+let activeConfigSearch = "";
+const defaultAutoFullCheckIntervalSeconds = 60;
+const maxConfigImportBytes = 5 * 1024 * 1024;
 let configState = createEmptyConfiguration();
 let pendingDeleteIndex = null;
 const expandedCategoryNames = new Set();
 const mobileSidebarQuery = window.matchMedia("(max-width: 991.98px)");
-const autoFullCheckIntervalMs = 60_000;
 
-function loadResults({ showErrors = true } = {}) {
-  return streamFullCheck({ showErrors });
+function loadResults({ showErrors = true, category = "" } = {}) {
+  return streamFullCheck({ showErrors, category });
 }
 
 /**
  * Opens the Server-Sent Events monitoring stream and routes each event to the
  * dashboard renderer. This keeps large inventories responsive because each
  * device result is shown as soon as the backend finishes it.
- * @param {{ showErrors?: boolean }} options Controls whether stream errors are displayed in the dashboard.
+ * @param {{ showErrors?: boolean, category?: string }} options Controls whether stream errors are displayed and optional category scope.
  * @returns {Promise<void>} Resolves when the stream completes, reports busy, or fails.
  */
-function streamFullCheck({ showErrors = true } = {}) {
+function streamFullCheck({ showErrors = true, category = "" } = {}) {
   if (activeMonitorStream) {
     lastCheck.textContent = "A monitoring execution is already running.";
     return Promise.resolve();
@@ -93,12 +115,18 @@ function streamFullCheck({ showErrors = true } = {}) {
 
   return new Promise(resolve => {
     let settled = false;
-    const source = new EventSource("/api/monitor/stream");
+    const streamUrl = category
+      ? `/api/monitor/stream?category=${encodeURIComponent(category)}`
+      : "/api/monitor/stream";
+    const source = new EventSource(streamUrl);
     activeMonitorStream = source;
 
     source.addEventListener("started", event => {
       const payload = JSON.parse(event.data);
-      resetStreamingDashboard(payload);
+      activeRunCategory = category;
+      activeRunKeepsDashboardStable = Boolean(category && latestResults.length > 0);
+      activeRunPreservesDashboard = Boolean(!category && autoRefreshEnabled && latestResults.length > 0);
+      resetStreamingDashboard(payload, category);
     });
 
     source.addEventListener("result", event => {
@@ -109,9 +137,7 @@ function streamFullCheck({ showErrors = true } = {}) {
     source.addEventListener("completed", event => {
       const payload = JSON.parse(event.data);
       closeMonitorStream();
-      hasCompletedFullCheck = true;
-      expandedCategoryNames.clear();
-      renderMonitorPayload({
+      const completedPayload = {
         settings: payload.settings,
         summary: payload.summary,
         categories: payload.categories,
@@ -119,8 +145,19 @@ function streamFullCheck({ showErrors = true } = {}) {
         lastExecutionTime: payload.timestamp,
         lastCheck: payload.timestamp,
         executionStatus: payload.executionStatus
-      });
-      hasLoadedDashboard = true;
+      };
+
+      if (category) {
+        renderScopedMonitorPayload(completedPayload, category);
+      } else {
+        hasCompletedFullCheck = true;
+        expandedCategoryNames.clear();
+        renderMonitorPayload(completedPayload);
+      }
+
+      activeRunCategory = "";
+      activeRunKeepsDashboardStable = false;
+      activeRunPreservesDashboard = false;
       settled = true;
       resolve();
     });
@@ -128,27 +165,71 @@ function streamFullCheck({ showErrors = true } = {}) {
     source.addEventListener("busy", event => {
       const payload = JSON.parse(event.data);
       closeMonitorStream();
+      activeRunCategory = "";
+      activeRunKeepsDashboardStable = false;
+      activeRunPreservesDashboard = false;
       lastCheck.textContent = payload.message || "A monitoring execution is already running.";
       settled = true;
       resolve();
     });
 
-    source.onerror = error => {
-      closeMonitorStream();
-
-      if (showErrors && !settled) {
-        resultsBody.innerHTML = `
-          <div class="text-center text-danger py-4">
-            Unable to stream monitoring results.
-          </div>`;
-        lastCheck.textContent = "Last execution failed";
+    source.addEventListener("error", event => {
+      if (!event.data || settled) {
+        return;
       }
+
+      const payload = JSON.parse(event.data);
+      handleMonitorStreamFailure(
+        payload.message || "Unable to stream monitoring results.",
+        category,
+        showErrors);
+      settled = true;
+      resolve();
+    });
+
+    source.onerror = error => {
+      if (settled) {
+        return;
+      }
+
+      handleMonitorStreamFailure("Unable to stream monitoring results.", category, showErrors);
 
       console.error(error);
       settled = true;
       resolve();
     };
   });
+}
+
+function handleMonitorStreamFailure(message, category, showErrors) {
+  const keepDashboardStable = activeRunKeepsDashboardStable
+    || activeRunPreservesDashboard
+    || Boolean(category && latestResults.length > 0);
+
+  closeMonitorStream();
+  activeRunCategory = "";
+  activeRunKeepsDashboardStable = false;
+  activeRunPreservesDashboard = false;
+
+  if (keepDashboardStable) {
+    monitorProgress.hidden = true;
+    renderFilteredCategories();
+  }
+
+  if (!showErrors) {
+    return;
+  }
+
+  if (keepDashboardStable) {
+    lastCheck.textContent = `${message} Existing dashboard results were kept.`;
+    return;
+  }
+
+  resultsBody.innerHTML = `
+    <div class="text-center text-danger py-4">
+      ${escapeHtml(message)}
+    </div>`;
+  lastCheck.textContent = "Last execution failed";
 }
 
 function renderMonitorPayload(payload) {
@@ -163,23 +244,60 @@ function renderMonitorPayload(payload) {
   updateProgressPanel(payload.results?.length ?? 0, payload.results?.length ?? 0, "Completed", false);
 }
 
+function renderScopedMonitorPayload(payload, category) {
+  const scopedResults = payload.results ?? [];
+  const scopedCategory = category.toLowerCase();
+  const remainingResults = latestResults.filter(result =>
+    String(result.category ?? "Uncategorized").toLowerCase() !== scopedCategory);
+
+  latestResults = [...remainingResults, ...scopedResults];
+  latestCategories = groupResultsByCategory(latestResults);
+  hasCompletedFullCheck = true;
+  activeRunCategory = "";
+  renderSummary(createSummaryFromCategories(latestCategories));
+  renderFilteredCategories();
+  executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
+  lastCheck.textContent = `Last ${category} execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
+  updateProgressPanel(scopedResults.length, scopedResults.length, "Completed", false);
+  activeRunKeepsDashboardStable = false;
+}
+
 /**
  * Resets dashboard state when a new progressive monitoring run starts.
  * @param {object} payload The started event received from /api/monitor/stream.
  */
-function resetStreamingDashboard(payload) {
-  hasCompletedFullCheck = false;
-  latestResults = [];
-  latestCategories = [];
-  renderSummary(payload.summary ?? createProgressSummary([], payload.totalDevices ?? 0));
-  updateProgressPanel(0, Number(payload.totalDevices) || 0, "Checking devices...", true);
-  resultsBody.innerHTML = `
-    <div class="progress-panel text-secondary">
-      <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-      Checking devices 0/${Number(payload.totalDevices) || 0}...
-    </div>`;
+function resetStreamingDashboard(payload, category = "") {
+  const scopeLabel = category ? `${category} ` : "";
+
+  if (!category) {
+    if (!activeRunPreservesDashboard) {
+      hasCompletedFullCheck = false;
+      latestResults = [];
+      latestCategories = [];
+    }
+  }
+
+  renderSummary((category && latestResults.length > 0) || activeRunPreservesDashboard
+    ? createSummaryFromCategories(latestCategories)
+    : payload.summary ?? createProgressSummary([], payload.totalDevices ?? 0));
+  if (activeRunKeepsDashboardStable) {
+    monitorProgress.hidden = true;
+  } else {
+    updateProgressPanel(0, Number(payload.totalDevices) || 0, `Checking ${scopeLabel}devices...`, true);
+  }
+
+  if ((category && latestResults.length > 0) || activeRunPreservesDashboard) {
+    renderFilteredCategories();
+  } else {
+    resultsBody.innerHTML = `
+      <div class="progress-panel text-secondary">
+        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        Checking ${scopeLabel}devices 0/${Number(payload.totalDevices) || 0}...
+      </div>`;
+  }
+
   executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
-  lastCheck.textContent = `Checking devices 0/${Number(payload.totalDevices) || 0}...`;
+  lastCheck.textContent = `Checking ${scopeLabel}devices 0/${Number(payload.totalDevices) || 0}...`;
 }
 
 /**
@@ -193,10 +311,22 @@ function renderStreamingResult(payload) {
   }
 
   latestCategories = groupResultsByCategory(latestResults);
-  renderSummary(payload.summary ?? createProgressSummary(latestResults, payload.totalDevices ?? latestResults.length));
-  updateProgressPanel(payload.completedDevices, payload.totalDevices, "Checking devices...", true);
+  renderSummary(activeRunCategory || activeRunPreservesDashboard
+    ? createSummaryFromCategories(latestCategories)
+    : payload.summary ?? createProgressSummary(latestResults, payload.totalDevices ?? latestResults.length));
+  if (activeRunKeepsDashboardStable) {
+    monitorProgress.hidden = true;
+  } else {
+    updateProgressPanel(
+      payload.completedDevices,
+      payload.totalDevices,
+      activeRunCategory ? `Checking ${activeRunCategory} devices...` : "Checking devices...",
+      true);
+  }
   renderFilteredCategories();
-  lastCheck.textContent = `Checking devices ${payload.completedDevices}/${payload.totalDevices}...`;
+  lastCheck.textContent = activeRunCategory
+    ? `Checking ${activeRunCategory} devices ${payload.completedDevices}/${payload.totalDevices}...`
+    : `Checking devices ${payload.completedDevices}/${payload.totalDevices}...`;
 }
 
 /**
@@ -309,7 +439,8 @@ function matchesSearch(device, search) {
 
   return String(device.name ?? "").toLowerCase().includes(search)
     || String(device.ip ?? "").toLowerCase().includes(search)
-    || String(device.hostname ?? "").toLowerCase().includes(search);
+    || String(device.hostname ?? "").toLowerCase().includes(search)
+    || String(device.websiteUrl ?? "").toLowerCase().includes(search);
 }
 
 function matchesFilter(device, filter) {
@@ -351,13 +482,21 @@ function renderCategory(category, index) {
   const problemDevices = stateDevices.filter(device => device.status === "Degraded" || device.status === "Down").length;
   const categoryPercent = stateTotalDevices === 0 ? 100 : Math.round((healthyDevices / stateTotalDevices) * 100);
   const isHealthyCategory = stateTotalDevices > 0 && problemDevices === 0 && healthyDevices === stateTotalDevices;
-  const stateClass = hasCompletedFullCheck
+  const isRunningCategory = activeRunCategory
+    && activeRunCategory.toLowerCase() === String(category.name ?? "").toLowerCase();
+  const stateClass = isRunningCategory
+    ? "category-section-running"
+    : hasCompletedFullCheck
     ? isHealthyCategory ? "category-section-healthy" : "category-section-problem"
     : "category-section-running";
-  const stateIcon = hasCompletedFullCheck
+  const stateIcon = isRunningCategory
+    ? "fa-spinner fa-spin"
+    : hasCompletedFullCheck
     ? isHealthyCategory ? "fa-circle-check" : "fa-circle-xmark"
     : "fa-spinner fa-spin";
-  const stateLabel = hasCompletedFullCheck
+  const stateLabel = isRunningCategory
+    ? "Checking"
+    : hasCompletedFullCheck
     ? isHealthyCategory ? "Healthy" : "Needs attention"
     : "Checking";
   const categoryId = `category-${index}-${slugify(category.name)}`;
@@ -367,7 +506,7 @@ function renderCategory(category, index) {
   return `
     <section class="category-section ${stateClass} ${expandedClass} mb-3">
       <div class="category-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 min-w-0">
           <button
             class="btn btn-sm btn-outline-secondary category-toggle"
             type="button"
@@ -382,7 +521,7 @@ function renderCategory(category, index) {
             <span class="category-subtitle small">${totalDevices} devices monitored</span>
           </div>
         </div>
-        <div class="category-status-strip d-flex align-items-center gap-2">
+        <div class="category-summary d-flex align-items-center justify-content-end gap-2 flex-wrap flex-sm-nowrap ms-auto">
           <span class="category-percent">${categoryPercent}%</span>
           <span class="category-state">
             <i class="fa-solid ${stateIcon} me-1"></i>${stateLabel}
@@ -390,6 +529,9 @@ function renderCategory(category, index) {
           <span class="category-counts">
             ${onlineDevices} online / ${offlineDevices} offline
           </span>
+          <button class="btn btn-sm btn-light category-run-button" type="button" data-run-category="${escapeHtml(category.name)}">
+            <i class="fa-solid fa-play me-1"></i>Run
+          </button>
         </div>
       </div>
       <div
@@ -418,15 +560,21 @@ function renderCategory(category, index) {
 }
 
 function renderRow(result) {
-  const statusClass = result.isOnline ? "text-bg-success" : "text-bg-danger";
-  const statusIcon = result.isOnline ? "fa-check" : "fa-xmark";
-  const statusText = result.isOnline
-    ? `Online (${Number(result.latencyMs) || 0} ms)`
-    : "Offline";
+  const pingCheck = getPingCheck(result);
+  const hasPingCheck = Boolean(pingCheck);
+  const isPingAvailable = Boolean(pingCheck?.isAvailable);
+  const statusClass = isPingAvailable ? "text-bg-success" : "text-bg-danger";
+  const statusIcon = isPingAvailable ? "fa-check" : "fa-xmark";
+  const statusText = isPingAvailable
+    ? `Ping OK (${Number(pingCheck.latencyMs) || 0} ms)`
+    : hasPingCheck ? "Ping failed" : "No ping check";
 
   return `
     <tr>
-      <td class="fw-semibold">${escapeHtml(result.name)}</td>
+      <td class="fw-semibold">
+        <div>${escapeHtml(result.name)}</div>
+        ${renderWebsiteLink(result.websiteUrl)}
+      </td>
       <td>
         <code>${escapeHtml(result.ip)}</code>
         ${result.hostname ? `<div class="text-secondary small">${escapeHtml(result.hostname)}</div>` : ""}
@@ -437,9 +585,25 @@ function renderRow(result) {
           <i class="fa-solid ${statusIcon} me-1"></i>${statusText}
         </span>
       </td>
-      <td>${renderPorts(result.requestedPorts ?? [], result.openPorts ?? [])}</td>
+      <td>${renderPorts(result)}</td>
       <td class="text-secondary small">${formatDate(result.lastCheck)}</td>
     </tr>`;
+}
+
+function renderWebsiteLink(websiteUrl) {
+  if (!isHttpUrl(websiteUrl)) {
+    return "";
+  }
+
+  return `
+    <a class="small text-decoration-none" href="${escapeHtml(websiteUrl)}" target="_blank" rel="noopener noreferrer">
+      <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Open website
+    </a>`;
+}
+
+function getPingCheck(result) {
+  return (result.checks ?? []).find(check =>
+    String(check.type ?? "").toLowerCase() === "ping");
 }
 
 function renderDeviceStatus(status) {
@@ -493,7 +657,10 @@ function groupResultsByCategory(results) {
     }));
 }
 
-function renderPorts(requestedPorts, openPorts) {
+function renderPorts(result) {
+  const requestedPorts = result.requestedPorts ?? [];
+  const openPorts = result.openPorts ?? [];
+
   if (requestedPorts.length === 0) {
     return `<span class="text-secondary">No ports configured</span>`;
   }
@@ -505,17 +672,36 @@ function renderPorts(requestedPorts, openPorts) {
     const badgeClass = isOpen ? "text-bg-success" : "text-bg-danger";
     const icon = isOpen ? "fa-check" : "fa-xmark";
     const label = isOpen ? "open" : "closed";
+    const webUrl = getWebPortUrl(result.ip, port);
+    const content = `
+        <i class="fa-solid ${icon}"></i>
+        ${port} ${label}`;
+
+    if (webUrl) {
+      return `
+        <a class="badge ${badgeClass} port-pill port-link" href="${escapeHtml(webUrl)}" target="_blank" rel="noopener noreferrer" title="Open ${escapeHtml(webUrl)}">
+          ${content}
+        </a>`;
+    }
 
     return `
       <span class="badge ${badgeClass} port-pill">
-        <i class="fa-solid ${icon}"></i>
-        ${port} ${label}
+        ${content}
       </span>`;
   }).join("");
 }
 
+function getWebPortUrl(address, port) {
+  if (!address || port !== 80 && port !== 443) {
+    return null;
+  }
+
+  return `${port === 443 ? "https" : "http"}://${address}`;
+}
+
 async function reloadJson() {
-  reloadButton.disabled = true;
+  setConfigBusy(true, { showSaveSpinner: false });
+  clearConfigAlert();
 
   try {
     const response = await fetch("/api/reload", { method: "POST" });
@@ -525,12 +711,128 @@ async function reloadJson() {
       throw new Error(payload.error || payload.detail || `Reload failed with ${response.status}`);
     }
 
-    await runFullCheck();
+    await loadConfig({ clearAlert: false, showBusy: false });
+    if (hasLoadedDashboardGroups) {
+      await loadDashboardGroups();
+    }
+    showConfigAlert("success", `Reloaded config.json from disk. ${formatNumber(payload.count)} devices loaded.`);
   } catch (error) {
-    lastCheck.textContent = `JSON reload failed: ${error.message}`;
+    showConfigAlert("danger", `JSON reload failed: ${error.message}`);
     console.error(error);
   } finally {
-    reloadButton.disabled = false;
+    setConfigBusy(false, { showSaveSpinner: false });
+  }
+}
+
+async function exportConfig() {
+  setConfigBusy(true, { showSaveSpinner: false });
+  clearConfigAlert();
+
+  try {
+    const response = await fetch("/api/config/export");
+    const contentType = response.headers.get("content-type")?.toLowerCase() || "";
+
+    if (response.ok && contentType.includes("application/json")) {
+      const blob = await response.blob();
+      downloadJsonBlob(blob, getDownloadFileName(response) || createExportFileName());
+      showConfigAlert("success", "Configuration exported as JSON.");
+      return;
+    }
+
+    if (!response.ok && contentType.includes("application/json")) {
+      const payload = await readJsonResponse(response);
+      throw new Error(payload.error || payload.detail || `Export failed with ${response.status}`);
+    }
+
+    await exportConfigFromConfigEndpoint();
+  } catch (error) {
+    showConfigAlert("danger", `JSON export failed: ${error.message}`);
+    console.error(error);
+  } finally {
+    setConfigBusy(false, { showSaveSpinner: false });
+  }
+}
+
+async function exportConfigFromConfigEndpoint() {
+  const response = await fetch("/api/config");
+  const payload = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(payload.error || payload.detail || `Export fallback failed with ${response.status}`);
+  }
+
+  const json = `${JSON.stringify(payload, null, 2)}\n`;
+  const blob = new Blob([json], { type: "application/json" });
+  downloadJsonBlob(blob, createExportFileName());
+  showConfigAlert("success", "Configuration exported as JSON.");
+}
+
+function downloadJsonBlob(blob, fileName) {
+  const downloadUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(downloadUrl);
+}
+
+function requestImportConfig() {
+  importConfigFileInput.value = "";
+  importConfigFileInput.click();
+}
+
+async function importConfigFile(file) {
+  if (!file) {
+    return;
+  }
+
+  if (!file.name.toLowerCase().endsWith(".json")) {
+    showConfigAlert("warning", "Choose a .json configuration file.");
+    return;
+  }
+
+  if (file.size === 0) {
+    showConfigAlert("warning", "The selected JSON file is empty.");
+    return;
+  }
+
+  if (file.size > maxConfigImportBytes) {
+    showConfigAlert("warning", "The selected JSON file is too large. Maximum size is 5 MB.");
+    return;
+  }
+
+  setConfigBusy(true, { showSaveSpinner: false });
+  clearConfigAlert();
+
+  try {
+    const formData = new FormData();
+    formData.append("configFile", file);
+
+    const response = await fetch("/api/config/import", {
+      method: "POST",
+      body: formData
+    });
+    const payload = await readJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(payload.error || payload.detail || `Import failed with ${response.status}`);
+    }
+
+    applyConfigPayload(payload.configuration);
+    hasLoadedConfig = true;
+    renderConfigDevices();
+    resetDeviceForm();
+    if (hasLoadedDashboardGroups) {
+      await loadDashboardGroups();
+    }
+    showConfigAlert("success", `Imported config.json. ${formatNumber(payload.count)} devices loaded.`);
+  } catch (error) {
+    showConfigAlert("danger", `JSON import failed: ${error.message}`);
+    console.error(error);
+  } finally {
+    setConfigBusy(false, { showSaveSpinner: false });
   }
 }
 
@@ -544,7 +846,30 @@ async function runFullCheck() {
   }
 }
 
-function toggleAutoRefresh() {
+async function runSelectedGroupCheck() {
+  const category = groupCheckSelect.value;
+
+  if (!category) {
+    return;
+  }
+
+  await runGroupCheck(category);
+}
+
+async function runGroupCheck(category) {
+  setButtonLoading(runGroupCheckButton, runGroupCheckSpinner, runGroupCheckIcon, true);
+  runFullCheckButton.disabled = true;
+
+  try {
+    await loadResults({ category });
+  } finally {
+    setButtonLoading(runGroupCheckButton, runGroupCheckSpinner, runGroupCheckIcon, false);
+    runGroupCheckButton.disabled = !groupCheckSelect.value;
+    runFullCheckButton.disabled = false;
+  }
+}
+
+async function toggleAutoRefresh() {
   autoRefreshEnabled = !autoRefreshEnabled;
   autoRefreshToggle.classList.toggle("btn-success", autoRefreshEnabled);
   autoRefreshToggle.classList.toggle("btn-danger", !autoRefreshEnabled);
@@ -554,16 +879,25 @@ function toggleAutoRefresh() {
   executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
 
   if (autoRefreshEnabled) {
-    scheduleRefresh();
+    if (!hasLoadedDashboardGroups) {
+      await loadDashboardGroups();
+    }
+
+    runFullCheck();
     return;
   }
 
   clearRefreshTimer();
 }
 
-async function loadConfig() {
-  setConfigBusy(true);
-  clearConfigAlert();
+async function loadConfig({ clearAlert = true, showBusy = true } = {}) {
+  if (showBusy) {
+    setConfigBusy(true, { showSaveSpinner: false });
+  }
+
+  if (clearAlert) {
+    clearConfigAlert();
+  }
 
   try {
     const response = await fetch("/api/config");
@@ -573,16 +907,7 @@ async function loadConfig() {
       throw new Error(payload.error || `Unable to load configuration. HTTP ${response.status}`);
     }
 
-    configState = payload;
-    configState.devices ??= [];
-    configState.settings ??= {
-      intervalSeconds: 15,
-      timeoutMs: 1000,
-      maxParallelChecks: 50,
-      useHostnameForPing: false
-    };
-    configState.settings.useHostnameForPing ??= false;
-    useHostnameForPingInput.checked = Boolean(configState.settings.useHostnameForPing);
+    applyConfigPayload(payload);
     hasLoadedConfig = true;
     renderConfigDevices();
     resetDeviceForm();
@@ -590,16 +915,21 @@ async function loadConfig() {
     showConfigAlert("danger", error.message || "Unable to load configuration.");
     console.error(error);
   } finally {
-    setConfigBusy(false);
+    if (showBusy) {
+      setConfigBusy(false, { showSaveSpinner: false });
+    }
   }
 }
 
-async function saveConfig(successMessage = "Configuration saved. Previous config was backed up as config.backup.json.") {
+async function saveConfig(successMessage = "Settings saved to config.json. Previous config was backed up as config.backup.json.") {
   setConfigBusy(true);
   clearConfigAlert();
 
   try {
-    syncConfigSettingsFromUi();
+    if (!syncConfigSettingsFromUi()) {
+      return;
+    }
+
     const response = await fetch("/api/config", {
       method: "POST",
       headers: {
@@ -614,17 +944,46 @@ async function saveConfig(successMessage = "Configuration saved. Previous config
       throw new Error(payload.error || `Request failed with ${response.status}`);
     }
 
-    configState = payload.configuration;
+    applyConfigPayload(payload.configuration);
     renderConfigDevices();
     resetDeviceForm();
+    if (hasLoadedDashboardGroups) {
+      await loadDashboardGroups();
+    }
+    if (autoRefreshEnabled) {
+      scheduleRefresh();
+    }
     showConfigAlert("success", successMessage);
-    await loadConfig();
   } catch (error) {
     showConfigAlert("danger", error.message || "Unable to save configuration.");
     console.error(error);
   } finally {
     setConfigBusy(false);
   }
+}
+
+function applyConfigPayload(payload) {
+  configState = payload;
+  configState.devices ??= [];
+  configState.settings ??= {
+    intervalSeconds: defaultAutoFullCheckIntervalSeconds,
+    timeoutMs: 1000,
+    maxParallelChecks: 50
+  };
+  configState.settings.intervalSeconds ??= defaultAutoFullCheckIntervalSeconds;
+  configState.settings.timeoutMs ??= 1000;
+  configState.settings.maxParallelChecks ??= 50;
+  const legacyUseHostnameForPing = Boolean(configState.settings.useHostnameForPing);
+  delete configState.settings.useHostnameForPing;
+  configState.devices = configState.devices.map(device => ({
+    ...device,
+    useHostnameForPing: device.useHostnameForPing ?? legacyUseHostnameForPing
+  }));
+  if (intervalSecondsInput) {
+    intervalSecondsInput.value = String(configState.settings.intervalSeconds);
+  }
+  timeoutMsInput.value = String(configState.settings.timeoutMs);
+  maxParallelChecksInput.value = String(configState.settings.maxParallelChecks);
 }
 
 async function readJsonResponse(response) {
@@ -637,17 +996,72 @@ async function readJsonResponse(response) {
   try {
     return JSON.parse(text);
   } catch {
-    throw new Error("Configuration API did not return JSON. Restart the application so the latest backend endpoints are loaded.");
+    throw new Error("The API did not return JSON. Restart the application so the latest backend endpoints are loaded.");
   }
 }
 
+function getDownloadFileName(response) {
+  const disposition = response.headers.get("content-disposition") || "";
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+
+  if (utf8Match) {
+    return decodeURIComponent(utf8Match[1].replaceAll("\"", ""));
+  }
+
+  const asciiMatch = disposition.match(/filename="?([^";]+)"?/i);
+  return asciiMatch ? asciiMatch[1] : "";
+}
+
+function createExportFileName() {
+  const timestamp = new Date()
+    .toISOString()
+    .replaceAll("-", "")
+    .replaceAll(":", "")
+    .replace(/\.\d{3}Z$/, "");
+
+  return `netwatch-lite-config-${timestamp}.json`;
+}
+
+async function loadDashboardGroups() {
+  try {
+    const response = await fetch("/api/config");
+    const payload = await readJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(payload.error || `Unable to load dashboard groups. HTTP ${response.status}`);
+    }
+
+    applyConfigPayload(payload);
+    renderGroupCheckOptions(payload.devices);
+    hasLoadedDashboardGroups = true;
+  } catch (error) {
+    console.error(error);
+    runGroupCheckButton.disabled = true;
+    lastCheck.textContent = error.message || "Unable to load dashboard groups.";
+  }
+}
+
+function renderGroupCheckOptions(devices) {
+  const categories = Array.from(new Set(
+    (devices ?? [])
+      .filter(device => device.enabled !== false)
+      .map(device => device.category || "Uncategorized")))
+    .sort((left, right) => left.localeCompare(right));
+
+  groupCheckSelect.innerHTML = `
+    <option value="">Select group</option>
+    ${categories.map(category => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`).join("")}`;
+  runGroupCheckButton.disabled = true;
+}
+
 function renderConfigDevices() {
-  const devices = configState.devices ?? [];
+  const devices = filterConfigDevices(configState.devices ?? []);
+  const hasSearch = activeConfigSearch.trim().length > 0;
 
   if (devices.length === 0) {
     configDevicesBody.innerHTML = `
       <tr>
-        <td colspan="5" class="text-center text-secondary py-4">No devices configured.</td>
+        <td colspan="6" class="text-center text-secondary py-4">${hasSearch ? "No devices match the current filter." : "No devices configured."}</td>
       </tr>`;
     return;
   }
@@ -658,7 +1072,7 @@ function renderConfigDevices() {
 
       return `
       <tr class="config-category-row">
-        <td colspan="5">
+        <td colspan="6">
           <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
             <div class="d-flex align-items-center gap-2">
               <button
@@ -680,16 +1094,31 @@ function renderConfigDevices() {
     .join("");
 }
 
+function filterConfigDevices(devices) {
+  const search = activeConfigSearch.trim().toLowerCase();
+  const indexedDevices = devices.map((device, index) => ({ device, index }));
+
+  if (!search) {
+    return indexedDevices;
+  }
+
+  return indexedDevices.filter(({ device }) =>
+    String(device.name ?? "").toLowerCase().includes(search)
+      || String(device.ip ?? "").toLowerCase().includes(search)
+      || String(device.hostname ?? "").toLowerCase().includes(search)
+      || String(device.websiteUrl ?? "").toLowerCase().includes(search));
+}
+
 /**
  * Groups configuration devices by category while preserving their original
  * array index so edit/delete actions still target the correct JSON entry.
- * @param {Array<object>} devices Devices from the editable configuration state.
+ * @param {Array<{device: object, index: number}>} devices Devices with their original configuration indexes.
  * @returns {Array<{name: string, devices: Array<{device: object, index: number}>}>} Sorted category groups.
  */
 function groupConfigDevicesByCategory(devices) {
   const groups = new Map();
 
-  devices.forEach((device, index) => {
+  devices.forEach(({ device, index }) => {
     const categoryName = device.category || "Uncategorized";
 
     if (!groups.has(categoryName)) {
@@ -716,6 +1145,8 @@ function groupConfigDevicesByCategory(devices) {
  * @returns {string} Table row markup.
  */
 function renderConfigDeviceRow(device, index, groupId) {
+  const pingModeLabel = device.useHostnameForPing ? "Hostname" : "Address";
+
   return `
     <tr class="config-device-row" data-config-category-row="${groupId}" hidden>
       <td>
@@ -724,6 +1155,7 @@ function renderConfigDeviceRow(device, index, groupId) {
       </td>
       <td><code>${escapeHtml(device.ip)}</code></td>
       <td>${device.hostname ? `<code>${escapeHtml(device.hostname)}</code>` : `<span class="text-secondary">Not set</span>`}</td>
+      <td><span class="badge text-bg-${device.useHostnameForPing ? "primary" : "secondary"}">${pingModeLabel}</span></td>
       <td>${device.checks?.length ?? 0}</td>
       <td class="text-end">
         <button class="btn btn-outline-primary btn-sm" type="button" data-edit-device="${index}">
@@ -773,6 +1205,8 @@ function editDevice(index) {
   deviceNameInput.value = device.name ?? "";
   deviceAddressInput.value = device.ip ?? "";
   deviceHostnameInput.value = device.hostname ?? "";
+  deviceUseHostnameForPingInput.checked = Boolean(device.useHostnameForPing);
+  deviceWebsiteUrlInput.value = device.websiteUrl ?? "";
   deviceCategoryInput.value = device.category ?? "";
   deviceEnabledInput.checked = device.enabled ?? true;
   checksList.innerHTML = "";
@@ -819,10 +1253,20 @@ function readDeviceForm() {
     return null;
   }
 
+  const websiteUrl = deviceWebsiteUrlInput.value.trim();
+
+  if (websiteUrl && !isHttpUrl(websiteUrl)) {
+    showConfigAlert("warning", "Website URL must start with http:// or https://.");
+    deviceWebsiteUrlInput.focus();
+    return null;
+  }
+
   return {
     name: deviceNameInput.value.trim(),
     ip: deviceAddressInput.value.trim(),
     hostname: deviceHostnameInput.value.trim() || null,
+    useHostnameForPing: deviceUseHostnameForPingInput.checked,
+    websiteUrl: websiteUrl || null,
     category: deviceCategoryInput.value.trim() || "Uncategorized",
     enabled: deviceEnabledInput.checked,
     checks
@@ -859,6 +1303,7 @@ function resetDeviceForm() {
   editingDeviceIndex.value = "";
   deviceForm.reset();
   deviceEnabledInput.checked = true;
+  deviceUseHostnameForPingInput.checked = false;
   deviceFormTitle.textContent = "Add Device";
   submitDeviceButton.textContent = "Add Device";
   checksList.innerHTML = "";
@@ -867,21 +1312,50 @@ function resetDeviceForm() {
 }
 
 function showDeviceForm() {
-  deviceForm.classList.remove("d-none");
+  if (deviceFormModal) {
+    deviceFormModal.show();
+  }
 }
 
 function hideDeviceForm() {
-  deviceForm.classList.add("d-none");
+  if (deviceFormModal) {
+    deviceFormModal.hide();
+  }
 }
 
 function syncConfigSettingsFromUi() {
   configState.settings ??= {
-    intervalSeconds: 15,
+    intervalSeconds: defaultAutoFullCheckIntervalSeconds,
     timeoutMs: 1000,
-    maxParallelChecks: 50,
-    useHostnameForPing: false
+    maxParallelChecks: 50
   };
-  configState.settings.useHostnameForPing = useHostnameForPingInput.checked;
+  const intervalSeconds = intervalSecondsInput
+    ? readPositiveIntegerSetting(intervalSecondsInput, "Auto refresh")
+    : Number(configState.settings.intervalSeconds) || defaultAutoFullCheckIntervalSeconds;
+  const timeoutMs = readPositiveIntegerSetting(timeoutMsInput, "Timeout");
+  const maxParallelChecks = readPositiveIntegerSetting(maxParallelChecksInput, "Max parallel checks");
+
+  if (intervalSeconds === null || timeoutMs === null || maxParallelChecks === null) {
+    return false;
+  }
+
+  configState.settings.intervalSeconds = intervalSeconds;
+  configState.settings.timeoutMs = timeoutMs;
+  configState.settings.maxParallelChecks = maxParallelChecks;
+  delete configState.settings.useHostnameForPing;
+  return true;
+}
+
+function readPositiveIntegerSetting(input, label) {
+  const value = Number(input.value);
+
+  if (!Number.isInteger(value) || value <= 0) {
+    showConfigAlert("warning", `${label} must be a whole number greater than zero.`);
+    input.focus();
+    return null;
+  }
+
+  return value;
 }
 
 function addCheckRow(check = { type: "ping" }) {
@@ -928,7 +1402,9 @@ function requestDeleteDevice(index) {
 
   pendingDeleteIndex = index;
   deleteDeviceName.textContent = device.name;
-  deleteDeviceModal.show();
+  if (deleteDeviceModal) {
+    deleteDeviceModal.show();
+  }
 }
 
 async function confirmDeleteDevice() {
@@ -938,20 +1414,28 @@ async function confirmDeleteDevice() {
 
   configState.devices.splice(pendingDeleteIndex, 1);
   pendingDeleteIndex = null;
-  deleteDeviceModal.hide();
+  if (deleteDeviceModal) {
+    deleteDeviceModal.hide();
+  }
   await saveConfig("Device deleted and saved to config.json.");
 }
 
-function setConfigBusy(isBusy) {
+function setConfigBusy(isBusy, { showSaveSpinner = true } = {}) {
   saveConfigButton.disabled = isBusy;
   reloadConfigButton.disabled = isBusy;
+  exportConfigButton.disabled = isBusy;
+  importConfigButton.disabled = isBusy;
   addDeviceButton.disabled = isBusy;
-  useHostnameForPingInput.disabled = isBusy;
+  if (intervalSecondsInput) {
+    intervalSecondsInput.disabled = isBusy;
+  }
+  timeoutMsInput.disabled = isBusy;
+  maxParallelChecksInput.disabled = isBusy;
   deviceForm.querySelectorAll("input, select, button").forEach(element => {
     element.disabled = isBusy;
   });
-  saveConfigSpinner.classList.toggle("d-none", !isBusy);
-  saveConfigIcon.classList.toggle("d-none", isBusy);
+  saveConfigSpinner.classList.toggle("d-none", !isBusy || !showSaveSpinner);
+  saveConfigIcon.classList.toggle("d-none", isBusy && showSaveSpinner);
 }
 
 function showConfigAlert(type, message) {
@@ -969,10 +1453,9 @@ function clearConfigAlert() {
 function createEmptyConfiguration() {
   return {
     settings: {
-      intervalSeconds: 15,
+      intervalSeconds: defaultAutoFullCheckIntervalSeconds,
       timeoutMs: 1000,
-      maxParallelChecks: 50,
-      useHostnameForPing: false
+      maxParallelChecks: 50
     },
     devices: []
   };
@@ -1010,12 +1493,12 @@ function navigateTo(route, replace = false) {
     resetDeviceForm();
   }
 
-  if (normalizedRoute === "/" && !hasLoadedDashboard) {
-    loadResults();
-  }
-
   if (normalizedRoute === "/config" && !hasLoadedConfig) {
     loadConfig();
+  }
+
+  if (normalizedRoute === "/" && !hasLoadedDashboardGroups) {
+    loadDashboardGroups();
   }
 }
 
@@ -1110,9 +1593,25 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-reloadButton.addEventListener("click", reloadJson);
+function isHttpUrl(value) {
+  if (!value) {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 autoRefreshToggle.addEventListener("click", toggleAutoRefresh);
 runFullCheckButton.addEventListener("click", runFullCheck);
+runGroupCheckButton.addEventListener("click", runSelectedGroupCheck);
+groupCheckSelect.addEventListener("change", () => {
+  runGroupCheckButton.disabled = !groupCheckSelect.value;
+});
 sidebarToggle.addEventListener("click", toggleSidebar);
 sidebarBackdrop.addEventListener("click", closeSidebar);
 navLinks.forEach(link => {
@@ -1135,6 +1634,13 @@ resultsBody.addEventListener("shown.bs.collapse", event => {
     expandedCategoryNames.add(categoryName);
   }
 });
+resultsBody.addEventListener("click", event => {
+  const runCategoryButton = event.target.closest("[data-run-category]");
+
+  if (runCategoryButton) {
+    runGroupCheck(runCategoryButton.dataset.runCategory);
+  }
+});
 searchInput.addEventListener("input", debounce(event => {
   activeSearch = event.target.value;
   renderFilteredCategories();
@@ -1145,11 +1651,27 @@ filterInputs.forEach(input => {
     renderFilteredCategories();
   });
 });
-reloadConfigButton.addEventListener("click", loadConfig);
+reloadConfigButton.addEventListener("click", reloadJson);
+exportConfigButton.addEventListener("click", exportConfig);
+importConfigButton.addEventListener("click", requestImportConfig);
+importConfigFileInput.addEventListener("change", event => {
+  importConfigFile(event.target.files?.[0]);
+});
 saveConfigButton.addEventListener("click", saveConfig);
-useHostnameForPingInput.addEventListener("change", () => {
-  syncConfigSettingsFromUi();
-  showConfigAlert("info", "Ping mode changed locally. Click Save to persist changes.");
+configDeviceSearchInput.addEventListener("input", debounce(event => {
+  activeConfigSearch = event.target.value;
+  renderConfigDevices();
+}, 150));
+if (intervalSecondsInput) {
+  intervalSecondsInput.addEventListener("input", () => {
+    showConfigAlert("info", "Auto refresh interval changed locally. Click Save Settings to persist changes.");
+  });
+}
+timeoutMsInput.addEventListener("input", () => {
+  showConfigAlert("info", "Timeout changed locally. Click Save Settings to persist changes.");
+});
+maxParallelChecksInput.addEventListener("input", () => {
+  showConfigAlert("info", "Parallel check limit changed locally. Click Save Settings to persist changes.");
 });
 addDeviceButton.addEventListener("click", startAddDevice);
 deviceForm.addEventListener("submit", submitDevice);
@@ -1186,6 +1708,11 @@ configDevicesBody.addEventListener("click", event => {
   }
 });
 confirmDeleteDeviceButton.addEventListener("click", confirmDeleteDevice);
+if (deviceFormModalElement) {
+  deviceFormModalElement.addEventListener("shown.bs.modal", () => {
+    deviceNameInput.focus();
+  });
+}
 window.addEventListener("popstate", () => navigateTo(location.pathname, true));
 
 navigateTo(currentRoute, true);
@@ -1194,8 +1721,17 @@ function scheduleRefresh() {
   clearRefreshTimer();
 
   if (autoRefreshEnabled) {
-    refreshTimer = setInterval(() => loadResults({ showErrors: false }), autoFullCheckIntervalMs);
+    refreshTimer = setInterval(() => loadResults({ showErrors: false }), getAutoRefreshIntervalMs());
   }
+}
+
+function getAutoRefreshIntervalMs() {
+  const intervalSeconds = Number(configState.settings?.intervalSeconds);
+  const safeIntervalSeconds = Number.isInteger(intervalSeconds) && intervalSeconds > 0
+    ? intervalSeconds
+    : defaultAutoFullCheckIntervalSeconds;
+
+  return safeIntervalSeconds * 1000;
 }
 
 function clearRefreshTimer() {

@@ -64,10 +64,6 @@
             <i class="fa-solid fa-bolt me-1" id="run-full-check-icon"></i>
             Run Full Check
           </button>
-          <button class="btn btn-outline-secondary btn-sm" type="button" id="reload-json">
-            <i class="fa-solid fa-rotate-right me-1"></i>
-            Reload JSON
-          </button>
         </div>
       </header>
 
@@ -82,7 +78,7 @@
                   </div>
                   <div>
                     <div class="text-secondary small">Total devices</div>
-                    <div class="h4 mb-0" id="metric-total">0</div>
+                    <div class="h4 mb-0" id="metric-total">-</div>
                   </div>
                 </div>
               </div>
@@ -95,7 +91,7 @@
                   </div>
                   <div>
                     <div class="text-secondary small">Online devices</div>
-                    <div class="h4 mb-0" id="metric-online">0</div>
+                    <div class="h4 mb-0" id="metric-online">-</div>
                   </div>
                 </div>
               </div>
@@ -108,7 +104,7 @@
                   </div>
                   <div>
                     <div class="text-secondary small">Offline devices</div>
-                    <div class="h4 mb-0" id="metric-offline">0</div>
+                    <div class="h4 mb-0" id="metric-offline">-</div>
                   </div>
                 </div>
               </div>
@@ -121,7 +117,7 @@
                   </div>
                   <div>
                     <div class="text-secondary small">Degraded devices</div>
-                    <div class="h4 mb-0" id="metric-degraded">0</div>
+                    <div class="h4 mb-0" id="metric-degraded">-</div>
                   </div>
                 </div>
               </div>
@@ -134,7 +130,7 @@
                   </div>
                   <div>
                     <div class="text-secondary small">Availability</div>
-                    <div class="h4 mb-0" id="metric-availability">0%</div>
+                    <div class="h4 mb-0" id="metric-availability">-</div>
                   </div>
                 </div>
               </div>
@@ -154,18 +150,34 @@
                 autocomplete="off">
             </div>
 
-            <div class="btn-group btn-group-sm status-filter-group" role="group" aria-label="Device status filters">
-              <input type="radio" class="btn-check" name="status-filter" id="filter-all" value="all" checked>
-              <label class="btn btn-outline-secondary" for="filter-all">Show All</label>
+            <div class="dashboard-toolbar-actions">
+              <div class="input-group input-group-sm group-check-control">
+                <label class="input-group-text" for="group-check-select">
+                  <i class="fa-solid fa-layer-group"></i>
+                </label>
+                <select class="form-select" id="group-check-select">
+                  <option value="">Select group</option>
+                </select>
+                <button class="btn btn-outline-primary" type="button" id="run-group-check" disabled>
+                  <span class="spinner-border spinner-border-sm me-1 d-none" id="run-group-check-spinner" aria-hidden="true"></span>
+                  <i class="fa-solid fa-play me-1" id="run-group-check-icon"></i>
+                  Run Group
+                </button>
+              </div>
 
-              <input type="radio" class="btn-check" name="status-filter" id="filter-online" value="online">
-              <label class="btn btn-outline-success" for="filter-online">Online</label>
+              <div class="btn-group btn-group-sm status-filter-group" role="group" aria-label="Device status filters">
+                <input type="radio" class="btn-check" name="status-filter" id="filter-all" value="all" checked>
+                <label class="btn btn-outline-secondary" for="filter-all">Show All</label>
 
-              <input type="radio" class="btn-check" name="status-filter" id="filter-offline" value="offline">
-              <label class="btn btn-outline-danger" for="filter-offline">Offline</label>
+                <input type="radio" class="btn-check" name="status-filter" id="filter-online" value="online">
+                <label class="btn btn-outline-success" for="filter-online">Online</label>
 
-              <input type="radio" class="btn-check" name="status-filter" id="filter-problems" value="problems">
-              <label class="btn btn-outline-warning" for="filter-problems">Problems</label>
+                <input type="radio" class="btn-check" name="status-filter" id="filter-offline" value="offline">
+                <label class="btn btn-outline-danger" for="filter-offline">Offline</label>
+
+                <input type="radio" class="btn-check" name="status-filter" id="filter-problems" value="problems">
+                <label class="btn btn-outline-warning" for="filter-problems">Problems</label>
+              </div>
             </div>
           </div>
 
@@ -184,7 +196,7 @@
           </div>
 
           <div id="results-body">
-            <div class="text-center text-secondary py-4">Loading...</div>
+            <div class="text-center text-secondary py-4">Run a full check to load monitoring results.</div>
           </div>
         </section>
 
@@ -195,18 +207,18 @@
               <p class="text-secondary mb-0">Manage devices stored in config.json.</p>
             </div>
             <div class="config-actions d-flex align-items-center gap-2">
-              <div class="form-check form-switch config-ping-mode mb-0">
-                <input class="form-check-input" type="checkbox" role="switch" id="use-hostname-for-ping">
-                <label class="form-check-label" for="use-hostname-for-ping">Ping by hostname</label>
-              </div>
-              <button class="btn btn-success btn-sm" type="button" id="save-config">
-                <span class="spinner-border spinner-border-sm me-1 d-none" id="save-config-spinner" aria-hidden="true"></span>
-                <i class="fa-solid fa-floppy-disk me-1" id="save-config-icon"></i>
-                Save
+              <button class="btn btn-outline-primary btn-sm" type="button" id="export-config">
+                <i class="fa-solid fa-file-export me-1"></i>
+                Export JSON
               </button>
+              <button class="btn btn-outline-primary btn-sm" type="button" id="import-config">
+                <i class="fa-solid fa-file-import me-1"></i>
+                Import JSON
+              </button>
+              <input class="visually-hidden" type="file" id="import-config-file" accept="application/json,.json">
               <button class="btn btn-outline-secondary btn-sm" type="button" id="reload-config">
-                <i class="fa-solid fa-download me-1"></i>
-                Reload
+                <i class="fa-solid fa-rotate-right me-1"></i>
+                Reload JSON
               </button>
             </div>
           </div>
@@ -216,27 +228,84 @@
           <div class="row g-3">
             <div class="col-12">
               <div class="card config-card">
-                <div class="card-header d-flex align-items-center justify-content-between">
-                  <span class="fw-semibold">Devices</span>
-                  <button class="btn btn-primary btn-sm" type="button" id="add-device">
-                    <i class="fa-solid fa-plus me-1"></i>
-                    Add Device
+                <div class="card-header config-settings-header">
+                  <span class="fw-semibold">Settings</span>
+                  <button class="btn btn-success btn-sm" type="button" id="save-config">
+                    <span class="spinner-border spinner-border-sm me-1 d-none" id="save-config-spinner" aria-hidden="true"></span>
+                    <i class="fa-solid fa-floppy-disk me-1" id="save-config-icon"></i>
+                    Save Settings
                   </button>
                 </div>
+                <div class="card-body">
+                  <div class="row g-3 align-items-end">
+                    <div class="col-12 col-md-4">
+                      <label class="form-label" for="interval-seconds">Auto refresh</label>
+                      <div class="input-group">
+                        <input class="form-control" type="number" min="1" step="1" id="interval-seconds" required>
+                        <span class="input-group-text">sec</span>
+                      </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label" for="timeout-ms">Timeout</label>
+                      <div class="input-group">
+                        <input class="form-control" type="number" min="1" step="1" id="timeout-ms" required>
+                        <span class="input-group-text">ms</span>
+                      </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label" for="max-parallel-checks">Max parallel checks</label>
+                      <input class="form-control" type="number" min="1" step="1" id="max-parallel-checks" required>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <div class="card config-card">
+                <div class="card-header config-devices-header">
+                  <span class="fw-semibold">Devices</span>
+                  <div class="config-devices-tools">
+                    <div class="input-group input-group-sm config-search-box">
+                      <span class="input-group-text">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                      </span>
+                      <input
+                        type="search"
+                        class="form-control"
+                        id="config-device-search"
+                        placeholder="Filter by name, address, or hostname"
+                        autocomplete="off">
+                    </div>
+                    <button class="btn btn-primary btn-sm" type="button" id="add-device">
+                      <i class="fa-solid fa-plus me-1"></i>
+                      Add Device
+                    </button>
+                  </div>
+                </div>
                 <div class="table-responsive">
-                  <table class="table table-hover align-middle mb-0">
+                  <table class="table table-hover align-middle mb-0 config-devices-table">
+                    <colgroup>
+                      <col class="config-col-name">
+                      <col class="config-col-address">
+                      <col class="config-col-hostname">
+                      <col class="config-col-ping-mode">
+                      <col class="config-col-checks">
+                      <col class="config-col-actions">
+                    </colgroup>
                     <thead class="table-light">
                       <tr>
                         <th>Name</th>
                         <th>Address</th>
                         <th>Hostname</th>
+                        <th>Ping target</th>
                         <th>Checks</th>
                         <th class="text-end">Actions</th>
                       </tr>
                     </thead>
                     <tbody id="config-devices-body">
                       <tr>
-                        <td colspan="5" class="text-center text-secondary py-4">Loading configuration...</td>
+                        <td colspan="6" class="text-center text-secondary py-4">Loading configuration...</td>
                       </tr>
                     </tbody>
                   </table>
@@ -244,46 +313,6 @@
               </div>
             </div>
 
-            <div class="col-12">
-              <form class="card config-card d-none" id="device-form">
-                <div class="card-header fw-semibold" id="device-form-title">Add Device</div>
-                <div class="card-body">
-                  <input type="hidden" id="editing-device-index">
-                  <div class="mb-3">
-                    <label class="form-label" for="device-name">Name</label>
-                    <input class="form-control" type="text" id="device-name" autocomplete="off" required>
-                  </div>
-                  <div class="mb-3">
-                    <label class="form-label" for="device-address">Address</label>
-                    <input class="form-control" type="text" id="device-address" autocomplete="off" required>
-                  </div>
-                  <div class="mb-3">
-                    <label class="form-label" for="device-hostname">Hostname</label>
-                    <input class="form-control" type="text" id="device-hostname" autocomplete="off" placeholder="Optional DNS name">
-                  </div>
-                  <div class="mb-3">
-                    <label class="form-label" for="device-category">Category</label>
-                    <input class="form-control" type="text" id="device-category" autocomplete="off" placeholder="Uncategorized">
-                  </div>
-                  <div class="form-check form-switch mb-3">
-                    <input class="form-check-input" type="checkbox" role="switch" id="device-enabled" checked>
-                    <label class="form-check-label" for="device-enabled">Enabled</label>
-                  </div>
-                  <div class="d-flex align-items-center justify-content-between mb-2">
-                    <label class="form-label mb-0">Checks</label>
-                    <button class="btn btn-outline-primary btn-sm" type="button" id="add-check">
-                      <i class="fa-solid fa-plus me-1"></i>
-                      Add Check
-                    </button>
-                  </div>
-                  <div class="checks-list" id="checks-list"></div>
-                </div>
-                <div class="card-footer d-flex justify-content-end gap-2">
-                  <button class="btn btn-outline-secondary" type="button" id="reset-device-form">Cancel</button>
-                  <button class="btn btn-primary" type="submit" id="submit-device">Add Device</button>
-                </div>
-              </form>
-            </div>
           </div>
         </section>
 
@@ -302,7 +331,7 @@
               <p>The dashboard shows device health grouped by category. Each category starts collapsed so large inventories stay easy to scan.</p>
               <ul>
                 <li>Use <strong>Run Full Check</strong> to execute all configured ping and TCP checks immediately.</li>
-                <li>Use <strong>Auto Refresh</strong> to run a full check every 60 seconds.</li>
+                <li>Use <strong>Auto Refresh</strong> to run a full check using the configured interval.</li>
                 <li>Use the search box to filter by name, IP, or hostname.</li>
                 <li>Use status filters to show all devices, online devices, offline devices, or problems.</li>
               </ul>
@@ -312,9 +341,9 @@
               <h3><i class="fa-solid fa-heart-pulse me-2 text-success"></i>Status Rules</h3>
               <p>Each device receives one final status after its checks complete.</p>
               <ul>
-                <li><strong>Healthy:</strong> ping succeeds and all TCP ports are open.</li>
-                <li><strong>Degraded:</strong> ping succeeds but at least one TCP port is closed.</li>
-                <li><strong>Down:</strong> ping fails.</li>
+                <li><strong>Healthy:</strong> every configured ping and TCP check succeeds.</li>
+                <li><strong>Degraded:</strong> at least one check succeeds, but one or more checks fail.</li>
+                <li><strong>Down:</strong> no configured checks succeed.</li>
               </ul>
             </section>
 
@@ -323,9 +352,12 @@
               <p>The Configuration page edits the same <code>config.json</code> used by the backend.</p>
               <ul>
                 <li>Devices are grouped by category and collapsed by default.</li>
-                <li>Add or edit name, address, hostname, category, enabled state, and checks.</li>
-                <li>Use <strong>Ping by hostname</strong> when device IPs change but DNS names stay stable.</li>
-                <li>Click <strong>Save</strong> to persist settings and create <code>config.backup.json</code>.</li>
+                <li>Filter configured devices by name, address, or hostname.</li>
+                <li>Add or edit name, address, hostname, website URL, category, enabled state, and checks from a modal editor.</li>
+                <li>Set <strong>Auto refresh</strong> to control how often Auto Refresh runs a full check.</li>
+                <li>Use <strong>Ping this device by hostname</strong> when that device's IP changes but its DNS name stays stable.</li>
+                <li>Use <strong>Export JSON</strong> and <strong>Import JSON</strong> to back up or restore the full configuration.</li>
+                <li>Click <strong>Save Settings</strong> to persist settings and create <code>config.backup.json</code>.</li>
               </ul>
             </section>
 
@@ -333,7 +365,9 @@
               <h3><i class="fa-solid fa-file-code me-2 text-info"></i>JSON File</h3>
               <p>The portable build keeps <code>config.json</code> beside <code>NetWatch-Lite.exe</code>, so operators can edit it directly if needed.</p>
               <ul>
+                <li>If <code>config.json</code> is missing, NetWatch Lite creates a starter <strong>Localhost</strong> ping device so first-time users can test immediately.</li>
                 <li><strong>Reload JSON</strong> reloads the file without restarting the app.</li>
+                <li><strong>Export JSON</strong> downloads the current configuration; <strong>Import JSON</strong> validates a selected file before replacing the current configuration.</li>
                 <li>Invalid JSON is reported in the UI/API so it can be corrected.</li>
                 <li>TCP checks verify whether a socket connection can be opened.</li>
               </ul>
@@ -379,6 +413,60 @@
           </div>
         </section>
       </main>
+    </div>
+  </div>
+
+  <div class="modal fade" id="device-form-modal" tabindex="-1" aria-labelledby="device-form-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+      <form class="modal-content" id="device-form">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="device-form-title">Add Device</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="editing-device-index">
+          <div class="mb-3">
+            <label class="form-label" for="device-name">Name</label>
+            <input class="form-control" type="text" id="device-name" autocomplete="off" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="device-address">Address</label>
+            <input class="form-control" type="text" id="device-address" autocomplete="off" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="device-hostname">Hostname</label>
+            <input class="form-control" type="text" id="device-hostname" autocomplete="off" placeholder="Optional DNS name">
+          </div>
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" role="switch" id="device-use-hostname-for-ping">
+            <label class="form-check-label" for="device-use-hostname-for-ping">Ping this device by hostname</label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="device-website-url">Website URL</label>
+            <input class="form-control" type="url" id="device-website-url" autocomplete="off" placeholder="Optional http:// or https:// URL">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="device-category">Category</label>
+            <input class="form-control" type="text" id="device-category" autocomplete="off" placeholder="Uncategorized">
+          </div>
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" role="switch" id="device-enabled" checked>
+            <label class="form-check-label" for="device-enabled">Enabled</label>
+          </div>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <label class="form-label mb-0">Checks</label>
+            <button class="btn btn-outline-primary btn-sm" type="button" id="add-check">
+              <i class="fa-solid fa-plus me-1"></i>
+              Add Check
+            </button>
+          </div>
+          <div class="checks-list" id="checks-list"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" id="reset-device-form">Cancel</button>
+          <button class="btn btn-primary" type="submit" id="submit-device">Add Device</button>
+        </div>
+      </form>
     </div>
   </div>
 

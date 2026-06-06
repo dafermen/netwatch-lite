@@ -6,7 +6,7 @@ namespace NetWatch.Models;
 public sealed class MonitorStreamEvent
 {
     /// <summary>
-    /// Event type consumed by the browser. Supported values are started, result, completed, and busy.
+    /// Event type consumed by the browser. Supported values are started, result, completed, busy, and error.
     /// </summary>
     public required string Type { get; init; }
 

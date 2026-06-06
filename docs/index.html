@@ -214,7 +214,7 @@
         <li>La aplicacion inicia en <code>Program.cs</code>.</li>
         <li><code>JsonDeviceRepository.ReloadAsync</code> carga y normaliza <code>config.json</code>.</li>
         <li>La UI llama <code>GET /api/monitor/stream</code> para ejecutar un full check progresivo.</li>
-        <li>El modo automatico ejecuta un full check cada 60 segundos.</li>
+        <li>El modo automatico ejecuta un full check segun <code>settings.intervalSeconds</code>.</li>
         <li><code>NetworkMonitorService.CheckAllDevicesAsync</code> revisa dispositivos habilitados en paralelo.</li>
         <li>Se calcula <span class="healthy">Healthy</span>, <span class="degraded">Degraded</span> o <span class="down">Down</span>.</li>
         <li>El backend agrupa resultados por categoria y genera metricas del dashboard.</li>
@@ -223,19 +223,20 @@
 
     <section>
       <h2>Configuracion JSON</h2>
-      <p>En desarrollo el archivo fuente vive en <code>Data/config.json</code>. Al publicar portable se copia como <code>config.json</code> junto al ejecutable.</p>
+      <p>En desarrollo el archivo fuente vive en <code>Data/config.json</code>. Al publicar portable se copia como <code>config.json</code> junto al ejecutable. Si el archivo no existe, la aplicacion crea una configuracion inicial con un dispositivo <code>Localhost</code> para poder probar el monitor inmediatamente.</p>
       <pre>{
   "settings": {
     "intervalSeconds": 15,
     "timeoutMs": 1000,
-    "maxParallelChecks": 50,
-    "useHostnameForPing": false
+    "maxParallelChecks": 50
   },
   "devices": [
     {
       "name": "Web Server",
       "ip": "192.168.4.10",
       "hostname": "web-server.local",
+      "useHostnameForPing": true,
+      "websiteUrl": "https://example.local/status",
       "category": "Servers",
       "enabled": true,
       "checks": [
@@ -251,11 +252,12 @@
           <tr><th>Campo</th><th>Descripcion</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>intervalSeconds</code></td><td>Valor heredado conservado por compatibilidad. El auto full check actual usa 60 segundos fijos.</td></tr>
+          <tr><td><code>intervalSeconds</code></td><td>Intervalo, en segundos, usado por Auto Refresh para repetir el full check.</td></tr>
           <tr><td><code>timeoutMs</code></td><td>Timeout de ping y TCP en milisegundos.</td></tr>
           <tr><td><code>maxParallelChecks</code></td><td>Limite global de checks concurrentes.</td></tr>
-          <tr><td><code>useHostnameForPing</code></td><td>Cuando esta activo, el ping usa <code>hostname</code> si el dispositivo lo tiene; si no, usa <code>ip</code>.</td></tr>
+          <tr><td><code>useHostnameForPing</code></td><td>Preferencia por dispositivo. Cuando esta activo, el ping usa <code>hostname</code> si existe; cuando esta apagado usa <code>ip</code>.</td></tr>
           <tr><td><code>hostname</code></td><td>Nombre DNS opcional para ping en redes donde la IP puede cambiar.</td></tr>
+          <tr><td><code>websiteUrl</code></td><td>URL HTTP/HTTPS opcional que muestra un link para abrir la pagina asociada desde el dashboard.</td></tr>
           <tr><td><code>category</code></td><td>Grupo visual del dashboard.</td></tr>
           <tr><td><code>enabled</code></td><td>Permite conservar dispositivos sin monitorearlos.</td></tr>
           <tr><td><code>checks</code></td><td>Lista de checks. Soporta <code>ping</code> y <code>tcp</code>.</td></tr>
@@ -276,9 +278,9 @@
           <tr><th>Estado</th><th>Regla</th><th>Color UI</th></tr>
         </thead>
         <tbody>
-          <tr><td class="healthy">Healthy</td><td>Ping exitoso y todos los puertos TCP abiertos.</td><td>Verde</td></tr>
-          <tr><td class="degraded">Degraded</td><td>Ping exitoso, pero al menos un puerto TCP cerrado.</td><td>Amarillo</td></tr>
-          <tr><td class="down">Down</td><td>Ping fallido.</td><td>Rojo</td></tr>
+          <tr><td class="healthy">Healthy</td><td>Todos los checks configurados de ping y TCP fueron exitosos.</td><td>Verde</td></tr>
+          <tr><td class="degraded">Degraded</td><td>Al menos un check respondio, pero uno o mas checks fallaron.</td><td>Amarillo</td></tr>
+          <tr><td class="down">Down</td><td>Ningun check configurado respondio.</td><td>Rojo</td></tr>
         </tbody>
       </table>
       <p>Disponibilidad: <code>(HealthyDevices / TotalDevices) * 100</code>, redondeado a un decimal.</p>
@@ -295,9 +297,11 @@
           <tr><td><span class="tag post">POST</span></td><td><code>/api/reload</code></td><td>Recarga <code>config.json</code> desde disco.</td><td>Conteos y settings.</td></tr>
           <tr><td><span class="tag get">GET</span></td><td><code>/api/config</code></td><td>Devuelve la configuracion completa editable.</td><td><code>MonitorConfiguration</code>.</td></tr>
           <tr><td><span class="tag post">POST</span></td><td><code>/api/config</code></td><td>Guarda la configuracion completa, crea <code>config.backup.json</code> y recarga memoria.</td><td>Configuracion guardada.</td></tr>
+          <tr><td><span class="tag get">GET</span></td><td><code>/api/config/export</code></td><td>Descarga la configuracion normalizada como JSON.</td><td>Archivo JSON.</td></tr>
+          <tr><td><span class="tag post">POST</span></td><td><code>/api/config/import</code></td><td>Importa un archivo <code>.json</code>, valida la configuracion, crea backup y recarga memoria.</td><td>Configuracion importada o error controlado.</td></tr>
           <tr><td><span class="tag get">GET</span></td><td><code>/api/results</code></td><td>Compatibilidad. Fuerza ejecucion completa.</td><td><code>MonitorResponse</code>.</td></tr>
           <tr><td><span class="tag post">POST</span></td><td><code>/api/monitor/run</code></td><td>Fuerza full check sin permitir solapamiento.</td><td><code>MonitorResponse</code> o HTTP 409.</td></tr>
-          <tr><td><span class="tag get">GET</span></td><td><code>/api/monitor/stream</code></td><td>Ejecuta full check y envia resultados progresivos por Server-Sent Events.</td><td>Eventos <code>started</code>, <code>result</code>, <code>completed</code> o <code>busy</code>.</td></tr>
+          <tr><td><span class="tag get">GET</span></td><td><code>/api/monitor/stream</code></td><td>Ejecuta full check y envia resultados progresivos por Server-Sent Events.</td><td>Eventos <code>started</code>, <code>result</code>, <code>completed</code>, <code>busy</code> o <code>error</code>.</td></tr>
         </tbody>
       </table>
     </section>
@@ -352,12 +356,12 @@
     <section>
       <h2>Frontend</h2>
       <p><code>wwwroot/index.html</code> define el layout compartido: sidebar hamburguesa, topbar, dashboard, pagina de configuracion, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto.</p>
-      <p>La pagina <code>/config</code> agrupa los dispositivos por categoria y mantiene los grupos colapsados por defecto para facilitar la edicion de inventarios grandes sin perder las acciones de editar o eliminar cada dispositivo. Las acciones de agregar, actualizar y eliminar dispositivos guardan inmediatamente en <code>config.json</code>, y el boton <code>Save</code> guarda ajustes generales como Ping by hostname.</p>
+      <p>La pagina <code>/config</code> agrupa los dispositivos por categoria y mantiene los grupos colapsados por defecto para facilitar la edicion de inventarios grandes sin perder las acciones de editar o eliminar cada dispositivo. Las acciones de agregar, actualizar y eliminar dispositivos guardan inmediatamente en <code>config.json</code>, y el boton <code>Save Settings</code> dentro de Settings guarda ajustes generales como intervalo, timeout y concurrencia maxima. <code>Export JSON</code> descarga la configuracion actual e <code>Import JSON</code> valida un archivo antes de reemplazar la configuracion.</p>
       <p>El sidebar tambien incluye <code>/manual</code> con un manual de usuario integrado y <code>/about</code> con informacion del proyecto, su caracter libre y notas operativas.</p>
       <p><code>wwwroot/app.js</code> contiene funciones JSDoc para:</p>
       <ul>
         <li>Consumir <code>/api/monitor/stream</code> para pintar resultados conforme termina cada dispositivo.</li>
-        <li>Renderizar metricas, categorias, filas, badges de estado y puertos.</li>
+        <li>Renderizar metricas, categorias, filas, badges de estado, puertos y links opcionales de <code>websiteUrl</code>.</li>
         <li>Contraer y expandir grupos de categorias para navegar inventarios grandes; al completar un full check, los grupos se contraen y quedan en verde o rojo segun la salud final.</li>
         <li>Manejar modo manual por defecto, auto refresh ON/OFF y Run Full Check.</li>
         <li>Administrar dispositivos y checks desde la ruta <code>/config</code>.</li>
@@ -381,7 +385,7 @@ dotnet run</pre>
           <tr><th>Version</th><th>Resumen</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>Unreleased</code></td><td>Modo manual por defecto; auto refresh ejecuta full check cada 60 segundos cuando el operador lo activa; render progresivo por dispositivo; categorias colapsadas por defecto; formulario de dispositivo bajo demanda; ping opcional por hostname.</td></tr>
+          <tr><td><code>Unreleased</code></td><td>Modo manual por defecto; auto refresh usa el intervalo configurable de <code>settings.intervalSeconds</code>; render progresivo por dispositivo; categorias colapsadas por defecto; editor de dispositivo en modal; import/export de JSON; ping opcional por hostname por dispositivo.</td></tr>
           <tr><td><code>v0.2.0</code></td><td>Grupos de categorias colapsables.</td></tr>
           <tr><td><code>v0.1.0</code></td><td>Version inicial con dashboard, checks, metricas, filtros, controles y portable.</td></tr>
         </tbody>
@@ -413,13 +417,18 @@ dotnet run</pre>
     <section>
       <h2>Notas Operativas</h2>
       <ul>
-        <li>El archivo <code>config.json</code> puede recargarse desde el boton Reload JSON o administrarse desde <code>/config</code>.</li>
-        <li>La aplicacion inicia en modo manual; el auto refresh solo empieza cuando el operador activa el boton y ejecuta full check cada 60 segundos.</li>
+        <li>El archivo <code>config.json</code> puede recargarse desde el boton Reload JSON en Configuracion o administrarse desde <code>/config</code>.</li>
+        <li>Si <code>config.json</code> no existe, se crea automaticamente con un check de ping a <code>127.0.0.1</code>.</li>
+        <li>Import JSON rechaza archivos vacios, archivos que no terminan en <code>.json</code>, archivos mayores de 5 MB, JSON invalido y configuraciones que no pasen validacion.</li>
+        <li>La aplicacion inicia en modo manual; el auto refresh solo empieza cuando el operador activa el boton y repite el full check segun <code>settings.intervalSeconds</code>.</li>
         <li>Los grupos de categorias se contraen al finalizar un recorrido y muestran una barra verde si todo esta sano o roja si hay problemas.</li>
         <li>La barra de progreso del monitoreo se muestra solo mientras corre un full check.</li>
         <li>En pantallas pequenas, los controles se apilan y las tablas anchas usan scroll horizontal para conservar legibilidad.</li>
         <li><code>Run Full Check</code> no permite ejecuciones solapadas; si una ya corre, el backend responde HTTP 409.</li>
         <li>JSON corrupto o invalido se reporta por API/UI para poder corregir la configuracion sin un cierre silencioso.</li>
+        <li>Errores de lectura o escritura de configuracion se devuelven como respuestas controladas para mostrarlos en Configuracion.</li>
+        <li>Si falla un Run de grupo durante streaming, el dashboard conserva los resultados anteriores y muestra el error en la linea de estado.</li>
+        <li>Si falla un full check sin resultados previos estables, la UI muestra un panel de error en el dashboard.</li>
         <li>Para redes grandes, ajustar <code>maxParallelChecks</code> segun capacidad de red y equipo.</li>
         <li>El ping puede requerir permisos o reglas de firewall dependiendo del sistema operativo y la red.</li>
         <li>Los checks TCP tratan timeouts, rechazos, destinos invalidos y fallos de socket como puertos no disponibles; no validan el protocolo de aplicacion.</li>

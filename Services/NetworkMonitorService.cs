@@ -92,14 +92,12 @@ public sealed class NetworkMonitorService
         SemaphoreSlim checkLimiter,
         CancellationToken cancellationToken)
     {
-        var pingTarget = ResolvePingTarget(device, settings);
+        var pingTarget = ResolvePingTarget(device);
         var checkTasks = device.Checks.Select(check =>
             RunLimitedCheckAsync(device.Ip, pingTarget, check, settings.TimeoutMs, checkLimiter, cancellationToken));
         var checkResults = await Task.WhenAll(checkTasks);
 
-        var isOnline = checkResults.Any(result =>
-            string.Equals(result.Type, "ping", StringComparison.OrdinalIgnoreCase)
-                && result.IsAvailable);
+        var hasAvailableCheck = checkResults.Any(result => result.IsAvailable);
         var latencyMs = checkResults
             .FirstOrDefault(result => string.Equals(result.Type, "ping", StringComparison.OrdinalIgnoreCase))
             ?.LatencyMs ?? 0;
@@ -115,16 +113,17 @@ public sealed class NetworkMonitorService
             .Select(result => result.Port!.Value)
             .Order()
             .ToList();
-        var status = ComputeStatus(isOnline, requestedPorts, openPorts);
+        var status = ComputeStatus(checkResults);
 
         return new DeviceResult
         {
             Name = device.Name,
             Ip = device.Ip,
             Hostname = device.Hostname,
+            WebsiteUrl = device.WebsiteUrl,
             PingTarget = pingTarget,
             Category = device.Category,
-            IsOnline = isOnline,
+            IsOnline = hasAvailableCheck,
             Status = status,
             LatencyMs = latencyMs,
             Enabled = device.Enabled,
@@ -136,36 +135,30 @@ public sealed class NetworkMonitorService
     }
 
     /// <summary>
-    /// Selects the network target used for ping checks based on global settings and device data.
+    /// Selects the network target used for ping checks based on the device setting.
     /// </summary>
     /// <param name="device">Device being checked.</param>
-    /// <param name="settings">Global monitor settings.</param>
     /// <returns>The hostname when hostname mode is enabled and available; otherwise the IP address.</returns>
-    private static string ResolvePingTarget(Device device, MonitorSettings settings)
+    private static string ResolvePingTarget(Device device)
     {
-        return settings.UseHostnameForPing && !string.IsNullOrWhiteSpace(device.Hostname)
+        return device.UseHostnameForPing == true && !string.IsNullOrWhiteSpace(device.Hostname)
             ? device.Hostname
             : device.Ip;
     }
 
     /// <summary>
-    /// Computes the final device status from ping availability and TCP port results.
+    /// Computes the final device status from all configured check results.
     /// </summary>
-    /// <param name="isOnline">True when ping succeeded.</param>
-    /// <param name="requestedPorts">All TCP ports configured for the device.</param>
-    /// <param name="openPorts">TCP ports that accepted a connection.</param>
-    /// <returns>Down when ping failed, Healthy when every requested port is open, otherwise Degraded.</returns>
-    private static DeviceStatus ComputeStatus(
-        bool isOnline,
-        IReadOnlyCollection<int> requestedPorts,
-        IReadOnlyCollection<int> openPorts)
+    /// <param name="checkResults">Raw ping and TCP check results for the device.</param>
+    /// <returns>Healthy when every check succeeded, Degraded when some checks succeeded, otherwise Down.</returns>
+    private static DeviceStatus ComputeStatus(IReadOnlyCollection<CheckResult> checkResults)
     {
-        if (!isOnline)
+        if (!checkResults.Any(result => result.IsAvailable))
         {
             return DeviceStatus.Down;
         }
 
-        return requestedPorts.Count == openPorts.Count
+        return checkResults.All(result => result.IsAvailable)
             ? DeviceStatus.Healthy
             : DeviceStatus.Degraded;
     }

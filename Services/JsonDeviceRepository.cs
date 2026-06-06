@@ -60,7 +60,6 @@ public sealed class JsonDeviceRepository
     /// </summary>
     /// <param name="cancellationToken">Token used to cancel the file read or JSON parse operation.</param>
     /// <returns>The normalized configuration loaded from disk.</returns>
-    /// <exception cref="FileNotFoundException">Thrown when the configured JSON file cannot be found.</exception>
     public async Task<MonitorConfiguration> ReloadAsync(CancellationToken cancellationToken = default)
     {
         await _reloadLock.WaitAsync(cancellationToken);
@@ -71,7 +70,14 @@ public sealed class JsonDeviceRepository
 
             if (!File.Exists(filePath))
             {
-                throw new FileNotFoundException("Device JSON file was not found.", filePath);
+                var starterConfiguration = CreateStarterConfiguration();
+                await SaveNormalizedConfigurationAsync(
+                    filePath,
+                    Normalize(starterConfiguration),
+                    createBackup: false,
+                    cancellationToken);
+                _configuration = Normalize(starterConfiguration);
+                return _configuration;
             }
 
             await using var stream = File.OpenRead(filePath);
@@ -111,26 +117,12 @@ public sealed class JsonDeviceRepository
         {
             Validate(configuration);
 
-            var filePath = ResolveDeviceFilePath();
-            var directory = Path.GetDirectoryName(filePath);
-
-            if (!string.IsNullOrWhiteSpace(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            if (File.Exists(filePath))
-            {
-                var backupPath = Path.Combine(
-                    directory ?? string.Empty,
-                    $"{Path.GetFileNameWithoutExtension(filePath)}.backup{Path.GetExtension(filePath)}");
-                File.Copy(filePath, backupPath, true);
-            }
-
             var normalized = Normalize(configuration);
-            await using var stream = File.Create(filePath);
-            await JsonSerializer.SerializeAsync(stream, normalized, JsonOptions, cancellationToken);
-
+            await SaveNormalizedConfigurationAsync(
+                ResolveDeviceFilePath(),
+                normalized,
+                createBackup: true,
+                cancellationToken);
             _configuration = normalized;
             return _configuration;
         }
@@ -160,9 +152,82 @@ public sealed class JsonDeviceRepository
 
         var developmentDataPath = Path.Combine(_environment.ContentRootPath, "Data", _options.DeviceFilePath);
 
-        return File.Exists(developmentDataPath)
+        if (File.Exists(developmentDataPath))
+        {
+            return developmentDataPath;
+        }
+
+        return Directory.Exists(Path.Combine(_environment.ContentRootPath, "Data"))
             ? developmentDataPath
             : contentRootPath;
+    }
+
+    /// <summary>
+    /// Writes a normalized configuration to disk and optionally backs up the previous file.
+    /// </summary>
+    /// <param name="filePath">Absolute path to config.json.</param>
+    /// <param name="configuration">Already-normalized configuration to persist.</param>
+    /// <param name="createBackup">Whether to create config.backup.json when replacing an existing file.</param>
+    /// <param name="cancellationToken">Token used to cancel file IO.</param>
+    private static async Task SaveNormalizedConfigurationAsync(
+        string filePath,
+        MonitorConfiguration configuration,
+        bool createBackup,
+        CancellationToken cancellationToken)
+    {
+        var directory = Path.GetDirectoryName(filePath);
+
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        if (createBackup && File.Exists(filePath))
+        {
+            var backupPath = Path.Combine(
+                directory ?? string.Empty,
+                $"{Path.GetFileNameWithoutExtension(filePath)}.backup{Path.GetExtension(filePath)}");
+            File.Copy(filePath, backupPath, true);
+        }
+
+        await using var stream = File.Create(filePath);
+        await JsonSerializer.SerializeAsync(stream, configuration, JsonOptions, cancellationToken);
+    }
+
+    /// <summary>
+    /// Creates a minimal first-run configuration so new installations can run a successful local check.
+    /// </summary>
+    /// <returns>A monitor configuration with one enabled localhost ping device.</returns>
+    private static MonitorConfiguration CreateStarterConfiguration()
+    {
+        return new MonitorConfiguration
+        {
+            Settings = new MonitorSettings
+            {
+                IntervalSeconds = 60,
+                TimeoutMs = 1000,
+                MaxParallelChecks = 50
+            },
+            Devices =
+            [
+                new Device
+                {
+                    Name = "Localhost",
+                    Ip = "127.0.0.1",
+                    Hostname = "localhost",
+                    UseHostnameForPing = false,
+                    Category = "Getting Started",
+                    Enabled = true,
+                    Checks =
+                    [
+                        new DeviceCheck
+                        {
+                            Type = "ping"
+                        }
+                    ]
+                }
+            ]
+        };
     }
 
     /// <summary>
@@ -188,6 +253,7 @@ public sealed class JsonDeviceRepository
             return new MonitorConfiguration();
         }
 
+        var legacyUseHostnameForPing = configuration.Settings?.UseHostnameForPing ?? false;
         var devices = configuration.Devices
             .Where(IsValidDevice)
             .Select(device => new Device
@@ -195,6 +261,8 @@ public sealed class JsonDeviceRepository
                 Name = device.Name,
                 Ip = device.Ip,
                 Hostname = NormalizeOptionalText(device.Hostname),
+                UseHostnameForPing = device.UseHostnameForPing ?? legacyUseHostnameForPing,
+                WebsiteUrl = NormalizeOptionalText(device.WebsiteUrl),
                 Category = NormalizeCategory(device.Category),
                 Enabled = device.Enabled,
                 Checks = (device.Checks ?? [])
@@ -205,8 +273,70 @@ public sealed class JsonDeviceRepository
 
         return new MonitorConfiguration
         {
-            Settings = configuration.Settings ?? new MonitorSettings(),
+            Settings = NormalizeSettings(configuration.Settings),
             Devices = devices
+        };
+    }
+
+    /// <summary>
+    /// Serializes the current normalized configuration for download.
+    /// </summary>
+    /// <param name="cancellationToken">Token used to cancel serialization.</param>
+    /// <returns>Indented JSON bytes containing the current monitor configuration.</returns>
+    public Task<byte[]> ExportAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(JsonSerializer.SerializeToUtf8Bytes(_configuration, JsonOptions));
+    }
+
+    /// <summary>
+    /// Imports a complete monitor configuration from JSON, validates it, saves it, and reloads memory.
+    /// </summary>
+    /// <param name="jsonStream">Readable stream containing a monitor configuration JSON document.</param>
+    /// <param name="cancellationToken">Token used to cancel JSON parsing and save operations.</param>
+    /// <returns>The normalized configuration after it has been saved and loaded into memory.</returns>
+    /// <exception cref="InvalidDataException">Thrown when JSON is malformed or the configuration is invalid.</exception>
+    public async Task<MonitorConfiguration> ImportAsync(
+        Stream jsonStream,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var configuration = await JsonSerializer.DeserializeAsync<MonitorConfiguration>(
+                jsonStream,
+                JsonOptions,
+                cancellationToken);
+
+            if (configuration is null)
+            {
+                throw new InvalidDataException("Imported file does not contain a configuration object.");
+            }
+
+            return await SaveAsync(configuration, cancellationToken);
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException("Imported file contains invalid JSON.", ex);
+        }
+    }
+
+    /// <summary>
+    /// Normalizes current global settings while dropping legacy ping mode from saved configuration.
+    /// </summary>
+    /// <param name="settings">Settings parsed from JSON or submitted by the UI.</param>
+    /// <returns>Settings containing only current global execution options.</returns>
+    private static MonitorSettings NormalizeSettings(MonitorSettings? settings)
+    {
+        if (settings is null)
+        {
+            return new MonitorSettings();
+        }
+
+        return new MonitorSettings
+        {
+            IntervalSeconds = settings.IntervalSeconds,
+            TimeoutMs = settings.TimeoutMs,
+            MaxParallelChecks = settings.MaxParallelChecks
         };
     }
 
@@ -266,6 +396,11 @@ public sealed class JsonDeviceRepository
                 throw new InvalidDataException($"Device '{device.Name}' requires at least one check.");
             }
 
+            if (!IsValidWebsiteUrl(device.WebsiteUrl))
+            {
+                throw new InvalidDataException($"Device '{device.Name}' has an invalid websiteUrl. Use an absolute http:// or https:// URL.");
+            }
+
             foreach (var check in device.Checks)
             {
                 if (!IsValidCheck(check))
@@ -290,6 +425,22 @@ public sealed class JsonDeviceRepository
 
         return string.Equals(check.Type, "tcp", StringComparison.OrdinalIgnoreCase)
             && check.Port is > 0 and <= 65535;
+    }
+
+    /// <summary>
+    /// Determines whether an optional dashboard website URL is empty or an absolute HTTP/HTTPS URL.
+    /// </summary>
+    /// <param name="websiteUrl">Optional URL submitted by the configuration UI.</param>
+    /// <returns>True when the URL can be safely opened by the browser dashboard.</returns>
+    private static bool IsValidWebsiteUrl(string? websiteUrl)
+    {
+        if (string.IsNullOrWhiteSpace(websiteUrl))
+        {
+            return true;
+        }
+
+        return Uri.TryCreate(websiteUrl.Trim(), UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
     }
 
     /// <summary>
