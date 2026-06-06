@@ -371,6 +371,22 @@ body {
   min-width: 5.5rem;
 }
 
+.device-check-actions {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+.device-run-button {
+  align-items: center;
+  display: inline-flex;
+  font-weight: 700;
+  line-height: 1;
+  min-height: 1.75rem;
+}
+
 .port-pill {
   align-items: center;
   display: inline-flex;

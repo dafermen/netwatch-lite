@@ -55,11 +55,15 @@ public sealed class MonitorExecutionService
     /// </summary>
     /// <param name="writeEventAsync">Callback used to send stream events to the client.</param>
     /// <param name="categoryName">Optional category name used to limit the execution to one group.</param>
+    /// <param name="deviceName">Optional device name used to limit the execution to one device.</param>
+    /// <param name="deviceIps">Optional device IP list used to limit the execution to selected devices.</param>
     /// <param name="cancellationToken">Token used to cancel waiting, checks, or writes.</param>
     /// <returns>True when streaming started; false when another execution is already running.</returns>
     public async Task<bool> TryStreamFullCheckAsync(
         Func<MonitorStreamEvent, CancellationToken, Task> writeEventAsync,
         string? categoryName = null,
+        string? deviceName = null,
+        IReadOnlyCollection<string>? deviceIps = null,
         CancellationToken cancellationToken = default)
     {
         if (!await _executionLock.WaitAsync(0, cancellationToken))
@@ -70,7 +74,7 @@ public sealed class MonitorExecutionService
         try
         {
             var loadedConfiguration = await _deviceRepository.GetConfigurationAsync();
-            var configuration = FilterConfigurationByCategory(loadedConfiguration, categoryName);
+            var configuration = FilterConfiguration(loadedConfiguration, categoryName, deviceName, deviceIps);
             var settings = configuration.Settings;
             var totalDevices = configuration.Devices.Count(device => device.Enabled);
             var results = new List<DeviceResult>();
@@ -147,26 +151,53 @@ public sealed class MonitorExecutionService
     }
 
     /// <summary>
-    /// Creates a configuration snapshot limited to one category when a category filter was requested.
+    /// Creates a configuration snapshot limited to the requested category and/or device.
     /// </summary>
     /// <param name="configuration">Loaded monitor configuration.</param>
     /// <param name="categoryName">Optional category name to execute.</param>
+    /// <param name="deviceName">Optional device name to execute.</param>
+    /// <param name="deviceIps">Optional device IP list used to limit the execution to selected devices.</param>
     /// <returns>The original configuration, or a category-filtered configuration snapshot.</returns>
-    private static MonitorConfiguration FilterConfigurationByCategory(
+    private static MonitorConfiguration FilterConfiguration(
         MonitorConfiguration configuration,
-        string? categoryName)
+        string? categoryName,
+        string? deviceName,
+        IReadOnlyCollection<string>? deviceIps)
     {
-        if (string.IsNullOrWhiteSpace(categoryName))
+        var requestedIps = deviceIps?
+            .Where(ip => !string.IsNullOrWhiteSpace(ip))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
+
+        if (string.IsNullOrWhiteSpace(categoryName)
+            && string.IsNullOrWhiteSpace(deviceName)
+            && requestedIps.Count == 0)
         {
             return configuration;
+        }
+
+        var devices = configuration.Devices.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(categoryName))
+        {
+            devices = devices.Where(device =>
+                string.Equals(device.Category, categoryName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(deviceName))
+        {
+            devices = devices.Where(device =>
+                string.Equals(device.Name, deviceName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (requestedIps.Count > 0)
+        {
+            devices = devices.Where(device => requestedIps.Contains(device.Ip));
         }
 
         return new MonitorConfiguration
         {
             Settings = configuration.Settings,
-            Devices = configuration.Devices
-                .Where(device => string.Equals(device.Category, categoryName, StringComparison.OrdinalIgnoreCase))
-                .ToList()
+            Devices = devices.ToList()
         };
     }
 

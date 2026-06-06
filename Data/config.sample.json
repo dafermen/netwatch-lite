@@ -1,0 +1,24 @@
+{
+  "settings": {
+    "intervalSeconds": 60,
+    "timeoutMs": 1000,
+    "maxParallelChecks": 50,
+    "retryCount": 0,
+    "retryDelayMs": 250
+  },
+  "devices": [
+    {
+      "name": "Localhost",
+      "ip": "127.0.0.1",
+      "hostname": "localhost",
+      "useHostnameForPing": false,
+      "category": "Getting Started",
+      "enabled": true,
+      "checks": [
+        {
+          "type": "ping"
+        }
+      ]
+    }
+  ]
+}

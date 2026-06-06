@@ -26,6 +26,11 @@ public sealed class CheckResult
     public required bool IsAvailable { get; init; }
 
     /// <summary>
+    /// Optional diagnostic status returned by the network check, such as Success, TimedOut, or SocketException.
+    /// </summary>
+    public string? Status { get; init; }
+
+    /// <summary>
     /// Display label used by clients, for example Ping or TCP 443.
     /// </summary>
     public required string Label { get; init; }

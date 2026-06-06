@@ -82,7 +82,7 @@ public sealed class NetworkMonitorService
     /// Runs every configured check for one device and computes the final aggregated status.
     /// </summary>
     /// <param name="device">Device to check.</param>
-    /// <param name="settings">Execution settings such as timeout and concurrency limit.</param>
+    /// <param name="settings">Execution settings such as timeout, retry, and concurrency limit.</param>
     /// <param name="checkLimiter">Shared semaphore limiting total concurrent checks across all devices.</param>
     /// <param name="cancellationToken">Token used to cancel check work.</param>
     /// <returns>A complete device result with ping state, latency, port lists, raw checks, and final status.</returns>
@@ -94,7 +94,7 @@ public sealed class NetworkMonitorService
     {
         var pingTarget = ResolvePingTarget(device);
         var checkTasks = device.Checks.Select(check =>
-            RunLimitedCheckAsync(device.Ip, pingTarget, check, settings.TimeoutMs, checkLimiter, cancellationToken));
+            RunLimitedCheckAsync(device.Ip, pingTarget, check, settings, checkLimiter, cancellationToken));
         var checkResults = await Task.WhenAll(checkTasks);
 
         var hasAvailableCheck = checkResults.Any(result => result.IsAvailable);
@@ -169,7 +169,7 @@ public sealed class NetworkMonitorService
     /// <param name="ip">Device IP address used for TCP checks.</param>
     /// <param name="pingTarget">IP address or hostname used for ping checks.</param>
     /// <param name="check">Check definition from the device configuration.</param>
-    /// <param name="timeoutMs">Network timeout in milliseconds.</param>
+    /// <param name="settings">Network timeout and retry settings.</param>
     /// <param name="checkLimiter">Shared semaphore limiting total concurrent checks.</param>
     /// <param name="cancellationToken">Token used to cancel queued or in-flight work.</param>
     /// <returns>The raw check result for ping or TCP.</returns>
@@ -177,7 +177,7 @@ public sealed class NetworkMonitorService
         string ip,
         string pingTarget,
         DeviceCheck check,
-        int timeoutMs,
+        MonitorSettings settings,
         SemaphoreSlim checkLimiter,
         CancellationToken cancellationToken)
     {
@@ -187,25 +187,35 @@ public sealed class NetworkMonitorService
         {
             if (string.Equals(check.Type, "ping", StringComparison.OrdinalIgnoreCase))
             {
-                var pingResult = await PingAsync(pingTarget, timeoutMs);
+                var pingResult = await RunWithRetryAsync(
+                    () => PingAsync(pingTarget, settings.TimeoutMs),
+                    result => result.IsAvailable,
+                    settings,
+                    cancellationToken);
                 return new CheckResult
                 {
                     Type = "ping",
                     Port = null,
                     LatencyMs = pingResult.LatencyMs,
                     IsAvailable = pingResult.IsAvailable,
+                    Status = pingResult.Status,
                     Label = "Ping"
                 };
             }
 
             var port = check.Port!.Value;
-            var isOpen = await CheckPortAsync(ip, port, timeoutMs, cancellationToken);
+            var isOpen = await RunWithRetryAsync(
+                () => CheckPortAsync(ip, port, settings.TimeoutMs, cancellationToken),
+                result => result,
+                settings,
+                cancellationToken);
             return new CheckResult
             {
                 Type = "tcp",
                 Port = port,
                 LatencyMs = null,
                 IsAvailable = isOpen,
+                Status = isOpen ? "Open" : "Unavailable",
                 Label = $"TCP {port}"
             };
         }
@@ -213,6 +223,38 @@ public sealed class NetworkMonitorService
         {
             checkLimiter.Release();
         }
+    }
+
+    /// <summary>
+    /// Runs a network check and repeats it when it fails, up to the configured retry count.
+    /// </summary>
+    /// <typeparam name="T">Result type returned by the check.</typeparam>
+    /// <param name="operation">Network operation to execute.</param>
+    /// <param name="isSuccessful">Predicate that returns true when no retry is needed.</param>
+    /// <param name="settings">Execution settings containing retry options.</param>
+    /// <param name="cancellationToken">Token used to cancel retry delays.</param>
+    /// <returns>The first successful result, or the last failed result.</returns>
+    private static async Task<T> RunWithRetryAsync<T>(
+        Func<Task<T>> operation,
+        Func<T, bool> isSuccessful,
+        MonitorSettings settings,
+        CancellationToken cancellationToken)
+    {
+        var maxAttempts = Math.Max(1, settings.RetryCount + 1);
+        var delayMs = Math.Max(0, settings.RetryDelayMs);
+        var result = await operation();
+
+        for (var attempt = 1; attempt < maxAttempts && !isSuccessful(result); attempt++)
+        {
+            if (delayMs > 0)
+            {
+                await Task.Delay(delayMs, cancellationToken);
+            }
+
+            result = await operation();
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -227,9 +269,11 @@ public sealed class NetworkMonitorService
         {
             using var ping = new Ping();
             var reply = await ping.SendPingAsync(ip, timeoutMs);
+            var status = reply.Status.ToString();
             return new PingCheckResult(
                 reply.Status == IPStatus.Success,
-                reply.Status == IPStatus.Success ? ConvertLatency(reply.RoundtripTime) : 0);
+                reply.Status == IPStatus.Success ? ConvertLatency(reply.RoundtripTime) : 0,
+                status);
         }
         catch (Exception ex) when (
             ex is PingException
@@ -238,7 +282,7 @@ public sealed class NetworkMonitorService
                 or ArgumentException)
         {
             _logger.LogDebug(ex, "Ping failed for {Ip}", ip);
-            return new PingCheckResult(false, 0);
+            return new PingCheckResult(false, 0, ex.GetType().Name);
         }
     }
 
@@ -298,5 +342,6 @@ public sealed class NetworkMonitorService
     /// </summary>
     /// <param name="IsAvailable">True when ping returned IPStatus.Success.</param>
     /// <param name="LatencyMs">Round-trip latency in milliseconds, or zero when unavailable.</param>
-    private readonly record struct PingCheckResult(bool IsAvailable, int LatencyMs);
+    /// <param name="Status">ICMP status or exception type captured during the ping.</param>
+    private readonly record struct PingCheckResult(bool IsAvailable, int LatencyMs, string Status);
 }

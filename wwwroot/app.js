@@ -21,6 +21,9 @@ const groupCheckSelect = document.querySelector("#group-check-select");
 const runGroupCheckButton = document.querySelector("#run-group-check");
 const runGroupCheckSpinner = document.querySelector("#run-group-check-spinner");
 const runGroupCheckIcon = document.querySelector("#run-group-check-icon");
+const runFailedCheckButton = document.querySelector("#run-failed-check");
+const runFailedCheckSpinner = document.querySelector("#run-failed-check-spinner");
+const runFailedCheckIcon = document.querySelector("#run-failed-check-icon");
 const searchInput = document.querySelector("#device-search");
 const filterInputs = document.querySelectorAll("input[name='status-filter']");
 const monitorProgress = document.querySelector("#monitor-progress");
@@ -47,6 +50,8 @@ const saveConfigIcon = document.querySelector("#save-config-icon");
 const intervalSecondsInput = document.querySelector("#interval-seconds");
 const timeoutMsInput = document.querySelector("#timeout-ms");
 const maxParallelChecksInput = document.querySelector("#max-parallel-checks");
+const retryCountInput = document.querySelector("#retry-count");
+const retryDelayMsInput = document.querySelector("#retry-delay-ms");
 const configDeviceSearchInput = document.querySelector("#config-device-search");
 const addDeviceButton = document.querySelector("#add-device");
 const deviceFormModalElement = document.querySelector("#device-form-modal");
@@ -83,6 +88,9 @@ let activeSearch = "";
 let autoRefreshEnabled = false;
 let hasCompletedFullCheck = false;
 let activeRunCategory = "";
+let activeRunDeviceName = "";
+let activeRunDeviceIp = "";
+let activeRunFailedIps = new Set();
 let activeRunKeepsDashboardStable = false;
 let activeRunPreservesDashboard = false;
 let currentRoute = normalizeRoute(location.pathname);
@@ -96,18 +104,18 @@ let pendingDeleteIndex = null;
 const expandedCategoryNames = new Set();
 const mobileSidebarQuery = window.matchMedia("(max-width: 991.98px)");
 
-function loadResults({ showErrors = true, category = "" } = {}) {
-  return streamFullCheck({ showErrors, category });
+function loadResults({ showErrors = true, category = "", device = null, devices = [] } = {}) {
+  return streamFullCheck({ showErrors, category, device, devices });
 }
 
 /**
  * Opens the Server-Sent Events monitoring stream and routes each event to the
  * dashboard renderer. This keeps large inventories responsive because each
  * device result is shown as soon as the backend finishes it.
- * @param {{ showErrors?: boolean, category?: string }} options Controls whether stream errors are displayed and optional category scope.
+ * @param {{ showErrors?: boolean, category?: string, device?: object | null, devices?: Array<object> }} options Controls whether stream errors are displayed and optional execution scope.
  * @returns {Promise<void>} Resolves when the stream completes, reports busy, or fails.
  */
-function streamFullCheck({ showErrors = true, category = "" } = {}) {
+function streamFullCheck({ showErrors = true, category = "", device = null, devices = [] } = {}) {
   if (activeMonitorStream) {
     lastCheck.textContent = "A monitoring execution is already running.";
     return Promise.resolve();
@@ -115,8 +123,28 @@ function streamFullCheck({ showErrors = true, category = "" } = {}) {
 
   return new Promise(resolve => {
     let settled = false;
-    const streamUrl = category
-      ? `/api/monitor/stream?category=${encodeURIComponent(category)}`
+    const streamParams = new URLSearchParams();
+
+    if (category) {
+      streamParams.set("category", category);
+    }
+
+    if (device?.name) {
+      streamParams.set("deviceName", device.name);
+    }
+
+    if (device?.ip) {
+      streamParams.set("deviceIp", device.ip);
+    }
+
+    for (const scopedDevice of devices) {
+      if (scopedDevice?.ip) {
+        streamParams.append("deviceIp", scopedDevice.ip);
+      }
+    }
+
+    const streamUrl = streamParams.toString()
+      ? `/api/monitor/stream?${streamParams}`
       : "/api/monitor/stream";
     const source = new EventSource(streamUrl);
     activeMonitorStream = source;
@@ -124,9 +152,12 @@ function streamFullCheck({ showErrors = true, category = "" } = {}) {
     source.addEventListener("started", event => {
       const payload = JSON.parse(event.data);
       activeRunCategory = category;
-      activeRunKeepsDashboardStable = Boolean(category && latestResults.length > 0);
-      activeRunPreservesDashboard = Boolean(!category && autoRefreshEnabled && latestResults.length > 0);
-      resetStreamingDashboard(payload, category);
+      activeRunDeviceName = device?.name || "";
+      activeRunDeviceIp = device?.ip || "";
+      activeRunFailedIps = new Set(devices.map(scopedDevice => scopedDevice.ip).filter(Boolean));
+      activeRunKeepsDashboardStable = Boolean((category || device || devices.length > 0) && latestResults.length > 0);
+      activeRunPreservesDashboard = Boolean(!category && !device && devices.length === 0 && autoRefreshEnabled && latestResults.length > 0);
+      resetStreamingDashboard(payload, getExecutionScopeLabel(category, device, devices));
     });
 
     source.addEventListener("result", event => {
@@ -147,7 +178,11 @@ function streamFullCheck({ showErrors = true, category = "" } = {}) {
         executionStatus: payload.executionStatus
       };
 
-      if (category) {
+      if (devices.length > 0) {
+        renderScopedDevicesPayload(completedPayload, devices);
+      } else if (device) {
+        renderScopedDevicePayload(completedPayload, device);
+      } else if (category) {
         renderScopedMonitorPayload(completedPayload, category);
       } else {
         hasCompletedFullCheck = true;
@@ -156,6 +191,9 @@ function streamFullCheck({ showErrors = true, category = "" } = {}) {
       }
 
       activeRunCategory = "";
+      activeRunDeviceName = "";
+      activeRunDeviceIp = "";
+      activeRunFailedIps = new Set();
       activeRunKeepsDashboardStable = false;
       activeRunPreservesDashboard = false;
       settled = true;
@@ -166,6 +204,9 @@ function streamFullCheck({ showErrors = true, category = "" } = {}) {
       const payload = JSON.parse(event.data);
       closeMonitorStream();
       activeRunCategory = "";
+      activeRunDeviceName = "";
+      activeRunDeviceIp = "";
+      activeRunFailedIps = new Set();
       activeRunKeepsDashboardStable = false;
       activeRunPreservesDashboard = false;
       lastCheck.textContent = payload.message || "A monitoring execution is already running.";
@@ -181,7 +222,7 @@ function streamFullCheck({ showErrors = true, category = "" } = {}) {
       const payload = JSON.parse(event.data);
       handleMonitorStreamFailure(
         payload.message || "Unable to stream monitoring results.",
-        category,
+        getExecutionScopeLabel(category, device, devices),
         showErrors);
       settled = true;
       resolve();
@@ -192,7 +233,7 @@ function streamFullCheck({ showErrors = true, category = "" } = {}) {
         return;
       }
 
-      handleMonitorStreamFailure("Unable to stream monitoring results.", category, showErrors);
+      handleMonitorStreamFailure("Unable to stream monitoring results.", getExecutionScopeLabel(category, device, devices), showErrors);
 
       console.error(error);
       settled = true;
@@ -201,13 +242,16 @@ function streamFullCheck({ showErrors = true, category = "" } = {}) {
   });
 }
 
-function handleMonitorStreamFailure(message, category, showErrors) {
+function handleMonitorStreamFailure(message, scopeLabel, showErrors) {
   const keepDashboardStable = activeRunKeepsDashboardStable
     || activeRunPreservesDashboard
-    || Boolean(category && latestResults.length > 0);
+    || Boolean(scopeLabel && latestResults.length > 0);
 
   closeMonitorStream();
   activeRunCategory = "";
+  activeRunDeviceName = "";
+  activeRunDeviceIp = "";
+  activeRunFailedIps = new Set();
   activeRunKeepsDashboardStable = false;
   activeRunPreservesDashboard = false;
 
@@ -238,6 +282,7 @@ function renderMonitorPayload(payload) {
   hasCompletedFullCheck = payload.executionStatus === "Completed" || hasCompletedFullCheck;
   renderSummary(payload.summary ?? createSummaryFromCategories(latestCategories));
   renderFilteredCategories();
+  updateRunFailedButton();
   scheduleRefresh();
   executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
   lastCheck.textContent = `Last execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
@@ -256,8 +301,56 @@ function renderScopedMonitorPayload(payload, category) {
   activeRunCategory = "";
   renderSummary(createSummaryFromCategories(latestCategories));
   renderFilteredCategories();
+  updateRunFailedButton();
   executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
   lastCheck.textContent = `Last ${category} execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
+  updateProgressPanel(scopedResults.length, scopedResults.length, "Completed", false);
+  activeRunKeepsDashboardStable = false;
+}
+
+function renderScopedDevicesPayload(payload, requestedDevices) {
+  const scopedResults = payload.results ?? [];
+
+  for (const result of scopedResults) {
+    upsertLatestResult(result);
+  }
+
+  latestCategories = groupResultsByCategory(latestResults);
+  hasCompletedFullCheck = true;
+  activeRunCategory = "";
+  activeRunDeviceName = "";
+  activeRunDeviceIp = "";
+  activeRunFailedIps = new Set();
+  renderSummary(createSummaryFromCategories(latestCategories));
+  renderFilteredCategories();
+  updateRunFailedButton();
+  executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
+  lastCheck.textContent = `Last failed-device retry: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
+  updateProgressPanel(scopedResults.length, requestedDevices.length, "Completed", false);
+  activeRunKeepsDashboardStable = false;
+}
+
+function renderScopedDevicePayload(payload, requestedDevice) {
+  const scopedResults = payload.results ?? [];
+  const result = scopedResults[0];
+
+  if (result) {
+    upsertLatestResult(result);
+  } else {
+    lastCheck.textContent = `No enabled device matched ${requestedDevice.name}.`;
+  }
+
+  latestCategories = groupResultsByCategory(latestResults);
+  hasCompletedFullCheck = true;
+  activeRunCategory = "";
+  activeRunDeviceName = "";
+  activeRunDeviceIp = "";
+  renderSummary(createSummaryFromCategories(latestCategories));
+  renderFilteredCategories();
+  executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
+  lastCheck.textContent = result
+    ? `Last ${result.name} execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`
+    : lastCheck.textContent;
   updateProgressPanel(scopedResults.length, scopedResults.length, "Completed", false);
   activeRunKeepsDashboardStable = false;
 }
@@ -266,10 +359,11 @@ function renderScopedMonitorPayload(payload, category) {
  * Resets dashboard state when a new progressive monitoring run starts.
  * @param {object} payload The started event received from /api/monitor/stream.
  */
-function resetStreamingDashboard(payload, category = "") {
-  const scopeLabel = category ? `${category} ` : "";
+function resetStreamingDashboard(payload, scopeLabel = "") {
+  const scopedRun = Boolean(scopeLabel);
+  const targetLabel = scopeLabel || "devices";
 
-  if (!category) {
+  if (!scopedRun) {
     if (!activeRunPreservesDashboard) {
       hasCompletedFullCheck = false;
       latestResults = [];
@@ -277,27 +371,27 @@ function resetStreamingDashboard(payload, category = "") {
     }
   }
 
-  renderSummary((category && latestResults.length > 0) || activeRunPreservesDashboard
+  renderSummary((scopedRun && latestResults.length > 0) || activeRunPreservesDashboard
     ? createSummaryFromCategories(latestCategories)
     : payload.summary ?? createProgressSummary([], payload.totalDevices ?? 0));
   if (activeRunKeepsDashboardStable) {
     monitorProgress.hidden = true;
   } else {
-    updateProgressPanel(0, Number(payload.totalDevices) || 0, `Checking ${scopeLabel}devices...`, true);
+    updateProgressPanel(0, Number(payload.totalDevices) || 0, `Checking ${targetLabel}...`, true);
   }
 
-  if ((category && latestResults.length > 0) || activeRunPreservesDashboard) {
+  if ((scopedRun && latestResults.length > 0) || activeRunPreservesDashboard) {
     renderFilteredCategories();
   } else {
     resultsBody.innerHTML = `
       <div class="progress-panel text-secondary">
         <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-        Checking ${scopeLabel}devices 0/${Number(payload.totalDevices) || 0}...
+        Checking ${escapeHtml(targetLabel)} 0/${Number(payload.totalDevices) || 0}...
       </div>`;
   }
 
   executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
-  lastCheck.textContent = `Checking ${scopeLabel}devices 0/${Number(payload.totalDevices) || 0}...`;
+  lastCheck.textContent = `Checking ${targetLabel} 0/${Number(payload.totalDevices) || 0}...`;
 }
 
 /**
@@ -311,7 +405,7 @@ function renderStreamingResult(payload) {
   }
 
   latestCategories = groupResultsByCategory(latestResults);
-  renderSummary(activeRunCategory || activeRunPreservesDashboard
+  renderSummary(activeRunCategory || activeRunDeviceName || activeRunFailedIps.size > 0 || activeRunPreservesDashboard
     ? createSummaryFromCategories(latestCategories)
     : payload.summary ?? createProgressSummary(latestResults, payload.totalDevices ?? latestResults.length));
   if (activeRunKeepsDashboardStable) {
@@ -320,11 +414,20 @@ function renderStreamingResult(payload) {
     updateProgressPanel(
       payload.completedDevices,
       payload.totalDevices,
-      activeRunCategory ? `Checking ${activeRunCategory} devices...` : "Checking devices...",
+      activeRunFailedIps.size > 0
+        ? "Checking failed devices..."
+        : activeRunDeviceName
+        ? `Checking ${activeRunDeviceName}...`
+        : activeRunCategory ? `Checking ${activeRunCategory} devices...` : "Checking devices...",
       true);
   }
   renderFilteredCategories();
-  lastCheck.textContent = activeRunCategory
+  updateRunFailedButton();
+  lastCheck.textContent = activeRunFailedIps.size > 0
+    ? `Checking failed devices ${payload.completedDevices}/${payload.totalDevices}...`
+    : activeRunDeviceName
+    ? `Checking ${activeRunDeviceName} ${payload.completedDevices}/${payload.totalDevices}...`
+    : activeRunCategory
     ? `Checking ${activeRunCategory} devices ${payload.completedDevices}/${payload.totalDevices}...`
     : `Checking devices ${payload.completedDevices}/${payload.totalDevices}...`;
 }
@@ -343,6 +446,20 @@ function upsertLatestResult(result) {
   }
 
   latestResults.push(result);
+}
+
+function getProblemDevices() {
+  return latestResults.filter(result =>
+    result.status === "Degraded" || result.status === "Down");
+}
+
+function updateRunFailedButton() {
+  const problemCount = getProblemDevices().length;
+  runFailedCheckButton.hidden = problemCount === 0;
+
+  if (problemCount > 0) {
+    runFailedCheckButton.title = `Run ${problemCount} failed device${problemCount === 1 ? "" : "s"}`;
+  }
 }
 
 /**
@@ -547,7 +664,7 @@ function renderCategory(category, index) {
                 <th scope="col">Status</th>
                 <th scope="col">Ping status</th>
                 <th scope="col">Ports status</th>
-                <th scope="col">Checked</th>
+                <th scope="col" class="text-end">Checked</th>
               </tr>
             </thead>
             <tbody>
@@ -563,11 +680,17 @@ function renderRow(result) {
   const pingCheck = getPingCheck(result);
   const hasPingCheck = Boolean(pingCheck);
   const isPingAvailable = Boolean(pingCheck?.isAvailable);
+  const hasProblem = result.status === "Degraded" || result.status === "Down";
+  const isRunningDevice = isActiveRunDevice(result);
+  const isRunningFailedDevice = activeRunFailedIps.has(result.ip);
   const statusClass = isPingAvailable ? "text-bg-success" : "text-bg-danger";
   const statusIcon = isPingAvailable ? "fa-check" : "fa-xmark";
   const statusText = isPingAvailable
     ? `Ping OK (${Number(pingCheck.latencyMs) || 0} ms)`
-    : hasPingCheck ? "Ping failed" : "No ping check";
+    : hasPingCheck ? formatPingFailureText(pingCheck) : "No ping check";
+  const pingTitle = hasPingCheck
+    ? `Target: ${result.pingTarget || result.ip}; Status: ${pingCheck.status || "Unknown"}; Timeout: ${configState.settings?.timeoutMs || "configured"} ms`
+    : "No ping check is configured for this device.";
 
   return `
     <tr>
@@ -581,13 +704,52 @@ function renderRow(result) {
       </td>
       <td>${renderDeviceStatus(result.status)}</td>
       <td>
-        <span class="badge ${statusClass} status-badge">
+        <span class="badge ${statusClass} status-badge" title="${escapeHtml(pingTitle)}">
           <i class="fa-solid ${statusIcon} me-1"></i>${statusText}
         </span>
       </td>
       <td>${renderPorts(result)}</td>
-      <td class="text-secondary small">${formatDate(result.lastCheck)}</td>
+      <td class="text-end">
+        <div class="device-check-actions">
+          <span class="text-secondary small">${formatDate(result.lastCheck)}</span>
+          ${hasProblem || isRunningDevice || isRunningFailedDevice
+            ? renderDeviceRunButton(result, isRunningDevice || isRunningFailedDevice)
+            : ""}
+        </div>
+      </td>
     </tr>`;
+}
+
+function renderDeviceRunButton(result, isRunning = false) {
+  return `
+    <button
+      class="btn ${isRunning ? "btn-primary" : "btn-outline-primary"} btn-sm device-run-button"
+      type="button"
+      title="${isRunning ? "This device is being checked" : "Run only this device"}"
+      ${isRunning ? "disabled" : ""}
+      data-run-device-name="${escapeHtml(result.name)}"
+      data-run-device-ip="${escapeHtml(result.ip)}"
+      data-run-device-category="${escapeHtml(result.category || "")}">
+      ${isRunning
+        ? `<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Checking`
+        : `<i class="fa-solid fa-rotate-right me-1"></i>Run`}
+    </button>`;
+}
+
+function isActiveRunDevice(result) {
+  return Boolean(activeRunDeviceName && activeRunDeviceIp)
+    && result.name === activeRunDeviceName
+    && result.ip === activeRunDeviceIp;
+}
+
+function formatPingFailureText(pingCheck) {
+  const status = String(pingCheck.status || "").trim();
+
+  if (status && status !== "Unknown") {
+    return `Ping ${status}`;
+  }
+
+  return "Ping failed";
 }
 
 function renderWebsiteLink(websiteUrl) {
@@ -859,6 +1021,8 @@ async function runSelectedGroupCheck() {
 async function runGroupCheck(category) {
   setButtonLoading(runGroupCheckButton, runGroupCheckSpinner, runGroupCheckIcon, true);
   runFullCheckButton.disabled = true;
+  runFailedCheckButton.disabled = true;
+  setDashboardRunButtonsDisabled(true);
 
   try {
     await loadResults({ category });
@@ -866,6 +1030,62 @@ async function runGroupCheck(category) {
     setButtonLoading(runGroupCheckButton, runGroupCheckSpinner, runGroupCheckIcon, false);
     runGroupCheckButton.disabled = !groupCheckSelect.value;
     runFullCheckButton.disabled = false;
+    runFailedCheckButton.disabled = false;
+    setDashboardRunButtonsDisabled(false);
+  }
+}
+
+async function runDeviceCheck(device) {
+  if (!device?.name || !device?.ip) {
+    return;
+  }
+
+  activeRunDeviceName = device.name;
+  activeRunDeviceIp = device.ip;
+  runFullCheckButton.disabled = true;
+  runGroupCheckButton.disabled = true;
+  runFailedCheckButton.disabled = true;
+  renderFilteredCategories();
+  setOtherDashboardRunButtonsDisabled(true, device);
+
+  try {
+    await loadResults({ device });
+  } finally {
+    activeRunDeviceName = "";
+    activeRunDeviceIp = "";
+    runFullCheckButton.disabled = false;
+    runGroupCheckButton.disabled = !groupCheckSelect.value;
+    runFailedCheckButton.disabled = false;
+    setOtherDashboardRunButtonsDisabled(false);
+    renderFilteredCategories();
+  }
+}
+
+async function runFailedChecks() {
+  const failedDevices = getProblemDevices();
+
+  if (failedDevices.length === 0) {
+    updateRunFailedButton();
+    return;
+  }
+
+  activeRunFailedIps = new Set(failedDevices.map(device => device.ip));
+  setButtonLoading(runFailedCheckButton, runFailedCheckSpinner, runFailedCheckIcon, true);
+  runFullCheckButton.disabled = true;
+  runGroupCheckButton.disabled = true;
+  renderFilteredCategories();
+  setOtherDashboardRunButtonsDisabled(true);
+
+  try {
+    await loadResults({ devices: failedDevices });
+  } finally {
+    activeRunFailedIps = new Set();
+    setButtonLoading(runFailedCheckButton, runFailedCheckSpinner, runFailedCheckIcon, false);
+    runFullCheckButton.disabled = false;
+    runGroupCheckButton.disabled = !groupCheckSelect.value;
+    setOtherDashboardRunButtonsDisabled(false);
+    updateRunFailedButton();
+    renderFilteredCategories();
   }
 }
 
@@ -922,6 +1142,10 @@ async function loadConfig({ clearAlert = true, showBusy = true } = {}) {
 }
 
 async function saveConfig(successMessage = "Settings saved to config.json. Previous config was backed up as config.backup.json.") {
+  const resolvedSuccessMessage = typeof successMessage === "string"
+    ? successMessage
+    : "Settings saved to config.json. Previous config was backed up as config.backup.json.";
+
   setConfigBusy(true);
   clearConfigAlert();
 
@@ -953,7 +1177,7 @@ async function saveConfig(successMessage = "Settings saved to config.json. Previ
     if (autoRefreshEnabled) {
       scheduleRefresh();
     }
-    showConfigAlert("success", successMessage);
+    showConfigAlert("success", resolvedSuccessMessage);
   } catch (error) {
     showConfigAlert("danger", error.message || "Unable to save configuration.");
     console.error(error);
@@ -968,11 +1192,15 @@ function applyConfigPayload(payload) {
   configState.settings ??= {
     intervalSeconds: defaultAutoFullCheckIntervalSeconds,
     timeoutMs: 1000,
-    maxParallelChecks: 50
+    maxParallelChecks: 50,
+    retryCount: 0,
+    retryDelayMs: 250
   };
   configState.settings.intervalSeconds ??= defaultAutoFullCheckIntervalSeconds;
   configState.settings.timeoutMs ??= 1000;
   configState.settings.maxParallelChecks ??= 50;
+  configState.settings.retryCount ??= 0;
+  configState.settings.retryDelayMs ??= 250;
   const legacyUseHostnameForPing = Boolean(configState.settings.useHostnameForPing);
   delete configState.settings.useHostnameForPing;
   configState.devices = configState.devices.map(device => ({
@@ -984,6 +1212,8 @@ function applyConfigPayload(payload) {
   }
   timeoutMsInput.value = String(configState.settings.timeoutMs);
   maxParallelChecksInput.value = String(configState.settings.maxParallelChecks);
+  retryCountInput.value = String(configState.settings.retryCount);
+  retryDelayMsInput.value = String(configState.settings.retryDelayMs);
 }
 
 async function readJsonResponse(response) {
@@ -1327,30 +1557,47 @@ function syncConfigSettingsFromUi() {
   configState.settings ??= {
     intervalSeconds: defaultAutoFullCheckIntervalSeconds,
     timeoutMs: 1000,
-    maxParallelChecks: 50
+    maxParallelChecks: 50,
+    retryCount: 0,
+    retryDelayMs: 250
   };
   const intervalSeconds = intervalSecondsInput
     ? readPositiveIntegerSetting(intervalSecondsInput, "Auto refresh")
     : Number(configState.settings.intervalSeconds) || defaultAutoFullCheckIntervalSeconds;
   const timeoutMs = readPositiveIntegerSetting(timeoutMsInput, "Timeout");
   const maxParallelChecks = readPositiveIntegerSetting(maxParallelChecksInput, "Max parallel checks");
+  const retryCount = readIntegerSetting(retryCountInput, "Retries", 0, 5);
+  const retryDelayMs = readIntegerSetting(retryDelayMsInput, "Retry delay", 0, 10000);
 
-  if (intervalSeconds === null || timeoutMs === null || maxParallelChecks === null) {
+  if (intervalSeconds === null
+    || timeoutMs === null
+    || maxParallelChecks === null
+    || retryCount === null
+    || retryDelayMs === null) {
     return false;
   }
 
   configState.settings.intervalSeconds = intervalSeconds;
   configState.settings.timeoutMs = timeoutMs;
   configState.settings.maxParallelChecks = maxParallelChecks;
+  configState.settings.retryCount = retryCount;
+  configState.settings.retryDelayMs = retryDelayMs;
   delete configState.settings.useHostnameForPing;
   return true;
 }
 
 function readPositiveIntegerSetting(input, label) {
+  return readIntegerSetting(input, label, 1);
+}
+
+function readIntegerSetting(input, label, min, max = null) {
   const value = Number(input.value);
 
-  if (!Number.isInteger(value) || value <= 0) {
-    showConfigAlert("warning", `${label} must be a whole number greater than zero.`);
+  if (!Number.isInteger(value) || value < min || (max !== null && value > max)) {
+    const rangeText = max === null
+      ? `greater than or equal to ${min}`
+      : `between ${min} and ${max}`;
+    showConfigAlert("warning", `${label} must be a whole number ${rangeText}.`);
     input.focus();
     return null;
   }
@@ -1431,6 +1678,8 @@ function setConfigBusy(isBusy, { showSaveSpinner = true } = {}) {
   }
   timeoutMsInput.disabled = isBusy;
   maxParallelChecksInput.disabled = isBusy;
+  retryCountInput.disabled = isBusy;
+  retryDelayMsInput.disabled = isBusy;
   deviceForm.querySelectorAll("input, select, button").forEach(element => {
     element.disabled = isBusy;
   });
@@ -1455,7 +1704,9 @@ function createEmptyConfiguration() {
     settings: {
       intervalSeconds: defaultAutoFullCheckIntervalSeconds,
       timeoutMs: 1000,
-      maxParallelChecks: 50
+      maxParallelChecks: 50,
+      retryCount: 0,
+      retryDelayMs: 250
     },
     devices: []
   };
@@ -1544,6 +1795,40 @@ function setButtonLoading(button, spinner, icon, isLoading) {
   icon.classList.toggle("d-none", isLoading);
 }
 
+function setDashboardRunButtonsDisabled(isDisabled) {
+  resultsBody
+    .querySelectorAll("[data-run-category], [data-run-device-name]")
+    .forEach(button => {
+      button.disabled = isDisabled;
+    });
+}
+
+function setOtherDashboardRunButtonsDisabled(isDisabled, activeDevice = null) {
+  resultsBody
+    .querySelectorAll("[data-run-category], [data-run-device-name]")
+    .forEach(button => {
+      const isActiveDeviceButton = activeDevice
+        && button.dataset.runDeviceName === activeDevice.name
+        && button.dataset.runDeviceIp === activeDevice.ip;
+
+      if (!isActiveDeviceButton) {
+        button.disabled = isDisabled;
+      }
+    });
+}
+
+function getExecutionScopeLabel(category, device, devices = []) {
+  if (devices.length > 0) {
+    return "failed devices";
+  }
+
+  if (device?.name) {
+    return `device ${device.name}`;
+  }
+
+  return category ? `${category} devices` : "";
+}
+
 function formatDate(value) {
   if (!value) {
     return "";
@@ -1609,6 +1894,7 @@ function isHttpUrl(value) {
 autoRefreshToggle.addEventListener("click", toggleAutoRefresh);
 runFullCheckButton.addEventListener("click", runFullCheck);
 runGroupCheckButton.addEventListener("click", runSelectedGroupCheck);
+runFailedCheckButton.addEventListener("click", runFailedChecks);
 groupCheckSelect.addEventListener("change", () => {
   runGroupCheckButton.disabled = !groupCheckSelect.value;
 });
@@ -1636,9 +1922,19 @@ resultsBody.addEventListener("shown.bs.collapse", event => {
 });
 resultsBody.addEventListener("click", event => {
   const runCategoryButton = event.target.closest("[data-run-category]");
+  const runDeviceButton = event.target.closest("[data-run-device-name]");
 
   if (runCategoryButton) {
     runGroupCheck(runCategoryButton.dataset.runCategory);
+    return;
+  }
+
+  if (runDeviceButton) {
+    runDeviceCheck({
+      name: runDeviceButton.dataset.runDeviceName,
+      ip: runDeviceButton.dataset.runDeviceIp,
+      category: runDeviceButton.dataset.runDeviceCategory
+    });
   }
 });
 searchInput.addEventListener("input", debounce(event => {
@@ -1657,7 +1953,7 @@ importConfigButton.addEventListener("click", requestImportConfig);
 importConfigFileInput.addEventListener("change", event => {
   importConfigFile(event.target.files?.[0]);
 });
-saveConfigButton.addEventListener("click", saveConfig);
+saveConfigButton.addEventListener("click", () => saveConfig());
 configDeviceSearchInput.addEventListener("input", debounce(event => {
   activeConfigSearch = event.target.value;
   renderConfigDevices();
@@ -1672,6 +1968,12 @@ timeoutMsInput.addEventListener("input", () => {
 });
 maxParallelChecksInput.addEventListener("input", () => {
   showConfigAlert("info", "Parallel check limit changed locally. Click Save Settings to persist changes.");
+});
+retryCountInput.addEventListener("input", () => {
+  showConfigAlert("info", "Retry count changed locally. Click Save Settings to persist changes.");
+});
+retryDelayMsInput.addEventListener("input", () => {
+  showConfigAlert("info", "Retry delay changed locally. Click Save Settings to persist changes.");
 });
 addDeviceButton.addEventListener("click", startAddDevice);
 deviceForm.addEventListener("submit", submitDevice);

@@ -27,6 +27,18 @@ public sealed class MonitorSettings
     public int MaxParallelChecks { get; init; } = 50;
 
     /// <summary>
+    /// Number of additional attempts to make after a failed ping or TCP check.
+    /// </summary>
+    [JsonPropertyName("retryCount")]
+    public int RetryCount { get; init; }
+
+    /// <summary>
+    /// Delay in milliseconds between retry attempts.
+    /// </summary>
+    [JsonPropertyName("retryDelayMs")]
+    public int RetryDelayMs { get; init; } = 250;
+
+    /// <summary>
     /// Legacy setting read from older config files and migrated to each device during normalization.
     /// New saved config files omit this value.
     /// </summary>

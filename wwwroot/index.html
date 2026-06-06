@@ -151,6 +151,12 @@
             </div>
 
             <div class="dashboard-toolbar-actions">
+              <button class="btn btn-outline-warning btn-sm" type="button" id="run-failed-check" hidden>
+                <span class="spinner-border spinner-border-sm me-1 d-none" id="run-failed-check-spinner" aria-hidden="true"></span>
+                <i class="fa-solid fa-rotate-right me-1" id="run-failed-check-icon"></i>
+                Run Failed
+              </button>
+
               <div class="input-group input-group-sm group-check-control">
                 <label class="input-group-text" for="group-check-select">
                   <i class="fa-solid fa-layer-group"></i>
@@ -238,23 +244,34 @@
                 </div>
                 <div class="card-body">
                   <div class="row g-3 align-items-end">
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-md-4 col-xl">
                       <label class="form-label" for="interval-seconds">Auto refresh</label>
                       <div class="input-group">
                         <input class="form-control" type="number" min="1" step="1" id="interval-seconds" required>
                         <span class="input-group-text">sec</span>
                       </div>
                     </div>
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-md-4 col-xl">
                       <label class="form-label" for="timeout-ms">Timeout</label>
                       <div class="input-group">
                         <input class="form-control" type="number" min="1" step="1" id="timeout-ms" required>
                         <span class="input-group-text">ms</span>
                       </div>
                     </div>
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-md-4 col-xl">
                       <label class="form-label" for="max-parallel-checks">Max parallel checks</label>
                       <input class="form-control" type="number" min="1" step="1" id="max-parallel-checks" required>
+                    </div>
+                    <div class="col-12 col-md-4 col-xl">
+                      <label class="form-label" for="retry-count">Retries</label>
+                      <input class="form-control" type="number" min="0" max="5" step="1" id="retry-count" required>
+                    </div>
+                    <div class="col-12 col-md-4 col-xl">
+                      <label class="form-label" for="retry-delay-ms">Retry delay</label>
+                      <div class="input-group">
+                        <input class="form-control" type="number" min="0" max="10000" step="1" id="retry-delay-ms" required>
+                        <span class="input-group-text">ms</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -331,6 +348,8 @@
               <p>The dashboard shows device health grouped by category. Each category starts collapsed so large inventories stay easy to scan.</p>
               <ul>
                 <li>Use <strong>Run Full Check</strong> to execute all configured ping and TCP checks immediately.</li>
+                <li>Use <strong>Run Failed</strong> when it appears to retry only devices currently marked as Degraded or Down.</li>
+                <li>Use <strong>Run</strong> beside a problem device's timestamp to repeat only that device when a failure may be temporary.</li>
                 <li>Use <strong>Auto Refresh</strong> to run a full check using the configured interval.</li>
                 <li>Use the search box to filter by name, IP, or hostname.</li>
                 <li>Use status filters to show all devices, online devices, offline devices, or problems.</li>
@@ -344,6 +363,7 @@
                 <li><strong>Healthy:</strong> every configured ping and TCP check succeeds.</li>
                 <li><strong>Degraded:</strong> at least one check succeeds, but one or more checks fail.</li>
                 <li><strong>Down:</strong> no configured checks succeed.</li>
+                <li>Ping badges include diagnostic details on hover, including the ping target, ICMP status, and configured timeout.</li>
               </ul>
             </section>
 

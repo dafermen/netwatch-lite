@@ -29,7 +29,7 @@ NetworkMonitorService
 Ping / TCP checks
 ```
 
-Configuration is stored in `config.json`. During development the editable source file is `Data/config.json`; during portable publish the runtime file is copied beside the executable. When `config.json` is missing, the repository creates a starter configuration with one enabled `Localhost` ping device.
+Configuration is stored in runtime `config.json`. During development, `Data/config.json` is private and ignored by Git; `Data/config.sample.json` is the safe committed example. During portable publish, the sample is copied beside the executable as `config.sample.json`. When runtime `config.json` is missing, the repository creates a starter configuration with one enabled `Localhost` ping device.
 
 ## Backend Entry Point
 
@@ -64,7 +64,7 @@ Important endpoints:
 | `POST /api/config/import` | Imports an uploaded `.json` file, validates it, backs up the current config, saves it, and reloads memory. |
 | `GET /api/results` | Backwards-compatible full-check endpoint. |
 | `POST /api/monitor/run` | Runs a full check and returns one final payload. |
-| `GET /api/monitor/stream` | Runs a full check, or one category when `category` is supplied, and streams progressive events. |
+| `GET /api/monitor/stream` | Runs a full check, one category when `category` is supplied, one device when `deviceName` and `deviceIp` are supplied, or selected devices when `deviceIp` is supplied multiple times, and streams progressive events. |
 
 ## Windows WebView2 Wallboard
 
@@ -101,6 +101,8 @@ Global execution settings:
 - `IntervalSeconds`: auto refresh interval in seconds.
 - `TimeoutMs`: ping and TCP timeout.
 - `MaxParallelChecks`: global concurrent check limit.
+- `RetryCount`: additional attempts after a failed ping or TCP check.
+- `RetryDelayMs`: pause between retry attempts in milliseconds.
 - `UseHostnameForPing`: legacy value read from older config files only; current saved configs omit it.
 
 ### Device
@@ -227,6 +229,7 @@ Key methods:
 - `CheckDevicesAsCompletedAsync`: yields each `DeviceResult` as soon as it finishes.
 - `CheckDeviceAsync`: runs checks for one device and computes status.
 - `RunLimitedCheckAsync`: wraps ping/TCP checks with the global concurrency semaphore.
+- `RunWithRetryAsync`: repeats failed ping/TCP checks using `RetryCount` and `RetryDelayMs`.
 - `PingAsync`: executes ICMP ping and returns success plus latency.
 - `CheckPortAsync`: attempts TCP connection within timeout.
 - `ComputeStatus`: maps ping/port results to `Healthy`, `Degraded`, or `Down`.
@@ -241,6 +244,7 @@ Concurrency:
 Failure behavior:
 
 - Ping exceptions become offline results.
+- Ping results include the ICMP status string so the dashboard can distinguish timeouts, unreachable targets, and exceptions.
 - TCP socket failures, timeouts, invalid targets, IO issues, and refused connections become closed/unavailable ports.
 - Per-device network failures stay local to the affected check so one bad endpoint does not stop the full execution.
 
@@ -252,7 +256,7 @@ Key methods:
 
 - `RunFullCheckAsync`: waits for any existing execution and returns a final `MonitorResponse`.
 - `TryRunFullCheckAsync`: starts only if no run is active; otherwise returns null.
-- `TryStreamFullCheckAsync`: starts only if no run is active and writes `MonitorStreamEvent` objects as devices complete.
+- `TryStreamFullCheckAsync`: starts only if no run is active and writes `MonitorStreamEvent` objects as devices complete. Optional filters limit a run to one category, one device identified by name and IP, or multiple selected IPs.
 
 Failure behavior:
 
@@ -299,14 +303,14 @@ Major areas:
 - Dashboard rendering.
 - Search and filters.
 - Configuration CRUD.
-- Configuration settings editing for auto refresh interval, timeout, max parallel checks, and per-device ping target mode.
+- Configuration settings editing for auto refresh interval, timeout, max parallel checks, retry behavior, and per-device ping target mode.
 - Form state.
 - Utility formatting and escaping.
 
 Important dashboard functions:
 
 - `loadResults`: starts a progressive full check.
-- `streamFullCheck`: opens `EventSource` to `/api/monitor/stream`, optionally scoped by category.
+- `streamFullCheck`: opens `EventSource` to `/api/monitor/stream`, optionally scoped by category or one device.
 - `loadDashboardGroups`: loads configured categories for group-level dashboard runs.
 - `resetStreamingDashboard`: clears previous results and initializes progress.
 - `renderStreamingResult`: adds one finished device and updates metrics.
@@ -314,6 +318,8 @@ Important dashboard functions:
 - `renderMonitorPayload`: renders final payload after completion.
 - `renderCategories`: renders grouped device tables and category health bars.
 - `renderRow`: renders one device row.
+- `runDeviceCheck`: reruns only one problem device from the dashboard row and replaces that row's latest result.
+- `runFailedChecks`: reruns only the current `Degraded` and `Down` dashboard devices and merges the refreshed results back into the dashboard.
 
 Important configuration functions:
 
@@ -419,7 +425,7 @@ config.json is written
 memory configuration is replaced
 ```
 
-Device add, update, and delete actions call the same save path immediately after the local state changes, so the user does not need a second Save click for device CRUD. The `Save Settings` button lives inside the Settings card and persists global settings such as auto refresh interval, timeout, and max parallel checks.
+Device add, update, and delete actions call the same save path immediately after the local state changes, so the user does not need a second Save click for device CRUD. The `Save Settings` button lives inside the Settings card and persists global settings such as auto refresh interval, timeout, retries, retry delay, and max parallel checks.
 
 ## Operational Notes For Developers
 

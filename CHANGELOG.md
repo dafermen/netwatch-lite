@@ -2,6 +2,16 @@
 
 All notable changes to NetWatch-Lite are documented here.
 
+## v0.4.1 - 2026-06-06
+
+- Added automatic retry settings for ping and TCP checks with configurable retry count and delay.
+- Added `Run Failed` to retry only current degraded or down dashboard devices.
+- Added per-device retry feedback so row-level `Run` buttons show a checking state.
+- Added ICMP/TCP diagnostic status details to check results.
+- Kept runtime `Data/config.json` ignored and committed only the safe `Data/config.sample.json`.
+- Fixed the Settings save alert so it no longer displays `[object PointerEvent]`.
+- Updated documentation and portable packaging to avoid including real runtime configuration data.
+
 ## v0.4.0 - 2026-06-06
 
 - Changed device health calculation so a device with a failed ping but an open TCP port is `Degraded` instead of `Down`.

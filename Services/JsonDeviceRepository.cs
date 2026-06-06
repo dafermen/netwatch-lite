@@ -206,7 +206,9 @@ public sealed class JsonDeviceRepository
             {
                 IntervalSeconds = 60,
                 TimeoutMs = 1000,
-                MaxParallelChecks = 50
+                MaxParallelChecks = 50,
+                RetryCount = 0,
+                RetryDelayMs = 250
             },
             Devices =
             [
@@ -336,7 +338,9 @@ public sealed class JsonDeviceRepository
         {
             IntervalSeconds = settings.IntervalSeconds,
             TimeoutMs = settings.TimeoutMs,
-            MaxParallelChecks = settings.MaxParallelChecks
+            MaxParallelChecks = settings.MaxParallelChecks,
+            RetryCount = settings.RetryCount,
+            RetryDelayMs = settings.RetryDelayMs
         };
     }
 
@@ -375,6 +379,16 @@ public sealed class JsonDeviceRepository
         if (configuration.Settings.MaxParallelChecks <= 0)
         {
             throw new InvalidDataException("maxParallelChecks must be greater than zero.");
+        }
+
+        if (configuration.Settings.RetryCount < 0 || configuration.Settings.RetryCount > 5)
+        {
+            throw new InvalidDataException("retryCount must be between 0 and 5.");
+        }
+
+        if (configuration.Settings.RetryDelayMs < 0 || configuration.Settings.RetryDelayMs > 10000)
+        {
+            throw new InvalidDataException("retryDelayMs must be between 0 and 10000.");
         }
 
         for (var deviceIndex = 0; deviceIndex < configuration.Devices.Count; deviceIndex++)

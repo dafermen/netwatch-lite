@@ -311,9 +311,16 @@ app.MapGet("/api/monitor/stream", async (
     try
     {
         var categoryName = context.Request.Query["category"].FirstOrDefault();
+        var deviceName = context.Request.Query["deviceName"].FirstOrDefault();
+        var deviceIps = context.Request.Query["deviceIp"]
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!)
+            .ToList();
         var started = await executionService.TryStreamFullCheckAsync(
             WriteEventAsync,
             categoryName,
+            deviceName,
+            deviceIps,
             context.RequestAborted);
 
         if (!started)

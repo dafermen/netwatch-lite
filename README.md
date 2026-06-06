@@ -14,9 +14,9 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 
 Download the latest Windows x64 portable ZIP:
 
-[Download NetWatch Lite portable ZIP](https://github.com/dafermen/netwatch-lite/raw/refs/heads/main/releases/NetWatch-Lite-win-x64-portable-2026-06-06-config-import-export.zip)
+[Download NetWatch Lite portable ZIP](https://github.com/dafermen/netwatch-lite/raw/refs/heads/main/releases/NetWatch-Lite-win-x64-portable-2026-06-06-retry-run-failed.zip)
 
-Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The editable `config.json` file is included beside the executable.
+Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The ZIP includes a safe `config.sample.json`; NetWatch Lite creates the editable runtime `config.json` beside the executable on first run if it does not already exist.
 
 ## Screenshots
 
@@ -38,6 +38,7 @@ Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The editable `config.jso
 - Async TCP port checks.
 - Parallel execution with `Task.WhenAll`.
 - Global concurrency limit with `maxParallelChecks`.
+- Configurable retry count and retry delay for transient ping and TCP failures.
 - Aggregated status:
   - `Healthy`: every configured ping and TCP check succeeds.
   - `Degraded`: at least one check succeeds, but one or more checks fail.
@@ -69,6 +70,8 @@ Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The editable `config.jso
 - Optional auto refresh toggle that runs a full check using `settings.intervalSeconds`.
 - Forced full check.
 - Category-scoped dashboard checks for running one group, such as IP Cameras, without checking the full inventory.
+- Device-scoped dashboard checks for rerunning one row without checking the full inventory.
+- Failed-device retry button that appears only when current dashboard results include `Degraded` or `Down` devices.
 - Progressive dashboard rendering through Server-Sent Events while checks are still running.
 - Visible monitoring progress with percentage and checked/total count while a run is active.
 - JSON reload without restarting.
@@ -80,7 +83,7 @@ netwatch-lite/
 ├── Assets/
 │   └── netwatch-lite.ico
 ├── Data/
-│   └── config.json
+│   └── config.sample.json
 ├── Models/
 │   ├── CategoryResult.cs
 │   ├── CheckResult.cs
@@ -126,7 +129,7 @@ The device JSON path is configured in `appsettings.json`.
 }
 ```
 
-During local development, `Data/config.json` is copied to the build output as `config.json`. During portable publish, it is copied next to `NetWatch-Lite.exe`. If `config.json` is missing on first run or was deleted, NetWatch Lite creates a starter configuration with one `Localhost` ping device.
+During local development, `Data/config.json` is treated as a private local file and is ignored by Git. `Data/config.sample.json` is the safe starter example that can be committed. If runtime `config.json` is missing on first run or was deleted, NetWatch Lite creates a starter configuration with one `Localhost` ping device.
 
 ## Device JSON Format
 
@@ -135,7 +138,9 @@ During local development, `Data/config.json` is copied to the build output as `c
   "settings": {
     "intervalSeconds": 15,
     "timeoutMs": 1000,
-    "maxParallelChecks": 50
+    "maxParallelChecks": 50,
+    "retryCount": 0,
+    "retryDelayMs": 250
   },
   "devices": [
     {
@@ -178,7 +183,7 @@ That project renders operational monitoring pages in native WebView2 panels for 
 | `POST` | `/api/config/import` | Imports a `.json` config file, validates it, creates `config.backup.json`, saves it, and reloads memory. |
 | `GET` | `/api/results` | Backwards-compatible endpoint that forces a full check. |
 | `POST` | `/api/monitor/run` | Forces a full check and prevents overlapping executions. |
-| `GET` | `/api/monitor/stream` | Streams a full check progressively with `started`, `result`, `completed`, `busy`, and `error` events. Supports optional `category` query filtering. |
+| `GET` | `/api/monitor/stream` | Streams a full check progressively with `started`, `result`, `completed`, `busy`, and `error` events. Supports optional `category`, `deviceName`, and `deviceIp` query filtering. |
 
 ## Version Notes
 
@@ -223,11 +228,13 @@ Expected output:
 ```text
 publish/win-x64-portable/
 ├── NetWatch-Lite.exe
-├── config.json
+├── config.sample.json
 ├── appsettings.json
 ├── wwwroot/
 └── runtime dependencies...
 ```
+
+On first run, NetWatch Lite creates `config.json` beside `NetWatch-Lite.exe` if the file does not already exist.
 
 Create a ZIP on macOS:
 
@@ -247,6 +254,8 @@ Edit `config.json` in the same folder as `NetWatch-Lite.exe`, or use the `/confi
 
 - `Run Full Check` executes all configured checks immediately.
 - `Run Group` executes checks only for the selected category.
+- `Run Failed` appears only when the current dashboard has `Degraded` or `Down` devices and retries only those devices.
+- `Run` appears beside the timestamp only for devices in `Degraded` or `Down` state; it executes only that device and replaces its latest dashboard result.
 - The dashboard starts empty in manual mode; results appear after `Run Full Check` or after enabling `Auto Refresh`.
 - Full checks stream results progressively, so devices appear as they finish instead of waiting for the whole execution.
 - When a full check finishes, category groups collapse and show a green bar when every device is healthy or a red bar when attention is needed.
@@ -257,10 +266,13 @@ Edit `config.json` in the same folder as `NetWatch-Lite.exe`, or use the `/confi
 - Auto refresh keeps existing dashboard groups visible while the next full check updates devices progressively.
 - Invalid or corrupt `config.json` content is reported through the API/UI instead of crashing silently.
 - Missing `config.json` is recreated automatically with a starter `Localhost` ping device.
+- If an operating system ping succeeds but NetWatch Lite shows a ping failure, compare the device ping target mode, configured `timeoutMs`, `retryCount`, and `retryDelayMs`. NetWatch Lite uses the per-device `useHostnameForPing` value and the configured timeout, which may be shorter than the operating system ping command's default wait time.
 - Configuration read/write problems return controlled API errors so the Configuration page can show the message to the operator.
 - JSON import rejects empty files, non-`.json` files, files larger than 5 MB, malformed JSON, and invalid monitor configurations before replacing the current file.
 - Monitoring stream failures are logged by the backend and sent to the dashboard as an `error` event when the client is still connected.
 - If a group check fails while previous dashboard results are visible, the UI keeps those results on screen and reports the failure in the status line.
 - `maxParallelChecks` should be adjusted carefully for large networks.
+- `retryCount` adds extra attempts after a failed ping or TCP check. Higher values can improve transient failures but increase total runtime.
+- `retryDelayMs` controls the pause between retry attempts.
 - TCP checks treat timeouts, refused connections, invalid targets, and unexpected socket failures as unavailable ports; they do not validate application protocol behavior.
 - On small screens, wide device tables scroll horizontally while toolbars and forms stack vertically.
