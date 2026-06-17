@@ -14,7 +14,7 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 
 Download the latest Windows x64 portable ZIP:
 
-[Download NetWatch Lite portable ZIP](https://github.com/dafermen/netwatch-lite/raw/refs/heads/main/releases/NetWatch-Lite-win-x64-portable-2026-06-17-facilities-themes.zip)
+[Download NetWatch Lite portable ZIP](https://github.com/dafermen/netwatch-lite/raw/refs/heads/main/releases/NetWatch-Lite-win-x64-portable-2026-06-17-v0.5.1-ui-themes.zip)
 
 Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The ZIP includes a safe `config.sample.json`; NetWatch Lite creates the editable runtime `config.json` and `themes.json` beside the executable on first run if they do not already exist.
 
@@ -50,7 +50,7 @@ Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The ZIP includes a safe 
   - Degraded devices.
   - Availability percentage.
 - Search and client-side filters.
-- Dashboard results group by facility and then category in the all-facilities view; category groups collapse after a full check and show green or red health bars.
+- Dashboard results group by facility and then category in the all-facilities view; facility/category groups collapse after a full check and show green, orange, or red health bars.
 - Hamburger sidebar navigation.
 - Branded NetWatch Lite logo and favicon.
 - Embedded Windows executable icon for portable builds.
@@ -63,10 +63,10 @@ Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The ZIP includes a safe 
 - Editable auto refresh interval, timeout, max parallel check limit, and per-device ping target mode in `/config`.
 - Add, update, and delete device actions save immediately to `config.json`.
 - Copy device action opens a prefilled add form so similar devices can be created quickly.
-- Theme templates can be created, copied, activated, deleted, or reset from the Themes page. If `themes.json` is missing, NetWatch Lite creates the default theme automatically.
+- Theme templates can be created, copied, renamed, activated, deleted one at a time, or fully reset from the Themes page. If `themes.json` is missing, NetWatch Lite creates the default theme automatically.
 - Configuration device table grouped by facility and category for easier editing.
 - Configuration devices can be filtered by name, address, hostname, facility, or category.
-- Configuration category groups are nested under each facility and collapsed by default.
+- Configuration facility and category groups are nested and collapsed by default.
 - Add/edit device form opens in a modal so large category lists do not push the editor out of view.
 - Configuration JSON export and import from `/config`, with server-side validation before imported files replace the current config.
 - Manual mode by default.
@@ -138,7 +138,7 @@ The device JSON path is configured in `appsettings.json`.
 
 During local development, `Data/config.json` is treated as a private local file and is ignored by Git. `Data/config.sample.json` is the safe starter example that can be committed. If runtime `config.json` is missing on first run or was deleted, NetWatch Lite creates a starter configuration with one `Localhost` ping device.
 
-`themes.json` stores GUI theme templates and the active theme id. It is runtime data and is ignored by Git, just like `config.json`. If it is missing, NetWatch Lite creates the built-in `NetWatch Default` theme automatically. Theme color tokens include page/surface/sidebar colors, status colors, category health colors, and dashboard action colors for `Auto Refresh: ON`, `Auto Refresh: OFF`, and `Run Full Check`.
+`themes.json` stores GUI theme templates and the active theme id. It is runtime data and is ignored by Git, just like `config.json`. If it is missing, NetWatch Lite creates the built-in `NetWatch Default` theme automatically. Theme color tokens include page/surface/sidebar colors, status colors, dashboard category health colors, Configuration collapsible header colors, and dashboard action colors for `Auto Refresh: ON`, `Auto Refresh: OFF`, and the primary run button.
 
 ## Device JSON Format
 
@@ -253,7 +253,7 @@ It also creates `themes.json` beside the executable if no theme file exists.
 Create a ZIP on macOS:
 
 ```bash
-ditto -c -k --sequesterRsrc --keepParent publish/win-x64-portable publish/NetWatch-Lite-win-x64-portable-2026-06-17-facilities-themes.zip
+ditto -c -k --sequesterRsrc --keepParent publish/win-x64-portable publish/NetWatch-Lite-win-x64-portable-2026-06-17-v0.5.1-ui-themes.zip
 ```
 
 To run on Windows:
@@ -266,14 +266,14 @@ Edit `config.json` in the same folder as `NetWatch-Lite.exe`, or use the `/confi
 
 ## Operational Notes
 
-- `Run Full Check` executes all configured checks immediately.
-- Facility tabs focus the dashboard on one site. `Run Facility` executes checks only for the selected facility.
+- `Run All Facilities` executes all configured checks immediately.
+- Facility tabs focus the dashboard on one site. The same primary run button changes to `Run Facility` and executes checks only for the selected facility.
 - `Run Group` executes checks only for the selected category.
 - `Run Failed` appears only when the current dashboard has `Degraded` or `Down` devices and retries only those devices.
 - `Run` appears beside the timestamp only for devices in `Degraded` or `Down` state; it executes only that device and replaces its latest dashboard result.
-- The dashboard starts empty in manual mode; results appear after `Run Full Check` or after enabling `Auto Refresh`.
+- The dashboard starts empty in manual mode; results appear after `Run All Facilities`, `Run Facility`, or after enabling `Auto Refresh`.
 - Full checks stream results progressively, so devices appear as they finish instead of waiting for the whole execution.
-- When a full check finishes, facilities show their nested category groups. Category groups collapse and show a green bar when every device is healthy or a red bar when attention is needed.
+- When a full check finishes, facilities show compact collapsible rows with nested category groups. Category groups collapse and show green when every device is healthy, orange when devices are degraded but none are down, and red when at least one device is down.
 - The monitoring progress bar is visible only while a full check is running.
 - NetWatch Lite starts in manual mode by default.
 - `Auto Refresh` runs a full check immediately after the operator turns it on, then repeats every `settings.intervalSeconds`.

@@ -2,6 +2,15 @@
 
 All notable changes to NetWatch-Lite are documented here.
 
+## v0.5.1 - 2026-06-17
+
+- Made dashboard facility sections compact and collapsible, with a per-facility `Run` action visible from the collapsed summary row.
+- Replaced the separate full-check button with one primary run button that runs all facilities or the selected facility depending on the active facility filter.
+- Made Configuration facility groups collapsible and saved the active theme immediately when `Set Active` is clicked.
+- Forced dashboard runs to reload `config.json` first so checks use the latest saved device configuration after edits.
+- Added theme controls for Configuration facility/category collapsible headers, made degraded-only category headers orange, and added theme rename support.
+- Clarified theme deletion controls: `Delete Theme` removes only the selected theme and `Reset All Themes` restores the built-in default after a stronger confirmation.
+
 ## v0.5.0 - 2026-06-17
 
 - Added per-device `facility` support for site/warehouse grouping.

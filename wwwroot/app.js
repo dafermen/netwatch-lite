@@ -15,14 +15,12 @@ const lastCheck = document.querySelector("#last-check");
 const executionMode = document.querySelector("#execution-mode");
 const autoRefreshToggle = document.querySelector("#auto-refresh-toggle");
 const autoRefreshLabel = document.querySelector("#auto-refresh-label");
-const runFullCheckButton = document.querySelector("#run-full-check");
-const runFullCheckSpinner = document.querySelector("#run-full-check-spinner");
-const runFullCheckIcon = document.querySelector("#run-full-check-icon");
 const facilityTabs = document.querySelector("#facility-tabs");
 const activeFacilityLabel = document.querySelector("#active-facility-label");
 const runFacilityCheckButton = document.querySelector("#run-facility-check");
 const runFacilityCheckSpinner = document.querySelector("#run-facility-check-spinner");
 const runFacilityCheckIcon = document.querySelector("#run-facility-check-icon");
+const runFacilityCheckLabel = document.querySelector("#run-facility-check-label");
 const groupCheckSelect = document.querySelector("#group-check-select");
 const runGroupCheckButton = document.querySelector("#run-group-check");
 const runGroupCheckSpinner = document.querySelector("#run-group-check-spinner");
@@ -98,6 +96,7 @@ const submitThemeButton = document.querySelector("#submit-theme");
 const themeColorInputs = document.querySelectorAll("[data-theme-color]");
 const newThemeButton = document.querySelector("#new-theme");
 const copyThemeButton = document.querySelector("#copy-theme");
+const renameThemeButton = document.querySelector("#rename-theme");
 const resetThemesButton = document.querySelector("#reset-themes");
 const saveThemesButton = document.querySelector("#save-themes");
 const saveThemesSpinner = document.querySelector("#save-themes-spinner");
@@ -126,6 +125,7 @@ let currentRoute = normalizeRoute(location.pathname);
 let hasLoadedDashboardGroups = false;
 let hasLoadedConfig = false;
 let hasLoadedThemes = false;
+let dashboardConfigStale = false;
 let activeConfigSearch = "";
 const defaultAutoFullCheckIntervalSeconds = 60;
 const maxConfigImportBytes = 5 * 1024 * 1024;
@@ -135,6 +135,7 @@ let editingThemeId = "default";
 let pendingThemeAction = "new";
 let pendingThemeSourceId = "";
 let pendingDeleteIndex = null;
+const expandedFacilityNames = new Set();
 const expandedCategoryNames = new Set();
 const mobileSidebarQuery = window.matchMedia("(max-width: 991.98px)");
 const themeCssVariables = {
@@ -150,14 +151,31 @@ const themeCssVariables = {
   mutedText: "--nw-muted-text",
   border: "--nw-border",
   categoryHealthy: "--nw-category-healthy",
+  categoryDegraded: "--nw-category-degraded",
   categoryProblem: "--nw-category-problem",
   categoryRunning: "--nw-category-running",
+  configFacilityHeader: "--nw-config-facility-header",
+  configFacilityText: "--nw-config-facility-text",
+  configCategoryHeader: "--nw-config-category-header",
+  configCategoryText: "--nw-config-category-text",
   autoRefreshOn: "--nw-auto-refresh-on",
   autoRefreshOff: "--nw-auto-refresh-off",
   runFullCheck: "--nw-run-full-check"
 };
 
-function loadResults({ showErrors = true, facility = "", category = "", device = null, devices = [] } = {}) {
+async function loadResults({ showErrors = true, facility = "", category = "", device = null, devices = [], reloadConfig = true } = {}) {
+  if (!activeMonitorStream && reloadConfig) {
+    try {
+      await refreshConfigurationForRun();
+    } catch (error) {
+      if (showErrors) {
+        lastCheck.textContent = error.message || "Unable to refresh configuration before running checks.";
+      }
+      console.error(error);
+      return;
+    }
+  }
+
   return streamFullCheck({ showErrors, facility, category, device, devices });
 }
 
@@ -244,6 +262,7 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
         renderScopedMonitorPayload(completedPayload, { facility, category });
       } else {
         hasCompletedFullCheck = true;
+        expandedFacilityNames.clear();
         expandedCategoryNames.clear();
         renderMonitorPayload(completedPayload);
       }
@@ -679,10 +698,13 @@ function renderFacilityTabs() {
   activeFacilityLabel.textContent = activeFacility
     ? `Showing ${activeFacility}`
     : "Showing all facilities";
-  runFacilityCheckButton.disabled = !activeFacility;
+  runFacilityCheckButton.disabled = false;
   runFacilityCheckButton.title = activeFacility
     ? `Run checks for ${activeFacility}`
-    : "Select a facility first";
+    : "Run checks for all facilities";
+  runFacilityCheckLabel.textContent = activeFacility
+    ? "Run Facility"
+    : "Run All Facilities";
 
   facilityTabs.innerHTML = [
     renderFacilityButton({
@@ -785,28 +807,69 @@ function renderFacilities(facilities) {
 function renderFacilitySection(facility, facilityIndex) {
   const totalDevices = facility.categories.reduce((total, category) => total + (category.totalDevices ?? 0), 0);
   const onlineDevices = facility.categories.reduce((total, category) => total + (category.onlineDevices ?? 0), 0);
+  const offlineDevices = totalDevices - onlineDevices;
   const problemDevices = facility.categories
     .flatMap(category => category.stateDevices ?? category.devices ?? [])
     .filter(device => device.status === "Degraded" || device.status === "Down")
     .length;
+  const isRunningFacility = activeRunFacility
+    && !activeRunCategory
+    && !activeRunDeviceName
+    && activeRunFacility.toLowerCase() === String(facility.name ?? "").toLowerCase();
+  const isHealthyFacility = problemDevices === 0;
+  const facilityKey = facility.name || "Unassigned";
+  const facilityId = `facility-${facilityIndex}-${slugify(facilityKey)}`;
+  const isExpanded = expandedFacilityNames.has(facilityKey);
+  const expandedClass = isExpanded ? "facility-section-expanded" : "";
+  const statusClass = isRunningFacility
+    ? "text-bg-secondary"
+    : isHealthyFacility ? "text-bg-success" : "text-bg-warning";
+  const statusText = isRunningFacility
+    ? "Checking"
+    : isHealthyFacility ? "Healthy" : `${problemDevices} issues`;
+  const statusIcon = isRunningFacility
+    ? "fa-spinner fa-spin"
+    : isHealthyFacility ? "fa-circle-check" : "fa-triangle-exclamation";
 
   return `
-    <section class="facility-section mb-3">
+    <section class="facility-section ${expandedClass} mb-2">
       <div class="facility-section-header">
-        <div>
-          <h2 class="h5 mb-0">${escapeHtml(facility.name)}</h2>
-          <span class="small text-secondary">${totalDevices} devices across ${facility.categories.length} categories</span>
+        <div class="d-flex align-items-center gap-2 min-w-0">
+          <button
+            class="btn btn-sm btn-outline-secondary facility-toggle"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#${facilityId}"
+            aria-expanded="${isExpanded}"
+            aria-controls="${facilityId}">
+            <i class="fa-solid fa-chevron-down"></i>
+          </button>
+          <div class="min-w-0">
+            <h2 class="facility-title mb-0">${escapeHtml(facility.name)}</h2>
+            <span class="facility-subtitle small">${totalDevices} devices / ${facility.categories.length} categories</span>
+          </div>
         </div>
         <div class="facility-section-summary">
-          <span class="badge text-bg-${problemDevices > 0 ? "warning" : "success"}">
-            ${problemDevices > 0 ? `${problemDevices} issues` : "Healthy"}
+          <span class="badge ${statusClass}">
+            <i class="fa-solid ${statusIcon} me-1"></i>${statusText}
           </span>
-          <span class="text-secondary small">${onlineDevices} online / ${totalDevices - onlineDevices} offline</span>
+          <span class="facility-counts">${onlineDevices} online / ${offlineDevices} offline</span>
+          <button
+            class="btn btn-sm btn-outline-primary facility-run-button"
+            type="button"
+            data-run-facility-only="${escapeHtml(facility.name)}">
+            <i class="fa-solid fa-play me-1"></i>Run
+          </button>
         </div>
       </div>
-      <div class="facility-category-stack">
-        ${facility.categories.map((category, categoryIndex) =>
-          renderCategory(category, `${facilityIndex}-${categoryIndex}`, facility.name)).join("")}
+      <div
+        class="collapse ${isExpanded ? "show" : ""}"
+        id="${facilityId}"
+        data-facility-key="${escapeHtml(facilityKey)}">
+        <div class="facility-category-stack">
+          ${facility.categories.map((category, categoryIndex) =>
+            renderCategory(category, `${facilityIndex}-${categoryIndex}`, facility.name)).join("")}
+        </div>
       </div>
     </section>`;
 }
@@ -832,8 +895,10 @@ function renderCategory(category, index, facilityName = "") {
   const stateTotalDevices = stateDevices.length;
   const healthyDevices = stateDevices.filter(device => device.status === "Healthy").length;
   const problemDevices = stateDevices.filter(device => device.status === "Degraded" || device.status === "Down").length;
+  const downDevices = stateDevices.filter(device => device.status === "Down").length;
   const categoryPercent = stateTotalDevices === 0 ? 100 : Math.round((healthyDevices / stateTotalDevices) * 100);
   const isHealthyCategory = stateTotalDevices > 0 && problemDevices === 0 && healthyDevices === stateTotalDevices;
+  const isDegradedCategory = problemDevices > 0 && downDevices === 0;
   const categoryFacility = facilityName || activeFacility || "";
   const isRunningCategory = activeRunCategory
     && activeRunCategory.toLowerCase() === String(category.name ?? "").toLowerCase()
@@ -841,12 +906,12 @@ function renderCategory(category, index, facilityName = "") {
   const stateClass = isRunningCategory
     ? "category-section-running"
     : hasCompletedFullCheck
-    ? isHealthyCategory ? "category-section-healthy" : "category-section-problem"
+    ? isHealthyCategory ? "category-section-healthy" : isDegradedCategory ? "category-section-degraded" : "category-section-problem"
     : "category-section-running";
   const stateIcon = isRunningCategory
     ? "fa-spinner fa-spin"
     : hasCompletedFullCheck
-    ? isHealthyCategory ? "fa-circle-check" : "fa-circle-xmark"
+    ? isHealthyCategory ? "fa-circle-check" : isDegradedCategory ? "fa-triangle-exclamation" : "fa-circle-xmark"
     : "fa-spinner fa-spin";
   const stateLabel = isRunningCategory
     ? "Checking"
@@ -1140,9 +1205,7 @@ async function reloadJson() {
     }
 
     await loadConfig({ clearAlert: false, showBusy: false });
-    if (hasLoadedDashboardGroups) {
-      await loadDashboardGroups();
-    }
+    markDashboardConfigurationStale();
     showConfigAlert("success", `Reloaded config.json from disk. ${formatNumber(payload.count)} devices loaded.`);
   } catch (error) {
     showConfigAlert("danger", `JSON reload failed: ${error.message}`);
@@ -1252,9 +1315,7 @@ async function importConfigFile(file) {
     hasLoadedConfig = true;
     renderConfigDevices();
     resetDeviceForm();
-    if (hasLoadedDashboardGroups) {
-      await loadDashboardGroups();
-    }
+    markDashboardConfigurationStale();
     showConfigAlert("success", `Imported config.json. ${formatNumber(payload.count)} devices loaded.`);
   } catch (error) {
     showConfigAlert("danger", `JSON import failed: ${error.message}`);
@@ -1265,35 +1326,41 @@ async function importConfigFile(file) {
 }
 
 async function runFullCheck() {
-  setButtonLoading(runFullCheckButton, runFullCheckSpinner, runFullCheckIcon, true);
-
-  try {
-    await loadResults();
-  } finally {
-    setButtonLoading(runFullCheckButton, runFullCheckSpinner, runFullCheckIcon, false);
-  }
+  await loadResults();
 }
 
 async function runSelectedFacilityCheck() {
-  if (!activeFacility) {
-    return;
-  }
+  await runFacilityCheck(activeFacility);
+}
 
-  setButtonLoading(runFacilityCheckButton, runFacilityCheckSpinner, runFacilityCheckIcon, true);
-  runFullCheckButton.disabled = true;
+async function runFacilityCheck(facility = "") {
+  const isSelectedFacilityRun = facility === activeFacility;
+  const previousRunFacility = activeRunFacility;
+  activeRunFacility = facility || "";
+  if (isSelectedFacilityRun) {
+    setButtonLoading(runFacilityCheckButton, runFacilityCheckSpinner, runFacilityCheckIcon, true);
+  } else {
+    runFacilityCheckButton.disabled = true;
+  }
   runGroupCheckButton.disabled = true;
   runFailedCheckButton.disabled = true;
+  renderFilteredCategories();
   setDashboardRunButtonsDisabled(true);
 
   try {
-    await loadResults({ facility: activeFacility });
+    await loadResults({ facility: facility || "" });
   } finally {
-    setButtonLoading(runFacilityCheckButton, runFacilityCheckSpinner, runFacilityCheckIcon, false);
-    runFacilityCheckButton.disabled = !activeFacility;
-    runFullCheckButton.disabled = false;
+    activeRunFacility = previousRunFacility;
+    if (isSelectedFacilityRun) {
+      setButtonLoading(runFacilityCheckButton, runFacilityCheckSpinner, runFacilityCheckIcon, false);
+    }
+    runFacilityCheckButton.disabled = false;
     runGroupCheckButton.disabled = !groupCheckSelect.value;
     runFailedCheckButton.disabled = false;
     setDashboardRunButtonsDisabled(false);
+    if (!isSelectedFacilityRun) {
+      renderFilteredCategories();
+    }
   }
 }
 
@@ -1311,7 +1378,7 @@ async function runGroupCheck(category, facility = activeFacility) {
   const previousRunFacility = activeRunFacility;
   activeRunFacility = facility || "";
   setButtonLoading(runGroupCheckButton, runGroupCheckSpinner, runGroupCheckIcon, true);
-  runFullCheckButton.disabled = true;
+  runFacilityCheckButton.disabled = true;
   runFailedCheckButton.disabled = true;
   setDashboardRunButtonsDisabled(true);
 
@@ -1321,7 +1388,7 @@ async function runGroupCheck(category, facility = activeFacility) {
     activeRunFacility = previousRunFacility;
     setButtonLoading(runGroupCheckButton, runGroupCheckSpinner, runGroupCheckIcon, false);
     runGroupCheckButton.disabled = !groupCheckSelect.value;
-    runFullCheckButton.disabled = false;
+    runFacilityCheckButton.disabled = false;
     runFailedCheckButton.disabled = false;
     setDashboardRunButtonsDisabled(false);
   }
@@ -1335,7 +1402,7 @@ async function runDeviceCheck(device) {
   activeRunDeviceName = device.name;
   activeRunDeviceIp = device.ip;
   activeRunFacility = device.facility || "";
-  runFullCheckButton.disabled = true;
+  runFacilityCheckButton.disabled = true;
   runGroupCheckButton.disabled = true;
   runFailedCheckButton.disabled = true;
   renderFilteredCategories();
@@ -1347,7 +1414,7 @@ async function runDeviceCheck(device) {
     activeRunDeviceName = "";
     activeRunDeviceIp = "";
     activeRunFacility = "";
-    runFullCheckButton.disabled = false;
+    runFacilityCheckButton.disabled = false;
     runGroupCheckButton.disabled = !groupCheckSelect.value;
     runFailedCheckButton.disabled = false;
     setOtherDashboardRunButtonsDisabled(false);
@@ -1365,7 +1432,7 @@ async function runFailedChecks() {
 
   activeRunFailedIps = new Set(failedDevices.map(device => device.ip));
   setButtonLoading(runFailedCheckButton, runFailedCheckSpinner, runFailedCheckIcon, true);
-  runFullCheckButton.disabled = true;
+  runFacilityCheckButton.disabled = true;
   runGroupCheckButton.disabled = true;
   renderFilteredCategories();
   setOtherDashboardRunButtonsDisabled(true);
@@ -1375,7 +1442,7 @@ async function runFailedChecks() {
   } finally {
     activeRunFailedIps = new Set();
     setButtonLoading(runFailedCheckButton, runFailedCheckSpinner, runFailedCheckIcon, false);
-    runFullCheckButton.disabled = false;
+    runFacilityCheckButton.disabled = false;
     runGroupCheckButton.disabled = !groupCheckSelect.value;
     setOtherDashboardRunButtonsDisabled(false);
     updateRunFailedButton();
@@ -1435,6 +1502,29 @@ async function loadConfig({ clearAlert = true, showBusy = true } = {}) {
   }
 }
 
+async function refreshConfigurationForRun() {
+  const reloadResponse = await fetch("/api/reload", { method: "POST" });
+  const reloadPayload = await readJsonResponse(reloadResponse);
+
+  if (!reloadResponse.ok) {
+    throw new Error(reloadPayload.error || reloadPayload.detail || `Configuration reload failed with ${reloadResponse.status}`);
+  }
+
+  const configResponse = await fetch("/api/config");
+  const configPayload = await readJsonResponse(configResponse);
+
+  if (!configResponse.ok) {
+    throw new Error(configPayload.error || configPayload.detail || `Unable to load refreshed configuration. HTTP ${configResponse.status}`);
+  }
+
+  applyConfigPayload(configPayload);
+  renderGroupCheckOptions(configState.devices);
+  renderFacilityTabs();
+  hasLoadedConfig = true;
+  hasLoadedDashboardGroups = true;
+  dashboardConfigStale = false;
+}
+
 async function saveConfig(successMessage = "Settings saved to config.json. Previous config was backed up as config.backup.json.") {
   const resolvedSuccessMessage = typeof successMessage === "string"
     ? successMessage
@@ -1465,9 +1555,7 @@ async function saveConfig(successMessage = "Settings saved to config.json. Previ
     applyConfigPayload(payload.configuration);
     renderConfigDevices();
     resetDeviceForm();
-    if (hasLoadedDashboardGroups) {
-      await loadDashboardGroups();
-    }
+    markDashboardConfigurationStale();
     if (autoRefreshEnabled) {
       scheduleRefresh();
     }
@@ -1477,6 +1565,26 @@ async function saveConfig(successMessage = "Settings saved to config.json. Previ
     console.error(error);
   } finally {
     setConfigBusy(false);
+  }
+}
+
+function markDashboardConfigurationStale() {
+  dashboardConfigStale = true;
+  hasLoadedDashboardGroups = false;
+  latestResults = [];
+  latestCategories = [];
+  hasCompletedFullCheck = false;
+  activeRunFailedIps = new Set();
+  expandedFacilityNames.clear();
+  expandedCategoryNames.clear();
+  renderGroupCheckOptions(configState.devices);
+  updateRunFailedButton();
+
+  if (currentRoute === "/") {
+    renderFacilityTabs();
+    renderSummary(createProgressSummary([], 0));
+    renderFilteredCategories();
+    lastCheck.textContent = "Configuration changed. Run All Facilities to refresh with the latest config.json.";
   }
 }
 
@@ -1611,7 +1719,17 @@ function renderConfigDevices() {
       <tr class="config-facility-row">
         <td colspan="7">
           <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-            <span class="fw-semibold"><i class="fa-solid fa-location-dot me-2"></i>${escapeHtml(facility.name)}</span>
+            <div class="d-flex align-items-center gap-2">
+              <button
+                class="btn btn-sm btn-outline-light category-toggle"
+                type="button"
+                data-config-facility-toggle="${facilityId}"
+                aria-expanded="false"
+                aria-controls="${facilityId}">
+                <i class="fa-solid fa-chevron-down"></i>
+              </button>
+              <span class="fw-semibold"><i class="fa-solid fa-location-dot me-2"></i>${escapeHtml(facility.name)}</span>
+            </div>
             <span class="badge text-bg-dark">${facility.devices.length} devices</span>
           </div>
         </td>
@@ -1620,7 +1738,7 @@ function renderConfigDevices() {
         const categoryId = `${facilityId}-category-${categoryIndex}-${slugify(category.name)}`;
 
         return `
-          <tr class="config-category-row">
+          <tr class="config-category-row" data-config-facility-row="${facilityId}" hidden>
             <td colspan="7">
               <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 ps-3">
                 <div class="d-flex align-items-center gap-2">
@@ -1779,6 +1897,41 @@ function toggleConfigCategory(toggleButton) {
     .querySelectorAll(`[data-config-category-row="${groupId}"]`)
     .forEach(row => {
       row.hidden = isExpanded;
+    });
+}
+
+/**
+ * Expands or collapses all category headers and device rows inside one configuration facility.
+ * @param {HTMLButtonElement} toggleButton Button clicked in the facility header.
+ */
+function toggleConfigFacility(toggleButton) {
+  const facilityId = toggleButton.dataset.configFacilityToggle;
+  const isExpanded = toggleButton.getAttribute("aria-expanded") === "true";
+
+  toggleButton.setAttribute("aria-expanded", String(!isExpanded));
+
+  configDevicesBody
+    .querySelectorAll(`[data-config-facility-row="${facilityId}"]`)
+    .forEach(row => {
+      row.hidden = isExpanded;
+    });
+
+  if (!isExpanded) {
+    return;
+  }
+
+  configDevicesBody
+    .querySelectorAll(`[data-config-facility-row="${facilityId}"]`)
+    .forEach(categoryToggle => {
+      categoryToggle
+        .querySelectorAll("[data-config-category-toggle]")
+        .forEach(toggle => toggle.setAttribute("aria-expanded", "false"));
+    });
+
+  configDevicesBody
+    .querySelectorAll(`[data-config-category-row^="${facilityId}-category-"]`)
+    .forEach(row => {
+      row.hidden = true;
     });
 }
 
@@ -2129,8 +2282,13 @@ function createDefaultThemeState() {
           mutedText: "#657182",
           border: "#dee2e6",
           categoryHealthy: "#3b9b40",
+          categoryDegraded: "#f59e0b",
           categoryProblem: "#be302b",
           categoryRunning: "#465464",
+          configFacilityHeader: "#111827",
+          configFacilityText: "#e5e7eb",
+          configCategoryHeader: "#eef2f7",
+          configCategoryText: "#334155",
           autoRefreshOn: "#198754",
           autoRefreshOff: "#dc3545",
           runFullCheck: "#ffc107"
@@ -2197,7 +2355,7 @@ async function saveThemes(successMessage = "Themes saved to themes.json.") {
 }
 
 async function resetThemes() {
-  if (!window.confirm("Reset themes to the built-in default? Custom themes will be removed.")) {
+  if (!window.confirm("Reset ALL themes to NetWatch Default? This deletes every custom theme in themes.json.")) {
     return;
   }
 
@@ -2261,6 +2419,7 @@ function renderThemeEditor() {
   }
 
   deleteThemeButton.disabled = Boolean(theme.builtIn);
+  renameThemeButton.disabled = Boolean(theme.builtIn);
   activateThemeButton.disabled = theme.id === themeState.activeThemeId;
 
   for (const input of themeColorInputs) {
@@ -2339,6 +2498,22 @@ function startCopyTheme() {
   themeNameInput.select();
 }
 
+function startRenameTheme() {
+  const theme = getEditingTheme();
+
+  if (!theme || theme.builtIn) {
+    return;
+  }
+
+  pendingThemeAction = "rename";
+  pendingThemeSourceId = theme.id;
+  themeFormTitle.textContent = "Rename Theme";
+  submitThemeButton.textContent = "Rename Theme";
+  themeNameInput.value = theme.name;
+  showThemeForm();
+  themeNameInput.select();
+}
+
 function submitThemeForm(event) {
   event.preventDefault();
 
@@ -2351,6 +2526,8 @@ function submitThemeForm(event) {
 
   if (pendingThemeAction === "copy") {
     copyTheme(themeName, pendingThemeSourceId);
+  } else if (pendingThemeAction === "rename") {
+    renameTheme(themeName, pendingThemeSourceId);
   } else {
     createTheme(themeName);
   }
@@ -2395,6 +2572,20 @@ function copyTheme(themeName, sourceThemeId = editingThemeId) {
   clearThemeAlert();
 }
 
+function renameTheme(themeName, themeId = editingThemeId) {
+  const theme = themeState.themes.find(currentTheme => currentTheme.id === themeId);
+
+  if (!theme || theme.builtIn) {
+    return;
+  }
+
+  theme.name = themeName;
+  editingThemeId = theme.id;
+  renderThemeSelect();
+  renderThemeEditor();
+  clearThemeAlert();
+}
+
 function showThemeForm() {
   if (themeFormModal) {
     themeFormModal.show();
@@ -2407,7 +2598,7 @@ function hideThemeForm() {
   }
 }
 
-function activateTheme() {
+async function activateTheme() {
   if (!getEditingTheme()) {
     return;
   }
@@ -2416,16 +2607,17 @@ function activateTheme() {
   renderThemeSelect();
   renderThemeEditor();
   applyActiveTheme();
+  await saveThemes("Active theme saved to themes.json.");
 }
 
-function deleteTheme() {
+async function deleteTheme() {
   const theme = getEditingTheme();
 
   if (!theme || theme.builtIn) {
     return;
   }
 
-  if (!window.confirm(`Delete theme '${theme.name}'?`)) {
+  if (!window.confirm(`Delete only the selected theme '${theme.name}'? Other themes will be kept.`)) {
     return;
   }
 
@@ -2439,6 +2631,7 @@ function deleteTheme() {
   renderThemeSelect();
   renderThemeEditor();
   applyActiveTheme();
+  await saveThemes(`Theme '${theme.name}' deleted from themes.json.`);
 }
 
 function getEditingTheme() {
@@ -2463,6 +2656,7 @@ function setThemeBusy(isBusy) {
   saveThemesButton.disabled = isBusy;
   newThemeButton.disabled = isBusy;
   copyThemeButton.disabled = isBusy;
+  renameThemeButton.disabled = isBusy || Boolean(getEditingTheme()?.builtIn);
   resetThemesButton.disabled = isBusy;
   activateThemeButton.disabled = isBusy || editingThemeId === themeState.activeThemeId;
   deleteThemeButton.disabled = isBusy || Boolean(getEditingTheme()?.builtIn);
@@ -2573,7 +2767,7 @@ function setButtonLoading(button, spinner, icon, isLoading) {
 
 function setDashboardRunButtonsDisabled(isDisabled) {
   resultsBody
-    .querySelectorAll("[data-run-category], [data-run-device-name]")
+    .querySelectorAll("[data-run-facility-only], [data-run-category], [data-run-device-name]")
     .forEach(button => {
       button.disabled = isDisabled;
     });
@@ -2581,7 +2775,7 @@ function setDashboardRunButtonsDisabled(isDisabled) {
 
 function setOtherDashboardRunButtonsDisabled(isDisabled, activeDevice = null) {
   resultsBody
-    .querySelectorAll("[data-run-category], [data-run-device-name]")
+    .querySelectorAll("[data-run-facility-only], [data-run-category], [data-run-device-name]")
     .forEach(button => {
       const isActiveDeviceButton = activeDevice
         && button.dataset.runDeviceName === activeDevice.name
@@ -2676,7 +2870,6 @@ function isHttpUrl(value) {
 }
 
 autoRefreshToggle.addEventListener("click", toggleAutoRefresh);
-runFullCheckButton.addEventListener("click", runFullCheck);
 runFacilityCheckButton.addEventListener("click", runSelectedFacilityCheck);
 runGroupCheckButton.addEventListener("click", runSelectedGroupCheck);
 runFailedCheckButton.addEventListener("click", runFailedChecks);
@@ -2699,22 +2892,38 @@ navLinks.forEach(link => {
   });
 });
 resultsBody.addEventListener("hidden.bs.collapse", event => {
+  const facilityKey = event.target.dataset.facilityKey;
   const categoryKey = event.target.dataset.categoryKey;
+
+  if (facilityKey) {
+    expandedFacilityNames.delete(facilityKey);
+  }
 
   if (categoryKey) {
     expandedCategoryNames.delete(categoryKey);
   }
 });
 resultsBody.addEventListener("shown.bs.collapse", event => {
+  const facilityKey = event.target.dataset.facilityKey;
   const categoryKey = event.target.dataset.categoryKey;
+
+  if (facilityKey) {
+    expandedFacilityNames.add(facilityKey);
+  }
 
   if (categoryKey) {
     expandedCategoryNames.add(categoryKey);
   }
 });
 resultsBody.addEventListener("click", event => {
+  const runFacilityButton = event.target.closest("[data-run-facility-only]");
   const runCategoryButton = event.target.closest("[data-run-category]");
   const runDeviceButton = event.target.closest("[data-run-device-name]");
+
+  if (runFacilityButton) {
+    runFacilityCheck(runFacilityButton.dataset.runFacilityOnly);
+    return;
+  }
 
   if (runCategoryButton) {
     runGroupCheck(runCategoryButton.dataset.runCategory, runCategoryButton.dataset.runFacility || activeFacility);
@@ -2785,10 +2994,16 @@ checksList.addEventListener("click", event => {
   }
 });
 configDevicesBody.addEventListener("click", event => {
+  const facilityToggle = event.target.closest("[data-config-facility-toggle]");
   const categoryToggle = event.target.closest("[data-config-category-toggle]");
   const editButton = event.target.closest("[data-edit-device]");
   const copyButton = event.target.closest("[data-copy-device]");
   const deleteButton = event.target.closest("[data-delete-device]");
+
+  if (facilityToggle) {
+    toggleConfigFacility(facilityToggle);
+    return;
+  }
 
   if (categoryToggle) {
     toggleConfigCategory(categoryToggle);
@@ -2835,6 +3050,7 @@ themeColorInputs.forEach(input => {
 themeForm.addEventListener("submit", submitThemeForm);
 newThemeButton.addEventListener("click", startNewTheme);
 copyThemeButton.addEventListener("click", startCopyTheme);
+renameThemeButton.addEventListener("click", startRenameTheme);
 activateThemeButton.addEventListener("click", activateTheme);
 deleteThemeButton.addEventListener("click", deleteTheme);
 saveThemesButton.addEventListener("click", () => saveThemes());

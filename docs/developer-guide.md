@@ -208,7 +208,7 @@ One GUI theme template:
 - `Id`: stable unique theme id.
 - `Name`: display name.
 - `BuiltIn`: true for templates the UI cannot delete.
-- `Colors`: dictionary of supported color tokens, including layout colors, status colors, category health colors, `autoRefreshOn`, `autoRefreshOff`, and `runFullCheck`.
+- `Colors`: dictionary of supported color tokens, including layout colors, status colors, dashboard category health colors, Configuration collapsible header colors, `autoRefreshOn`, `autoRefreshOff`, and `runFullCheck`.
 
 ## Services
 
@@ -381,6 +381,7 @@ Important configuration functions:
 - `groupConfigDevicesByFacility`: groups devices by facility and category while preserving their original JSON index.
 - `renderConfigDeviceRow`: renders one editable device row inside a category group.
 - `toggleConfigCategory`: expands or collapses all rows for one configuration category.
+- `toggleConfigFacility`: expands or collapses all category headers and device rows for one configuration facility.
 - `startAddDevice`: opens the add device modal.
 - `editDevice`: opens the edit device modal.
 - `submitDevice`: updates device state and immediately persists the full configuration.
@@ -393,13 +394,14 @@ Important configuration functions:
 Important theme functions:
 
 - `loadThemes`: reads `/api/themes` and applies the active theme.
-- `startNewTheme` and `startCopyTheme`: open the theme naming modal.
-- `submitThemeForm`: creates a new theme or copy after the modal form is submitted.
+- `startNewTheme`, `startCopyTheme`, and `startRenameTheme`: open the theme naming modal.
+- `submitThemeForm`: creates, copies, or renames a theme after the modal form is submitted.
 - `renderThemeEditor`: syncs the selected theme into color inputs.
 - `syncThemeEditorToState`: writes color input changes back to the selected theme.
 - `applyThemeColors`: maps theme color tokens to CSS variables on `document.documentElement`.
 - `saveThemes`: posts theme templates to `/api/themes`.
 - `resetThemes`: posts to `/api/themes/reset`.
+- `deleteTheme`: deletes only the selected custom theme and saves the updated theme list.
 
 Safety:
 
@@ -430,7 +432,7 @@ Defines:
 ### Progressive Dashboard Flow
 
 ```text
-User clicks Run Full Check, Run Group, or enables Auto Refresh
+User clicks Run All Facilities, Run Facility, Run Group, or enables Auto Refresh
   |
   v
 app.js calls GET /api/monitor/stream
@@ -461,7 +463,7 @@ The dashboard updates:
 - Facility and category tables.
 - Last execution text.
 
-After the `completed` event, the UI clears expanded category state so all dashboard groups collapse. In the all-facilities view, results are grouped by facility first and category second, so duplicate device names in different sites remain visually distinct. Each category header shows the final category health as a compact bar: green when every device is `Healthy`, red when at least one device is `Down` or `Degraded`. The progress panel is hidden once the full run is complete.
+After the `completed` event, the UI clears expanded category state so all dashboard groups collapse. In the all-facilities view, results are grouped by facility first and category second, so duplicate device names in different sites remain visually distinct. Each category header shows the final category health as a compact bar: green when every device is `Healthy`, orange when at least one device is `Degraded` and none are `Down`, and red when at least one device is `Down`. The progress panel is hidden once the full run is complete.
 
 During a facility-scoped or category-scoped run, previous dashboard results stay visible. If that scoped run fails, the scoped run state is cleared, the old results remain on screen, and the top status line reports the failure.
 

@@ -376,14 +376,14 @@
       <p><code>wwwroot/index.html</code> define el layout compartido: sidebar hamburguesa, topbar, dashboard, pagina de configuracion, pagina de temas, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto. Cuando hay problemas aparece <code>Run Failed</code> para repetir solo los dispositivos fallidos, y cada fila con problema muestra <code>Run</code> junto al timestamp para repetir solo ese dispositivo.</p>
       <p>El dashboard muestra botones de facility para enfocar una sede y habilitar <code>Run Facility</code>. En vista general, las tablas se agrupan por facility y luego por categoria, por lo que dos equipos con el mismo nombre en sedes distintas se ven como registros diferentes.</p>
       <p>La pagina <code>/config</code> agrupa los dispositivos por facility y categoria, con grupos colapsados por defecto para facilitar la edicion de inventarios grandes. Las acciones de agregar, copiar, actualizar y eliminar dispositivos guardan inmediatamente en <code>config.json</code>, y el boton <code>Save Settings</code> dentro de Settings guarda ajustes generales como intervalo, timeout, reintentos, pausa entre reintentos y concurrencia maxima. <code>Export JSON</code> descarga la configuracion actual e <code>Import JSON</code> valida un archivo antes de reemplazar la configuracion.</p>
-      <p>La pagina <code>/themes</code> permite crear, copiar, activar, borrar, resetear y guardar templates de color en <code>themes.json</code>. El nombre de un tema nuevo o copiado se captura en modal, y los colores editables incluyen el sidebar, superficies, estados, categorias, <code>Auto Refresh ON</code>, <code>Auto Refresh OFF</code> y <code>Run Full Check</code>.</p>
+      <p>La pagina <code>/themes</code> permite crear, copiar, renombrar, activar, borrar, resetear y guardar templates de color en <code>themes.json</code>. El nombre de un tema nuevo, copiado o renombrado se captura en modal, y los colores editables incluyen el sidebar, superficies, estados, categorias, headers colapsables de Configuration, <code>Auto Refresh ON</code>, <code>Auto Refresh OFF</code> y el boton principal de ejecucion.</p>
       <p>El sidebar tambien incluye <code>/manual</code> con un manual de usuario integrado y <code>/about</code> con informacion del proyecto, su caracter libre y notas operativas.</p>
       <p><code>wwwroot/app.js</code> contiene funciones JSDoc para:</p>
       <ul>
         <li>Consumir <code>/api/monitor/stream</code> para pintar resultados conforme termina cada dispositivo.</li>
         <li>Renderizar metricas, facilities, categorias, filas, badges de estado, puertos y links opcionales de <code>websiteUrl</code>.</li>
-        <li>Contraer y expandir grupos de categorias para navegar inventarios grandes; al completar un full check, los grupos se contraen y quedan en verde o rojo segun la salud final.</li>
-        <li>Manejar modo manual por defecto, auto refresh ON/OFF y Run Full Check.</li>
+        <li>Contraer y expandir grupos de facility y categoria para navegar inventarios grandes; al completar un full check, los grupos se contraen y quedan en verde, naranja o rojo segun la salud final.</li>
+        <li>Manejar modo manual por defecto, auto refresh ON/OFF y el boton principal <code>Run All Facilities</code>/<code>Run Facility</code>.</li>
         <li>Administrar dispositivos y checks desde la ruta <code>/config</code>.</li>
         <li>Administrar templates de color desde la ruta <code>/themes</code>.</li>
         <li>Filtrar por texto, facility, categoria, online, offline y problemas.</li>
@@ -406,6 +406,7 @@ dotnet run</pre>
           <tr><th>Version</th><th>Resumen</th></tr>
         </thead>
         <tbody>
+          <tr><td><code>v0.5.1</code></td><td>Facilities compactas y colapsables, Configuration colapsable por facility/categoria, boton unico de ejecucion, temas renombrables, controles de color para headers colapsables y naranja para categorias degradadas.</td></tr>
           <tr><td><code>v0.5.0</code></td><td>Facilities, agrupacion facility/categoria, Run Facility, copia de dispositivos, temas editables en <code>themes.json</code> y colores para botones del dashboard.</td></tr>
           <tr><td><code>v0.4.1</code></td><td>Reintentos configurables, Run Failed, feedback por dispositivo y protecciones para config runtime.</td></tr>
           <tr><td><code>v0.4.0</code></td><td>Estados Healthy/Degraded/Down, links web, manual/about integrados, icono y portable actualizado.</td></tr>
@@ -428,7 +429,7 @@ dotnet run</pre>
 ├── wwwroot/
 └── runtime dependencies...</pre>
       <p>Crear ZIP en macOS:</p>
-      <pre>ditto -c -k --sequesterRsrc --keepParent publish/win-x64-portable publish/NetWatch-Lite-win-x64-portable-2026-06-17-facilities-themes.zip</pre>
+      <pre>ditto -c -k --sequesterRsrc --keepParent publish/win-x64-portable publish/NetWatch-Lite-win-x64-portable-2026-06-17-v0.5.1-ui-themes.zip</pre>
       <p>Uso en Windows:</p>
       <ol>
         <li>Descomprimir el ZIP.</li>
@@ -449,10 +450,10 @@ dotnet run</pre>
         <li>Import JSON rechaza archivos vacios, archivos que no terminan en <code>.json</code>, archivos mayores de 5 MB, JSON invalido y configuraciones que no pasen validacion.</li>
         <li>La aplicacion inicia en modo manual; el auto refresh solo empieza cuando el operador activa el boton y repite el full check segun <code>settings.intervalSeconds</code>.</li>
         <li>Los botones de facility permiten enfocar y ejecutar una sede especifica cuando existen cientos de dispositivos.</li>
-        <li>Los grupos de categorias se contraen al finalizar un recorrido y muestran una barra verde si todo esta sano o roja si hay problemas.</li>
+        <li>Los grupos de facility y categoria se contraen al finalizar un recorrido y muestran barras verdes, naranjas o rojas segun el estado.</li>
         <li>La barra de progreso del monitoreo se muestra solo mientras corre un full check.</li>
         <li>En pantallas pequenas, los controles se apilan y las tablas anchas usan scroll horizontal para conservar legibilidad.</li>
-        <li><code>Run Full Check</code> no permite ejecuciones solapadas; si una ya corre, el backend responde HTTP 409.</li>
+        <li><code>Run All Facilities</code> y <code>Run Facility</code> no permiten ejecuciones solapadas; si una ya corre, el backend responde HTTP 409.</li>
         <li>JSON corrupto o invalido se reporta por API/UI para poder corregir la configuracion sin un cierre silencioso.</li>
         <li>Errores de lectura o escritura de configuracion se devuelven como respuestas controladas para mostrarlos en Configuracion.</li>
         <li>Si falla un Run de grupo durante streaming, el dashboard conserva los resultados anteriores y muestra el error en la linea de estado.</li>
