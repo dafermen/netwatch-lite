@@ -14,9 +14,9 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 
 Download the latest Windows x64 portable ZIP:
 
-[Download NetWatch Lite portable ZIP](https://github.com/dafermen/netwatch-lite/raw/refs/heads/main/releases/NetWatch-Lite-win-x64-portable-2026-06-06-retry-run-failed.zip)
+[Download NetWatch Lite portable ZIP](https://github.com/dafermen/netwatch-lite/raw/refs/heads/main/releases/NetWatch-Lite-win-x64-portable-2026-06-17-facilities-themes.zip)
 
-Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The ZIP includes a safe `config.sample.json`; NetWatch Lite creates the editable runtime `config.json` beside the executable on first run if it does not already exist.
+Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The ZIP includes a safe `config.sample.json`; NetWatch Lite creates the editable runtime `config.json` and `themes.json` beside the executable on first run if they do not already exist.
 
 ## Screenshots
 
@@ -50,20 +50,23 @@ Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The ZIP includes a safe 
   - Degraded devices.
   - Availability percentage.
 - Search and client-side filters.
-- Category groups collapse after a full check and show green or red health bars by category.
+- Dashboard results group by facility and then category in the all-facilities view; category groups collapse after a full check and show green or red health bars.
 - Hamburger sidebar navigation.
 - Branded NetWatch Lite logo and favicon.
 - Embedded Windows executable icon for portable builds.
 - Built-in User Manual and About pages.
+- Built-in Themes page for reusable GUI color templates stored in `themes.json`.
 - Companion Windows WebView2 wallboard is maintained in the sibling `netwatch-lite-wallboard` repository.
 - Responsive layout for desktop, tablet, and mobile screens.
 - Configuration page at `/config`.
 - CRUD UI for devices and checks stored in `config.json`.
 - Editable auto refresh interval, timeout, max parallel check limit, and per-device ping target mode in `/config`.
 - Add, update, and delete device actions save immediately to `config.json`.
-- Configuration device table grouped by category for easier editing.
-- Configuration devices can be filtered by name, address, or hostname.
-- Configuration category groups collapsed by default.
+- Copy device action opens a prefilled add form so similar devices can be created quickly.
+- Theme templates can be created, copied, activated, deleted, or reset from the Themes page. If `themes.json` is missing, NetWatch Lite creates the default theme automatically.
+- Configuration device table grouped by facility and category for easier editing.
+- Configuration devices can be filtered by name, address, hostname, facility, or category.
+- Configuration category groups are nested under each facility and collapsed by default.
 - Add/edit device form opens in a modal so large category lists do not push the editor out of view.
 - Configuration JSON export and import from `/config`, with server-side validation before imported files replace the current config.
 - Manual mode by default.
@@ -95,10 +98,13 @@ netwatch-lite/
 │   ├── MonitorConfiguration.cs
 │   ├── MonitorResponse.cs
 │   ├── MonitorStreamEvent.cs
-│   └── MonitorSettings.cs
+│   ├── MonitorSettings.cs
+│   ├── ThemeConfiguration.cs
+│   └── ThemeDefinition.cs
 ├── Services/
 │   ├── JsonDeviceRepository.cs
 │   ├── MonitorExecutionService.cs
+│   ├── JsonThemeRepository.cs
 │   ├── NetworkMonitorOptions.cs
 │   └── NetworkMonitorService.cs
 ├── wwwroot/
@@ -124,12 +130,15 @@ The device JSON path is configured in `appsettings.json`.
 ```json
 {
   "NetworkMonitor": {
-    "DeviceFilePath": "config.json"
+    "DeviceFilePath": "config.json",
+    "ThemeFilePath": "themes.json"
   }
 }
 ```
 
 During local development, `Data/config.json` is treated as a private local file and is ignored by Git. `Data/config.sample.json` is the safe starter example that can be committed. If runtime `config.json` is missing on first run or was deleted, NetWatch Lite creates a starter configuration with one `Localhost` ping device.
+
+`themes.json` stores GUI theme templates and the active theme id. It is runtime data and is ignored by Git, just like `config.json`. If it is missing, NetWatch Lite creates the built-in `NetWatch Default` theme automatically. Theme color tokens include page/surface/sidebar colors, status colors, category health colors, and dashboard action colors for `Auto Refresh: ON`, `Auto Refresh: OFF`, and `Run Full Check`.
 
 ## Device JSON Format
 
@@ -149,6 +158,7 @@ During local development, `Data/config.json` is treated as a private local file 
       "hostname": "web-server.local",
       "useHostnameForPing": true,
       "websiteUrl": "https://example.local/status",
+      "facility": "Miami Warehouse",
       "category": "Servers",
       "enabled": true,
       "checks": [
@@ -161,7 +171,7 @@ During local development, `Data/config.json` is treated as a private local file 
 }
 ```
 
-Use `category` to group devices in the UI. Use `enabled: false` to keep a device in the file without monitoring it. Use optional `websiteUrl` to show an `Open website` link in the dashboard; it must be an absolute `http://` or `https://` URL. Set `useHostnameForPing` on each device to choose whether that device's ping checks use `hostname` or `ip`. TCP checks continue to use `ip`.
+Use `facility` for the physical site, warehouse, branch, or datacenter where the device lives. The dashboard shows facilities as quick tabs so operators can focus or run one site at a time; missing values are normalized to `Unassigned`. Use `category` to group device types inside each facility. Use `enabled: false` to keep a device in the file without monitoring it. Use optional `websiteUrl` to show an `Open website` link in the dashboard; it must be an absolute `http://` or `https://` URL. Set `useHostnameForPing` on each device to choose whether that device's ping checks use `hostname` or `ip`. TCP checks continue to use `ip`.
 
 ## Companion Wallboard Project
 
@@ -181,9 +191,12 @@ That project renders operational monitoring pages in native WebView2 panels for 
 | `POST` | `/api/config` | Saves the full configuration, creates `config.backup.json`, and reloads memory. |
 | `GET` | `/api/config/export` | Downloads the current normalized configuration as JSON. |
 | `POST` | `/api/config/import` | Imports a `.json` config file, validates it, creates `config.backup.json`, saves it, and reloads memory. |
+| `GET` | `/api/themes` | Returns normalized theme templates from `themes.json`, creating the default theme when missing. |
+| `POST` | `/api/themes` | Saves theme templates after validation and normalization. |
+| `POST` | `/api/themes/reset` | Resets theme templates to the built-in default. |
 | `GET` | `/api/results` | Backwards-compatible endpoint that forces a full check. |
 | `POST` | `/api/monitor/run` | Forces a full check and prevents overlapping executions. |
-| `GET` | `/api/monitor/stream` | Streams a full check progressively with `started`, `result`, `completed`, `busy`, and `error` events. Supports optional `category`, `deviceName`, and `deviceIp` query filtering. |
+| `GET` | `/api/monitor/stream` | Streams a full check progressively with `started`, `result`, `completed`, `busy`, and `error` events. Supports optional `facility`, `category`, `deviceName`, and `deviceIp` query filtering. |
 
 ## Version Notes
 
@@ -235,11 +248,12 @@ publish/win-x64-portable/
 ```
 
 On first run, NetWatch Lite creates `config.json` beside `NetWatch-Lite.exe` if the file does not already exist.
+It also creates `themes.json` beside the executable if no theme file exists.
 
 Create a ZIP on macOS:
 
 ```bash
-ditto -c -k --sequesterRsrc --keepParent publish/win-x64-portable publish/NetWatch-Lite-win-x64-portable.zip
+ditto -c -k --sequesterRsrc --keepParent publish/win-x64-portable publish/NetWatch-Lite-win-x64-portable-2026-06-17-facilities-themes.zip
 ```
 
 To run on Windows:
@@ -253,12 +267,13 @@ Edit `config.json` in the same folder as `NetWatch-Lite.exe`, or use the `/confi
 ## Operational Notes
 
 - `Run Full Check` executes all configured checks immediately.
+- Facility tabs focus the dashboard on one site. `Run Facility` executes checks only for the selected facility.
 - `Run Group` executes checks only for the selected category.
 - `Run Failed` appears only when the current dashboard has `Degraded` or `Down` devices and retries only those devices.
 - `Run` appears beside the timestamp only for devices in `Degraded` or `Down` state; it executes only that device and replaces its latest dashboard result.
 - The dashboard starts empty in manual mode; results appear after `Run Full Check` or after enabling `Auto Refresh`.
 - Full checks stream results progressively, so devices appear as they finish instead of waiting for the whole execution.
-- When a full check finishes, category groups collapse and show a green bar when every device is healthy or a red bar when attention is needed.
+- When a full check finishes, facilities show their nested category groups. Category groups collapse and show a green bar when every device is healthy or a red bar when attention is needed.
 - The monitoring progress bar is visible only while a full check is running.
 - NetWatch Lite starts in manual mode by default.
 - `Auto Refresh` runs a full check immediately after the operator turns it on, then repeats every `settings.intervalSeconds`.

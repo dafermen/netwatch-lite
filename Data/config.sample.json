@@ -12,6 +12,7 @@
       "ip": "127.0.0.1",
       "hostname": "localhost",
       "useHostnameForPing": false,
+      "facility": "Local",
       "category": "Getting Started",
       "enabled": true,
       "checks": [

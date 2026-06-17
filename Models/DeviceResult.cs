@@ -31,6 +31,11 @@ public sealed class DeviceResult
     public required string PingTarget { get; init; }
 
     /// <summary>
+    /// Device facility copied from configuration and used for dashboard scoping.
+    /// </summary>
+    public required string Facility { get; init; }
+
+    /// <summary>
     /// Device category copied from configuration and used for grouped dashboard rendering.
     /// </summary>
     public required string Category { get; init; }

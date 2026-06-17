@@ -31,6 +31,8 @@ Ping / TCP checks
 
 Configuration is stored in runtime `config.json`. During development, `Data/config.json` is private and ignored by Git; `Data/config.sample.json` is the safe committed example. During portable publish, the sample is copied beside the executable as `config.sample.json`. When runtime `config.json` is missing, the repository creates a starter configuration with one enabled `Localhost` ping device.
 
+GUI theme templates are stored in runtime `themes.json`. The file is also ignored by Git and is created automatically with the built-in `NetWatch Default` theme when missing.
+
 ## Backend Entry Point
 
 ### Program.cs
@@ -42,6 +44,7 @@ Important responsibilities:
 - Registers JSON enum serialization so `DeviceStatus` is sent as `Healthy`, `Degraded`, or `Down`.
 - Registers singleton services:
   - `JsonDeviceRepository`
+  - `JsonThemeRepository`
   - `NetworkMonitorService`
   - `MonitorExecutionService`
 - Attempts to load `config.json` at startup.
@@ -62,6 +65,9 @@ Important endpoints:
 | `POST /api/config` | Validates, backs up, saves, and reloads the configuration. |
 | `GET /api/config/export` | Downloads the current normalized configuration as JSON. |
 | `POST /api/config/import` | Imports an uploaded `.json` file, validates it, backs up the current config, saves it, and reloads memory. |
+| `GET /api/themes` | Returns normalized theme templates from `themes.json`, creating the default file when missing. |
+| `POST /api/themes` | Validates, normalizes, and saves theme templates. |
+| `POST /api/themes/reset` | Replaces `themes.json` with the built-in default theme. |
 | `GET /api/results` | Backwards-compatible full-check endpoint. |
 | `POST /api/monitor/run` | Runs a full check and returns one final payload. |
 | `GET /api/monitor/stream` | Runs a full check, one category when `category` is supplied, one device when `deviceName` and `deviceIp` are supplied, or selected devices when `deviceIp` is supplied multiple times, and streams progressive events. |
@@ -114,6 +120,7 @@ One configured device:
 - `Hostname`: optional DNS name for ping.
 - `UseHostnameForPing`: per-device ping mode. When true, ping uses `hostname` when present; when false, ping uses `ip`.
 - `WebsiteUrl`: optional HTTP/HTTPS page opened from the dashboard.
+- `Facility`: physical site, warehouse, branch, or datacenter used for facility-first grouping and scoped runs.
 - `Category`: dashboard group.
 - `Enabled`: controls whether the device is checked.
 - `Checks`: ping/TCP check definitions.
@@ -139,7 +146,7 @@ Raw result for a single check:
 
 Aggregated result for one device:
 
-- Name/address/category values copied from `Device`.
+- Name/address/facility/category values copied from `Device`.
 - `IsOnline` from at least one successful check.
 - `WebsiteUrl` copied from `Device` for dashboard links.
 - `Status` computed as `Healthy`, `Degraded`, or `Down`.
@@ -187,6 +194,21 @@ Event types:
 - `busy`: tells the UI another run is already in progress.
 - `error`: reports a controlled backend stream failure while keeping the client response in SSE format.
 
+### ThemeConfiguration
+
+Root object of `themes.json`:
+
+- `ActiveThemeId`: id of the theme currently applied by the UI.
+- `Themes`: list of available `ThemeDefinition` templates.
+
+### ThemeDefinition
+
+One GUI theme template:
+
+- `Id`: stable unique theme id.
+- `Name`: display name.
+- `BuiltIn`: true for templates the UI cannot delete.
+- `Colors`: dictionary of supported color tokens, including layout colors, status colors, category health colors, `autoRefreshOn`, `autoRefreshOff`, and `runFullCheck`.
 
 ## Services
 
@@ -218,6 +240,28 @@ Failure behavior:
 - Missing required fields become clear validation errors.
 - Startup does not crash permanently; the app logs the issue and keeps `/config` available.
 - Save failures caused by file permissions, IO errors, or cancellation are returned as controlled API problems.
+
+### JsonThemeRepository
+
+Owns `themes.json` access.
+
+Key methods:
+
+- `GetConfigurationAsync`: reads and normalizes `themes.json`, creating the built-in default when missing.
+- `SaveAsync`: validates submitted theme templates, normalizes color tokens, and writes `themes.json`.
+- `ResetAsync`: replaces `themes.json` with the built-in default template.
+
+Important internal helpers:
+
+- `ResolveThemeFilePath`: finds `themes.json` beside the executable or in `Data/themes.json` during development.
+- `Normalize`: ensures the built-in default theme exists, removes invalid/duplicate templates, and fills missing color tokens.
+- `Validate`: requires unique theme ids, non-empty names, valid `activeThemeId`, and `#RRGGBB` colors for every supported token.
+
+Failure behavior:
+
+- Invalid JSON becomes `InvalidDataException`.
+- Missing or invalid color tokens are normalized on read and rejected on save.
+- File read/write problems are returned as controlled API errors from `Program.cs`.
 
 ### NetworkMonitorService
 
@@ -256,7 +300,7 @@ Key methods:
 
 - `RunFullCheckAsync`: waits for any existing execution and returns a final `MonitorResponse`.
 - `TryRunFullCheckAsync`: starts only if no run is active; otherwise returns null.
-- `TryStreamFullCheckAsync`: starts only if no run is active and writes `MonitorStreamEvent` objects as devices complete. Optional filters limit a run to one category, one device identified by name and IP, or multiple selected IPs.
+- `TryStreamFullCheckAsync`: starts only if no run is active and writes `MonitorStreamEvent` objects as devices complete. Optional filters limit a run to one facility, one category, one device identified by name and IP, or multiple selected IPs.
 
 Failure behavior:
 
@@ -283,7 +327,9 @@ Defines:
 - Topbar controls.
 - Dashboard page.
 - Configuration page.
+- Themes page.
 - Add/edit device modal.
+- Add/copy theme modal.
 - Delete confirmation modal.
 - Monitoring progress panel.
 
@@ -291,6 +337,7 @@ Routes:
 
 - `/`: dashboard.
 - `/config`: configuration CRUD page.
+- `/themes`: GUI theme template editor.
 - `/manual`: built-in user manual.
 - `/about`: project information and open-project notes.
 
@@ -303,6 +350,7 @@ Major areas:
 - Dashboard rendering.
 - Search and filters.
 - Configuration CRUD.
+- Theme loading, editing, activation, and CSS variable application.
 - Configuration settings editing for auto refresh interval, timeout, max parallel checks, retry behavior, and per-device ping target mode.
 - Form state.
 - Utility formatting and escaping.
@@ -310,13 +358,13 @@ Major areas:
 Important dashboard functions:
 
 - `loadResults`: starts a progressive full check.
-- `streamFullCheck`: opens `EventSource` to `/api/monitor/stream`, optionally scoped by category or one device.
-- `loadDashboardGroups`: loads configured categories for group-level dashboard runs.
+- `streamFullCheck`: opens `EventSource` to `/api/monitor/stream`, optionally scoped by facility, category, or one device.
+- `loadDashboardGroups`: loads configured facilities and categories for dashboard-scoped runs.
 - `resetStreamingDashboard`: clears previous results and initializes progress.
 - `renderStreamingResult`: adds one finished device and updates metrics.
 - `updateProgressPanel`: updates percentage, progress bar, and checked/total text.
 - `renderMonitorPayload`: renders final payload after completion.
-- `renderCategories`: renders grouped device tables and category health bars.
+- `renderFacilities` and `renderCategories`: render facility-first grouped device tables and category health bars.
 - `renderRow`: renders one device row.
 - `runDeviceCheck`: reruns only one problem device from the dashboard row and replaces that row's latest result.
 - `runFailedChecks`: reruns only the current `Degraded` and `Down` dashboard devices and merges the refreshed results back into the dashboard.
@@ -328,9 +376,9 @@ Important configuration functions:
 - `exportConfig`: downloads `/api/config/export` and triggers a browser JSON file download.
 - `importConfigFile`: validates selected file name/size, uploads it to `/api/config/import`, and refreshes UI state.
 - `applyConfigPayload`: syncs loaded settings and devices into the configuration UI.
-- `renderConfigDevices`: paints the grouped device table.
-- `filterConfigDevices`: filters configuration devices by name, address, or hostname while preserving original indexes.
-- `groupConfigDevicesByCategory`: groups devices by category while preserving their original JSON index.
+- `renderConfigDevices`: paints the facility/category grouped device table.
+- `filterConfigDevices`: filters configuration devices by name, address, hostname, facility, or category while preserving original indexes.
+- `groupConfigDevicesByFacility`: groups devices by facility and category while preserving their original JSON index.
 - `renderConfigDeviceRow`: renders one editable device row inside a category group.
 - `toggleConfigCategory`: expands or collapses all rows for one configuration category.
 - `startAddDevice`: opens the add device modal.
@@ -341,6 +389,17 @@ Important configuration functions:
 - `readCheckRows`: validates check rows.
 - `requestDeleteDevice`: opens confirmation modal.
 - `confirmDeleteDevice`: deletes device state and immediately persists the full configuration.
+
+Important theme functions:
+
+- `loadThemes`: reads `/api/themes` and applies the active theme.
+- `startNewTheme` and `startCopyTheme`: open the theme naming modal.
+- `submitThemeForm`: creates a new theme or copy after the modal form is submitted.
+- `renderThemeEditor`: syncs the selected theme into color inputs.
+- `syncThemeEditorToState`: writes color input changes back to the selected theme.
+- `applyThemeColors`: maps theme color tokens to CSS variables on `document.documentElement`.
+- `saveThemes`: posts theme templates to `/api/themes`.
+- `resetThemes`: posts to `/api/themes/reset`.
 
 Safety:
 
@@ -362,6 +421,8 @@ Defines:
 - Category sections.
 - Progress panel.
 - Configuration cards and form rows.
+- Facility tabs and facility/category grouped tables.
+- Theme color editor and preview.
 - Mobile stacking and horizontal table scrolling.
 
 ## Monitoring Flow
@@ -397,12 +458,30 @@ The dashboard updates:
 - Progress percentage.
 - Checked/total count.
 - Summary cards.
-- Category tables.
+- Facility and category tables.
 - Last execution text.
 
-After the `completed` event, the UI clears expanded category state so all dashboard groups collapse. Each category header shows the final category health as a compact bar: green when every device is `Healthy`, red when at least one device is `Down` or `Degraded`. The progress panel is hidden once the full run is complete.
+After the `completed` event, the UI clears expanded category state so all dashboard groups collapse. In the all-facilities view, results are grouped by facility first and category second, so duplicate device names in different sites remain visually distinct. Each category header shows the final category health as a compact bar: green when every device is `Healthy`, red when at least one device is `Down` or `Degraded`. The progress panel is hidden once the full run is complete.
 
-During a category-scoped run, previous dashboard results stay visible. If that scoped run fails, the category run state is cleared, the old results remain on screen, and the top status line reports the failure.
+During a facility-scoped or category-scoped run, previous dashboard results stay visible. If that scoped run fails, the scoped run state is cleared, the old results remain on screen, and the top status line reports the failure.
+
+### Theme Save Flow
+
+```text
+User creates, copies, edits, activates, or resets a theme from /themes
+  |
+  v
+app.js GET/POST /api/themes or POST /api/themes/reset
+  |
+  v
+JsonThemeRepository validates and normalizes color tokens
+  |
+  v
+themes.json is written
+  |
+  v
+CSS variables update the GUI colors
+```
 
 ### Configuration Save Flow
 

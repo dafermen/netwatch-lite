@@ -20,6 +20,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.Configure<NetworkMonitorOptions>(
     builder.Configuration.GetSection(NetworkMonitorOptions.SectionName));
 builder.Services.AddSingleton<JsonDeviceRepository>();
+builder.Services.AddSingleton<JsonThemeRepository>();
 builder.Services.AddSingleton<NetworkMonitorService>();
 builder.Services.AddSingleton<MonitorExecutionService>();
 
@@ -225,6 +226,78 @@ app.MapPost("/api/config/import", async (
     }
 });
 
+// Returns the editable UI theme templates and active theme selection.
+app.MapGet("/api/themes", async (
+    JsonThemeRepository themeRepository,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return Results.Ok(await themeRepository.GetConfigurationAsync(cancellationToken));
+    }
+    catch (Exception ex) when (IsConfigurationReadException(ex))
+    {
+        return Results.BadRequest(new
+        {
+            error = ex.Message
+        });
+    }
+});
+
+// Saves UI theme templates to themes.json.
+app.MapPost("/api/themes", async (
+    ThemeConfiguration configuration,
+    JsonThemeRepository themeRepository,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var saved = await themeRepository.SaveAsync(configuration, cancellationToken);
+
+        return Results.Ok(new
+        {
+            savedAt = DateTimeOffset.Now,
+            configuration = saved
+        });
+    }
+    catch (InvalidDataException ex)
+    {
+        return Results.BadRequest(new
+        {
+            error = ex.Message
+        });
+    }
+    catch (Exception ex) when (IsConfigurationWriteException(ex))
+    {
+        return Results.Problem(
+            title: "Unable to save themes.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
+// Resets UI theme templates to the built-in default.
+app.MapPost("/api/themes/reset", async (
+    JsonThemeRepository themeRepository,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return Results.Ok(new
+        {
+            resetAt = DateTimeOffset.Now,
+            configuration = await themeRepository.ResetAsync(cancellationToken)
+        });
+    }
+    catch (Exception ex) when (IsConfigurationWriteException(ex))
+    {
+        return Results.Problem(
+            title: "Unable to reset themes.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
 // Backwards-compatible endpoint that forces a fresh full check and returns the monitor payload.
 app.MapGet("/api/results", async (MonitorExecutionService executionService) =>
 {
@@ -310,6 +383,7 @@ app.MapGet("/api/monitor/stream", async (
 
     try
     {
+        var facilityName = context.Request.Query["facility"].FirstOrDefault();
         var categoryName = context.Request.Query["category"].FirstOrDefault();
         var deviceName = context.Request.Query["deviceName"].FirstOrDefault();
         var deviceIps = context.Request.Query["deviceIp"]
@@ -318,6 +392,7 @@ app.MapGet("/api/monitor/stream", async (
             .ToList();
         var started = await executionService.TryStreamFullCheckAsync(
             WriteEventAsync,
+            facilityName,
             categoryName,
             deviceName,
             deviceIps,

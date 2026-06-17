@@ -122,6 +122,7 @@ public sealed class NetworkMonitorService
             Hostname = device.Hostname,
             WebsiteUrl = device.WebsiteUrl,
             PingTarget = pingTarget,
+            Facility = device.Facility,
             Category = device.Category,
             IsOnline = hasAvailableCheck,
             Status = status,

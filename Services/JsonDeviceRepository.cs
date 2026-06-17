@@ -218,6 +218,7 @@ public sealed class JsonDeviceRepository
                     Ip = "127.0.0.1",
                     Hostname = "localhost",
                     UseHostnameForPing = false,
+                    Facility = "Local",
                     Category = "Getting Started",
                     Enabled = true,
                     Checks =
@@ -265,6 +266,7 @@ public sealed class JsonDeviceRepository
                 Hostname = NormalizeOptionalText(device.Hostname),
                 UseHostnameForPing = device.UseHostnameForPing ?? legacyUseHostnameForPing,
                 WebsiteUrl = NormalizeOptionalText(device.WebsiteUrl),
+                Facility = NormalizeFacility(device.Facility),
                 Category = NormalizeCategory(device.Category),
                 Enabled = device.Enabled,
                 Checks = (device.Checks ?? [])
@@ -467,6 +469,18 @@ public sealed class JsonDeviceRepository
         return string.IsNullOrWhiteSpace(category)
             ? "Uncategorized"
             : category.Trim();
+    }
+
+    /// <summary>
+    /// Converts missing or whitespace facility values into a stable fallback site name.
+    /// </summary>
+    /// <param name="facility">Facility value from JSON.</param>
+    /// <returns>A trimmed facility or Unassigned when no value was supplied.</returns>
+    private static string NormalizeFacility(string? facility)
+    {
+        return string.IsNullOrWhiteSpace(facility)
+            ? "Unassigned"
+            : facility.Trim();
     }
 
     /// <summary>

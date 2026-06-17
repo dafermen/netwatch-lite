@@ -54,6 +54,7 @@ public sealed class MonitorExecutionService
     /// Attempts to stream a full monitor execution, sending each device result as it completes.
     /// </summary>
     /// <param name="writeEventAsync">Callback used to send stream events to the client.</param>
+    /// <param name="facilityName">Optional facility name used to limit the execution to one site.</param>
     /// <param name="categoryName">Optional category name used to limit the execution to one group.</param>
     /// <param name="deviceName">Optional device name used to limit the execution to one device.</param>
     /// <param name="deviceIps">Optional device IP list used to limit the execution to selected devices.</param>
@@ -61,6 +62,7 @@ public sealed class MonitorExecutionService
     /// <returns>True when streaming started; false when another execution is already running.</returns>
     public async Task<bool> TryStreamFullCheckAsync(
         Func<MonitorStreamEvent, CancellationToken, Task> writeEventAsync,
+        string? facilityName = null,
         string? categoryName = null,
         string? deviceName = null,
         IReadOnlyCollection<string>? deviceIps = null,
@@ -74,7 +76,7 @@ public sealed class MonitorExecutionService
         try
         {
             var loadedConfiguration = await _deviceRepository.GetConfigurationAsync();
-            var configuration = FilterConfiguration(loadedConfiguration, categoryName, deviceName, deviceIps);
+            var configuration = FilterConfiguration(loadedConfiguration, facilityName, categoryName, deviceName, deviceIps);
             var settings = configuration.Settings;
             var totalDevices = configuration.Devices.Count(device => device.Enabled);
             var results = new List<DeviceResult>();
@@ -151,15 +153,17 @@ public sealed class MonitorExecutionService
     }
 
     /// <summary>
-    /// Creates a configuration snapshot limited to the requested category and/or device.
+    /// Creates a configuration snapshot limited to the requested facility, category, and/or device.
     /// </summary>
     /// <param name="configuration">Loaded monitor configuration.</param>
+    /// <param name="facilityName">Optional facility name to execute.</param>
     /// <param name="categoryName">Optional category name to execute.</param>
     /// <param name="deviceName">Optional device name to execute.</param>
     /// <param name="deviceIps">Optional device IP list used to limit the execution to selected devices.</param>
     /// <returns>The original configuration, or a category-filtered configuration snapshot.</returns>
     private static MonitorConfiguration FilterConfiguration(
         MonitorConfiguration configuration,
+        string? facilityName,
         string? categoryName,
         string? deviceName,
         IReadOnlyCollection<string>? deviceIps)
@@ -168,7 +172,8 @@ public sealed class MonitorExecutionService
             .Where(ip => !string.IsNullOrWhiteSpace(ip))
             .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
 
-        if (string.IsNullOrWhiteSpace(categoryName)
+        if (string.IsNullOrWhiteSpace(facilityName)
+            && string.IsNullOrWhiteSpace(categoryName)
             && string.IsNullOrWhiteSpace(deviceName)
             && requestedIps.Count == 0)
         {
@@ -176,6 +181,12 @@ public sealed class MonitorExecutionService
         }
 
         var devices = configuration.Devices.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(facilityName))
+        {
+            devices = devices.Where(device =>
+                string.Equals(device.Facility, facilityName, StringComparison.OrdinalIgnoreCase));
+        }
 
         if (!string.IsNullOrWhiteSpace(categoryName))
         {

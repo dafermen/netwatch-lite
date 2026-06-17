@@ -7,7 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="/netwatch-lite.svg">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
-  <link href="/styles.css" rel="stylesheet">
+  <link href="/styles.css?v=theme-modal-buttons-20260616" rel="stylesheet">
 </head>
 <body>
   <div class="app-shell">
@@ -24,6 +24,10 @@
         <a class="nav-link" href="/config" data-route="/config">
           <i class="fa-solid fa-sliders"></i>
           Configuration
+        </a>
+        <a class="nav-link" href="/themes" data-route="/themes">
+          <i class="fa-solid fa-palette"></i>
+          Themes
         </a>
         <a class="nav-link" href="/manual" data-route="/manual">
           <i class="fa-solid fa-book-open"></i>
@@ -134,6 +138,23 @@
                   </div>
                 </div>
               </div>
+            </div>
+          </section>
+
+          <section class="facility-strip mb-3" aria-label="Facility filters">
+            <div class="facility-strip-header">
+              <div>
+                <div class="text-secondary small text-uppercase fw-semibold">Facilities</div>
+                <div class="small text-secondary" id="active-facility-label">Showing all facilities</div>
+              </div>
+              <button class="btn btn-outline-primary btn-sm" type="button" id="run-facility-check" disabled>
+                <span class="spinner-border spinner-border-sm me-1 d-none" id="run-facility-check-spinner" aria-hidden="true"></span>
+                <i class="fa-solid fa-play me-1" id="run-facility-check-icon"></i>
+                Run Facility
+              </button>
+            </div>
+            <div class="facility-tabs" id="facility-tabs">
+              <button class="btn btn-dark btn-sm" type="button" data-facility-filter="">All Facilities</button>
             </div>
           </section>
 
@@ -304,6 +325,7 @@
                   <table class="table table-hover align-middle mb-0 config-devices-table">
                     <colgroup>
                       <col class="config-col-name">
+                      <col class="config-col-facility">
                       <col class="config-col-address">
                       <col class="config-col-hostname">
                       <col class="config-col-ping-mode">
@@ -313,6 +335,7 @@
                     <thead class="table-light">
                       <tr>
                         <th>Name</th>
+                        <th>Facility</th>
                         <th>Address</th>
                         <th>Hostname</th>
                         <th>Ping target</th>
@@ -322,7 +345,7 @@
                     </thead>
                     <tbody id="config-devices-body">
                       <tr>
-                        <td colspan="6" class="text-center text-secondary py-4">Loading configuration...</td>
+                        <td colspan="7" class="text-center text-secondary py-4">Loading configuration...</td>
                       </tr>
                     </tbody>
                   </table>
@@ -330,6 +353,107 @@
               </div>
             </div>
 
+          </div>
+        </section>
+
+        <section id="themes-page" data-page="/themes" hidden>
+          <div class="config-toolbar d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+            <div>
+              <h2 class="h4 mb-1">Themes</h2>
+              <p class="text-secondary mb-0">Create, edit, and activate color templates stored in themes.json.</p>
+            </div>
+            <div class="config-actions d-flex align-items-center gap-2">
+              <button class="btn btn-outline-primary btn-sm" type="button" id="new-theme">
+                <i class="fa-solid fa-plus me-1"></i>
+                New Theme
+              </button>
+              <button class="btn btn-outline-secondary btn-sm" type="button" id="copy-theme">
+                <i class="fa-solid fa-copy me-1"></i>
+                Copy Theme
+              </button>
+              <button class="btn btn-outline-danger btn-sm" type="button" id="reset-themes">
+                <i class="fa-solid fa-rotate-left me-1"></i>
+                Reset
+              </button>
+            </div>
+          </div>
+
+          <div id="theme-alert"></div>
+
+          <div class="row g-3">
+            <div class="col-12 col-xl-5">
+              <div class="card config-card h-100">
+                <div class="card-header config-settings-header">
+                  <span class="fw-semibold">Theme Templates</span>
+                  <button class="btn btn-success btn-sm" type="button" id="save-themes">
+                    <span class="spinner-border spinner-border-sm me-1 d-none" id="save-themes-spinner" aria-hidden="true"></span>
+                    <i class="fa-solid fa-floppy-disk me-1" id="save-themes-icon"></i>
+                    Save Themes
+                  </button>
+                </div>
+                <div class="card-body">
+                  <label class="form-label" for="theme-select">Theme</label>
+                  <select class="form-select mb-3" id="theme-select"></select>
+
+                  <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-primary btn-sm" type="button" id="activate-theme">
+                      <i class="fa-solid fa-circle-check me-1"></i>
+                      Set Active
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" type="button" id="delete-theme">
+                      <i class="fa-solid fa-trash me-1"></i>
+                      Delete Theme
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12 col-xl-7">
+              <div class="card config-card">
+                <div class="card-header">
+                  <span class="fw-semibold">Colors</span>
+                </div>
+                <div class="card-body">
+                  <div class="theme-color-grid">
+                    <label class="theme-color-field">App background<input type="color" data-theme-color="appBackground"></label>
+                    <label class="theme-color-field">Surface<input type="color" data-theme-color="surface"></label>
+                    <label class="theme-color-field">Sidebar background<input type="color" data-theme-color="sidebarBackground"></label>
+                    <label class="theme-color-field">Sidebar text<input type="color" data-theme-color="sidebarText"></label>
+                    <label class="theme-color-field">Primary<input type="color" data-theme-color="primary"></label>
+                    <label class="theme-color-field">Success<input type="color" data-theme-color="success"></label>
+                    <label class="theme-color-field">Warning<input type="color" data-theme-color="warning"></label>
+                    <label class="theme-color-field">Danger<input type="color" data-theme-color="danger"></label>
+                    <label class="theme-color-field">Text<input type="color" data-theme-color="text"></label>
+                    <label class="theme-color-field">Muted text<input type="color" data-theme-color="mutedText"></label>
+                    <label class="theme-color-field">Border<input type="color" data-theme-color="border"></label>
+                    <label class="theme-color-field">Healthy category<input type="color" data-theme-color="categoryHealthy"></label>
+                    <label class="theme-color-field">Problem category<input type="color" data-theme-color="categoryProblem"></label>
+                    <label class="theme-color-field">Running category<input type="color" data-theme-color="categoryRunning"></label>
+                    <label class="theme-color-field">Auto Refresh ON<input type="color" data-theme-color="autoRefreshOn"></label>
+                    <label class="theme-color-field">Auto Refresh OFF<input type="color" data-theme-color="autoRefreshOff"></label>
+                    <label class="theme-color-field">Run Full Check<input type="color" data-theme-color="runFullCheck"></label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="theme-preview mt-3" id="theme-preview">
+                <div class="theme-preview-sidebar">NetWatch</div>
+                <div class="theme-preview-main">
+                  <div class="theme-preview-card">Surface card</div>
+                  <div class="theme-preview-states">
+                    <span class="badge theme-preview-success">Healthy</span>
+                    <span class="badge theme-preview-warning">Degraded</span>
+                    <span class="badge theme-preview-danger">Down</span>
+                  </div>
+                  <div class="theme-preview-actions">
+                    <span class="btn btn-sm" style="background: var(--nw-auto-refresh-off); border-color: var(--nw-auto-refresh-off); color: #fff;">Auto Refresh: OFF</span>
+                    <span class="btn btn-sm" style="background: var(--nw-auto-refresh-on); border-color: var(--nw-auto-refresh-on); color: #fff;">Auto Refresh: ON</span>
+                    <span class="btn btn-sm" style="background: var(--nw-run-full-check); border-color: var(--nw-run-full-check); color: #111827;">Run Full Check</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -347,11 +471,12 @@
               <h3><i class="fa-solid fa-gauge-high me-2 text-primary"></i>Dashboard</h3>
               <p>The dashboard shows device health grouped by category. Each category starts collapsed so large inventories stay easy to scan.</p>
               <ul>
+                <li>Use facility buttons to focus one site, then run only that facility when hundreds of devices are configured.</li>
                 <li>Use <strong>Run Full Check</strong> to execute all configured ping and TCP checks immediately.</li>
                 <li>Use <strong>Run Failed</strong> when it appears to retry only devices currently marked as Degraded or Down.</li>
                 <li>Use <strong>Run</strong> beside a problem device's timestamp to repeat only that device when a failure may be temporary.</li>
                 <li>Use <strong>Auto Refresh</strong> to run a full check using the configured interval.</li>
-                <li>Use the search box to filter by name, IP, or hostname.</li>
+                <li>Use the search box to filter by name, IP, hostname, facility, or category.</li>
                 <li>Use status filters to show all devices, online devices, offline devices, or problems.</li>
               </ul>
             </section>
@@ -373,9 +498,10 @@
               <ul>
                 <li>Devices are grouped by category and collapsed by default.</li>
                 <li>Filter configured devices by name, address, or hostname.</li>
-                <li>Add or edit name, address, hostname, website URL, category, enabled state, and checks from a modal editor.</li>
+                <li>Add, copy, or edit name, facility, address, hostname, website URL, category, enabled state, and checks from a modal editor.</li>
                 <li>Set <strong>Auto refresh</strong> to control how often Auto Refresh runs a full check.</li>
                 <li>Use <strong>Ping this device by hostname</strong> when that device's IP changes but its DNS name stays stable.</li>
+                <li>Use <strong>Themes</strong> to create reusable color templates for the GUI.</li>
                 <li>Use <strong>Export JSON</strong> and <strong>Import JSON</strong> to back up or restore the full configuration.</li>
                 <li>Click <strong>Save Settings</strong> to persist settings and create <code>config.backup.json</code>.</li>
               </ul>
@@ -436,6 +562,25 @@
     </div>
   </div>
 
+  <div class="modal fade" id="theme-form-modal" tabindex="-1" aria-labelledby="theme-form-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <form class="modal-content" id="theme-form">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="theme-form-title">New Theme</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label" for="theme-name">Name</label>
+          <input class="form-control" type="text" id="theme-name" autocomplete="off" required>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" type="submit" id="submit-theme">Create Theme</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="modal fade" id="device-form-modal" tabindex="-1" aria-labelledby="device-form-title" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
       <form class="modal-content" id="device-form">
@@ -452,6 +597,10 @@
           <div class="mb-3">
             <label class="form-label" for="device-address">Address</label>
             <input class="form-control" type="text" id="device-address" autocomplete="off" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="device-facility">Facility</label>
+            <input class="form-control" type="text" id="device-facility" autocomplete="off" placeholder="Unassigned">
           </div>
           <div class="mb-3">
             <label class="form-label" for="device-hostname">Hostname</label>
@@ -509,6 +658,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="/app.js"></script>
+  <script src="/app.js?v=theme-modal-buttons-20260616"></script>
 </body>
 </html>

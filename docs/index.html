@@ -172,7 +172,7 @@
       <div class="grid">
         <div class="card">
           <h3>Backend</h3>
-          <p>ASP.NET Core minimal API en .NET 8. Expone endpoints para forzar ejecuciones, recargar JSON y consultar dispositivos.</p>
+          <p>ASP.NET Core minimal API en .NET 8. Expone endpoints para configuracion, temas, ejecuciones progresivas, recarga JSON y consultas de dispositivos.</p>
         </div>
         <div class="card">
           <h3>Monitor</h3>
@@ -180,11 +180,11 @@
         </div>
         <div class="card">
           <h3>UI</h3>
-          <p>HTML, Bootstrap 5, FontAwesome y JavaScript con fetch API. Incluye resumen, categorias, filtros, busqueda, controles de ejecucion y layout responsive para desktop, tablet y mobile.</p>
+          <p>HTML, Bootstrap 5, FontAwesome y JavaScript. Incluye resumen, facilities, categorias, filtros, busqueda, configuracion, temas, controles de ejecucion y layout responsive.</p>
         </div>
         <div class="card">
           <h3>Portable</h3>
-          <p>Se publica como <code>win-x64</code> self-contained. El archivo runtime <code>config.json</code> queda junto a <code>NetWatch-Lite.exe</code> para editar inventario sin recompilar y no debe versionarse.</p>
+          <p>Se publica como <code>win-x64</code> self-contained. Los archivos runtime <code>config.json</code> y <code>themes.json</code> quedan junto a <code>NetWatch-Lite.exe</code> y no deben versionarse.</p>
         </div>
         <div class="card">
           <h3>WebView2</h3>
@@ -217,13 +217,15 @@
         <li>El modo automatico ejecuta un full check segun <code>settings.intervalSeconds</code>.</li>
         <li><code>NetworkMonitorService.CheckAllDevicesAsync</code> revisa dispositivos habilitados en paralelo.</li>
         <li>Se calcula <span class="healthy">Healthy</span>, <span class="degraded">Degraded</span> o <span class="down">Down</span>.</li>
-        <li>El backend agrupa resultados por categoria y genera metricas del dashboard.</li>
+        <li>El backend devuelve resultados con facility/categoria y genera metricas del dashboard.</li>
+        <li>La UI agrupa primero por facility y luego por categoria, evitando ambiguedad cuando dos sedes usan nombres iguales.</li>
       </ol>
     </section>
 
     <section>
       <h2>Configuracion JSON</h2>
       <p>En desarrollo <code>Data/config.json</code> es local e ignorado por Git. El ejemplo seguro versionado vive en <code>Data/config.sample.json</code>. Al publicar portable se copia como <code>config.sample.json</code>; si el runtime <code>config.json</code> no existe, la aplicacion crea una configuracion inicial con un dispositivo <code>Localhost</code> para poder probar el monitor inmediatamente.</p>
+      <p>El archivo <code>themes.json</code> tambien es runtime e ignorado por Git. Guarda templates de color para el GUI y se crea automaticamente con el tema <code>NetWatch Default</code> si no existe.</p>
       <pre>{
   "settings": {
     "intervalSeconds": 15,
@@ -239,6 +241,7 @@
       "hostname": "web-server.local",
       "useHostnameForPing": true,
       "websiteUrl": "https://example.local/status",
+      "facility": "Miami Warehouse",
       "category": "Servers",
       "enabled": true,
       "checks": [
@@ -262,7 +265,8 @@
           <tr><td><code>useHostnameForPing</code></td><td>Preferencia por dispositivo. Cuando esta activo, el ping usa <code>hostname</code> si existe; cuando esta apagado usa <code>ip</code>.</td></tr>
           <tr><td><code>hostname</code></td><td>Nombre DNS opcional para ping en redes donde la IP puede cambiar.</td></tr>
           <tr><td><code>websiteUrl</code></td><td>URL HTTP/HTTPS opcional que muestra un link para abrir la pagina asociada desde el dashboard.</td></tr>
-          <tr><td><code>category</code></td><td>Grupo visual del dashboard.</td></tr>
+          <tr><td><code>facility</code></td><td>Sede, bodega, sucursal o datacenter. El dashboard permite filtrar y ejecutar checks por facility. Si falta, se normaliza como <code>Unassigned</code>.</td></tr>
+          <tr><td><code>category</code></td><td>Grupo visual dentro de cada facility.</td></tr>
           <tr><td><code>enabled</code></td><td>Permite conservar dispositivos sin monitorearlos.</td></tr>
           <tr><td><code>checks</code></td><td>Lista de checks. Soporta <code>ping</code> y <code>tcp</code>.</td></tr>
         </tbody>
@@ -303,9 +307,12 @@
           <tr><td><span class="tag post">POST</span></td><td><code>/api/config</code></td><td>Guarda la configuracion completa, crea <code>config.backup.json</code> y recarga memoria.</td><td>Configuracion guardada.</td></tr>
           <tr><td><span class="tag get">GET</span></td><td><code>/api/config/export</code></td><td>Descarga la configuracion normalizada como JSON.</td><td>Archivo JSON.</td></tr>
           <tr><td><span class="tag post">POST</span></td><td><code>/api/config/import</code></td><td>Importa un archivo <code>.json</code>, valida la configuracion, crea backup y recarga memoria.</td><td>Configuracion importada o error controlado.</td></tr>
+          <tr><td><span class="tag get">GET</span></td><td><code>/api/themes</code></td><td>Lee y normaliza <code>themes.json</code>; crea el tema por defecto si falta.</td><td><code>ThemeConfiguration</code>.</td></tr>
+          <tr><td><span class="tag post">POST</span></td><td><code>/api/themes</code></td><td>Guarda templates de tema despues de validar ids, nombres y colores.</td><td>Configuracion guardada.</td></tr>
+          <tr><td><span class="tag post">POST</span></td><td><code>/api/themes/reset</code></td><td>Restaura el tema integrado por defecto.</td><td>Configuracion de tema por defecto.</td></tr>
           <tr><td><span class="tag get">GET</span></td><td><code>/api/results</code></td><td>Compatibilidad. Fuerza ejecucion completa.</td><td><code>MonitorResponse</code>.</td></tr>
           <tr><td><span class="tag post">POST</span></td><td><code>/api/monitor/run</code></td><td>Fuerza full check sin permitir solapamiento.</td><td><code>MonitorResponse</code> o HTTP 409.</td></tr>
-          <tr><td><span class="tag get">GET</span></td><td><code>/api/monitor/stream</code></td><td>Ejecuta full check, una categoria con <code>category</code>, un dispositivo con <code>deviceName</code> y <code>deviceIp</code>, o varios dispositivos repitiendo <code>deviceIp</code>; envia resultados progresivos por Server-Sent Events.</td><td>Eventos <code>started</code>, <code>result</code>, <code>completed</code>, <code>busy</code> o <code>error</code>.</td></tr>
+          <tr><td><span class="tag get">GET</span></td><td><code>/api/monitor/stream</code></td><td>Ejecuta full check, una facility con <code>facility</code>, una categoria con <code>category</code>, un dispositivo con <code>deviceName</code> y <code>deviceIp</code>, o varios dispositivos repitiendo <code>deviceIp</code>; envia resultados progresivos por Server-Sent Events.</td><td>Eventos <code>started</code>, <code>result</code>, <code>completed</code>, <code>busy</code> o <code>error</code>.</td></tr>
         </tbody>
       </table>
     </section>
@@ -329,6 +336,8 @@
           <tr><td><code>CategoryResult.cs</code></td><td>Resultados agrupados por categoria.</td></tr>
           <tr><td><code>MonitorResponse.cs</code></td><td>Payload completo consumido por la UI.</td></tr>
           <tr><td><code>MonitorStreamEvent.cs</code></td><td>Evento incremental para pintar resultados mientras un full check sigue corriendo.</td></tr>
+          <tr><td><code>ThemeConfiguration.cs</code></td><td>Objeto raiz de <code>themes.json</code> con tema activo y templates disponibles.</td></tr>
+          <tr><td><code>ThemeDefinition.cs</code></td><td>Template de tema con id, nombre, bandera built-in y colores soportados.</td></tr>
         </tbody>
       </table>
 
@@ -342,6 +351,11 @@
             <td><code>JsonDeviceRepository</code></td>
             <td><code>ReloadAsync</code>, <code>GetConfigurationAsync</code>, <code>GetDevicesAsync</code></td>
             <td>Lee JSON desde disco y entrega configuracion normalizada.</td>
+          </tr>
+          <tr>
+            <td><code>JsonThemeRepository</code></td>
+            <td><code>GetConfigurationAsync</code>, <code>SaveAsync</code>, <code>ResetAsync</code></td>
+            <td>Lee, valida, normaliza y guarda templates de tema en <code>themes.json</code>.</td>
           </tr>
           <tr>
             <td><code>NetworkMonitorService</code></td>
@@ -359,17 +373,20 @@
 
     <section>
       <h2>Frontend</h2>
-      <p><code>wwwroot/index.html</code> define el layout compartido: sidebar hamburguesa, topbar, dashboard, pagina de configuracion, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto. Cuando hay problemas aparece <code>Run Failed</code> para repetir solo los dispositivos fallidos, y cada fila con problema muestra <code>Run</code> junto al timestamp para repetir solo ese dispositivo.</p>
-      <p>La pagina <code>/config</code> agrupa los dispositivos por categoria y mantiene los grupos colapsados por defecto para facilitar la edicion de inventarios grandes sin perder las acciones de editar o eliminar cada dispositivo. Las acciones de agregar, actualizar y eliminar dispositivos guardan inmediatamente en <code>config.json</code>, y el boton <code>Save Settings</code> dentro de Settings guarda ajustes generales como intervalo, timeout, reintentos, pausa entre reintentos y concurrencia maxima. <code>Export JSON</code> descarga la configuracion actual e <code>Import JSON</code> valida un archivo antes de reemplazar la configuracion.</p>
+      <p><code>wwwroot/index.html</code> define el layout compartido: sidebar hamburguesa, topbar, dashboard, pagina de configuracion, pagina de temas, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto. Cuando hay problemas aparece <code>Run Failed</code> para repetir solo los dispositivos fallidos, y cada fila con problema muestra <code>Run</code> junto al timestamp para repetir solo ese dispositivo.</p>
+      <p>El dashboard muestra botones de facility para enfocar una sede y habilitar <code>Run Facility</code>. En vista general, las tablas se agrupan por facility y luego por categoria, por lo que dos equipos con el mismo nombre en sedes distintas se ven como registros diferentes.</p>
+      <p>La pagina <code>/config</code> agrupa los dispositivos por facility y categoria, con grupos colapsados por defecto para facilitar la edicion de inventarios grandes. Las acciones de agregar, copiar, actualizar y eliminar dispositivos guardan inmediatamente en <code>config.json</code>, y el boton <code>Save Settings</code> dentro de Settings guarda ajustes generales como intervalo, timeout, reintentos, pausa entre reintentos y concurrencia maxima. <code>Export JSON</code> descarga la configuracion actual e <code>Import JSON</code> valida un archivo antes de reemplazar la configuracion.</p>
+      <p>La pagina <code>/themes</code> permite crear, copiar, activar, borrar, resetear y guardar templates de color en <code>themes.json</code>. El nombre de un tema nuevo o copiado se captura en modal, y los colores editables incluyen el sidebar, superficies, estados, categorias, <code>Auto Refresh ON</code>, <code>Auto Refresh OFF</code> y <code>Run Full Check</code>.</p>
       <p>El sidebar tambien incluye <code>/manual</code> con un manual de usuario integrado y <code>/about</code> con informacion del proyecto, su caracter libre y notas operativas.</p>
       <p><code>wwwroot/app.js</code> contiene funciones JSDoc para:</p>
       <ul>
         <li>Consumir <code>/api/monitor/stream</code> para pintar resultados conforme termina cada dispositivo.</li>
-        <li>Renderizar metricas, categorias, filas, badges de estado, puertos y links opcionales de <code>websiteUrl</code>.</li>
+        <li>Renderizar metricas, facilities, categorias, filas, badges de estado, puertos y links opcionales de <code>websiteUrl</code>.</li>
         <li>Contraer y expandir grupos de categorias para navegar inventarios grandes; al completar un full check, los grupos se contraen y quedan en verde o rojo segun la salud final.</li>
         <li>Manejar modo manual por defecto, auto refresh ON/OFF y Run Full Check.</li>
         <li>Administrar dispositivos y checks desde la ruta <code>/config</code>.</li>
-        <li>Filtrar por texto, online, offline y problemas.</li>
+        <li>Administrar templates de color desde la ruta <code>/themes</code>.</li>
+        <li>Filtrar por texto, facility, categoria, online, offline y problemas.</li>
       </ul>
     </section>
 
@@ -389,7 +406,10 @@ dotnet run</pre>
           <tr><th>Version</th><th>Resumen</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>Unreleased</code></td><td>Modo manual por defecto; auto refresh usa el intervalo configurable de <code>settings.intervalSeconds</code>; render progresivo por dispositivo; categorias colapsadas por defecto; editor de dispositivo en modal; import/export de JSON; ping opcional por hostname por dispositivo.</td></tr>
+          <tr><td><code>v0.5.0</code></td><td>Facilities, agrupacion facility/categoria, Run Facility, copia de dispositivos, temas editables en <code>themes.json</code> y colores para botones del dashboard.</td></tr>
+          <tr><td><code>v0.4.1</code></td><td>Reintentos configurables, Run Failed, feedback por dispositivo y protecciones para config runtime.</td></tr>
+          <tr><td><code>v0.4.0</code></td><td>Estados Healthy/Degraded/Down, links web, manual/about integrados, icono y portable actualizado.</td></tr>
+          <tr><td><code>v0.3.0</code></td><td>Modo manual por defecto; auto refresh usa el intervalo configurable de <code>settings.intervalSeconds</code>; render progresivo por dispositivo; editor en modal; import/export de JSON; ping por hostname por dispositivo.</td></tr>
           <tr><td><code>v0.2.0</code></td><td>Grupos de categorias colapsables.</td></tr>
           <tr><td><code>v0.1.0</code></td><td>Version inicial con dashboard, checks, metricas, filtros, controles y portable.</td></tr>
         </tbody>
@@ -408,11 +428,12 @@ dotnet run</pre>
 ├── wwwroot/
 └── runtime dependencies...</pre>
       <p>Crear ZIP en macOS:</p>
-      <pre>ditto -c -k --sequesterRsrc --keepParent publish/win-x64-portable publish/NetWatch-Lite-win-x64-portable.zip</pre>
+      <pre>ditto -c -k --sequesterRsrc --keepParent publish/win-x64-portable publish/NetWatch-Lite-win-x64-portable-2026-06-17-facilities-themes.zip</pre>
       <p>Uso en Windows:</p>
       <ol>
         <li>Descomprimir el ZIP.</li>
         <li>Editar <code>config.json</code> en la misma carpeta de <code>NetWatch-Lite.exe</code> o usar la pagina <code>/config</code>; si no existe, la aplicacion lo crea al iniciar.</li>
+        <li>Editar temas desde <code>/themes</code>; si <code>themes.json</code> no existe, la aplicacion lo crea al iniciar.</li>
         <li>Ejecutar <code>NetWatch-Lite.exe</code>.</li>
         <li>Abrir la URL que muestra la consola.</li>
       </ol>
@@ -422,9 +443,12 @@ dotnet run</pre>
       <h2>Notas Operativas</h2>
       <ul>
         <li>El archivo <code>config.json</code> puede recargarse desde el boton Reload JSON en Configuracion o administrarse desde <code>/config</code>.</li>
+        <li>El archivo <code>themes.json</code> se administra desde <code>/themes</code> y guarda el tema activo y los templates de color.</li>
         <li>Si <code>config.json</code> no existe, se crea automaticamente con un check de ping a <code>127.0.0.1</code>.</li>
+        <li>Si <code>themes.json</code> no existe, se crea automaticamente con <code>NetWatch Default</code>.</li>
         <li>Import JSON rechaza archivos vacios, archivos que no terminan en <code>.json</code>, archivos mayores de 5 MB, JSON invalido y configuraciones que no pasen validacion.</li>
         <li>La aplicacion inicia en modo manual; el auto refresh solo empieza cuando el operador activa el boton y repite el full check segun <code>settings.intervalSeconds</code>.</li>
+        <li>Los botones de facility permiten enfocar y ejecutar una sede especifica cuando existen cientos de dispositivos.</li>
         <li>Los grupos de categorias se contraen al finalizar un recorrido y muestran una barra verde si todo esta sano o roja si hay problemas.</li>
         <li>La barra de progreso del monitoreo se muestra solo mientras corre un full check.</li>
         <li>En pantallas pequenas, los controles se apilan y las tablas anchas usan scroll horizontal para conservar legibilidad.</li>

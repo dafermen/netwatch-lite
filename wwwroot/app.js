@@ -7,6 +7,7 @@ const currentPageLabel = document.querySelector("#current-page-label");
 
 const dashboardPage = document.querySelector("#dashboard-page");
 const configPage = document.querySelector("#config-page");
+const themesPage = document.querySelector("#themes-page");
 const manualPage = document.querySelector("#manual-page");
 const aboutPage = document.querySelector("#about-page");
 const resultsBody = document.querySelector("#results-body");
@@ -17,6 +18,11 @@ const autoRefreshLabel = document.querySelector("#auto-refresh-label");
 const runFullCheckButton = document.querySelector("#run-full-check");
 const runFullCheckSpinner = document.querySelector("#run-full-check-spinner");
 const runFullCheckIcon = document.querySelector("#run-full-check-icon");
+const facilityTabs = document.querySelector("#facility-tabs");
+const activeFacilityLabel = document.querySelector("#active-facility-label");
+const runFacilityCheckButton = document.querySelector("#run-facility-check");
+const runFacilityCheckSpinner = document.querySelector("#run-facility-check-spinner");
+const runFacilityCheckIcon = document.querySelector("#run-facility-check-icon");
 const groupCheckSelect = document.querySelector("#group-check-select");
 const runGroupCheckButton = document.querySelector("#run-group-check");
 const runGroupCheckSpinner = document.querySelector("#run-group-check-spinner");
@@ -63,6 +69,7 @@ const deviceFormTitle = document.querySelector("#device-form-title");
 const editingDeviceIndex = document.querySelector("#editing-device-index");
 const deviceNameInput = document.querySelector("#device-name");
 const deviceAddressInput = document.querySelector("#device-address");
+const deviceFacilityInput = document.querySelector("#device-facility");
 const deviceHostnameInput = document.querySelector("#device-hostname");
 const deviceUseHostnameForPingInput = document.querySelector("#device-use-hostname-for-ping");
 const deviceWebsiteUrlInput = document.querySelector("#device-website-url");
@@ -78,6 +85,26 @@ const deleteDeviceModal = typeof bootstrap !== "undefined" && deleteDeviceModalE
   : null;
 const deleteDeviceName = document.querySelector("#delete-device-name");
 const confirmDeleteDeviceButton = document.querySelector("#confirm-delete-device");
+const themeAlert = document.querySelector("#theme-alert");
+const themeSelect = document.querySelector("#theme-select");
+const themeNameInput = document.querySelector("#theme-name");
+const themeFormModalElement = document.querySelector("#theme-form-modal");
+const themeFormModal = typeof bootstrap !== "undefined" && themeFormModalElement
+  ? new bootstrap.Modal(themeFormModalElement)
+  : null;
+const themeForm = document.querySelector("#theme-form");
+const themeFormTitle = document.querySelector("#theme-form-title");
+const submitThemeButton = document.querySelector("#submit-theme");
+const themeColorInputs = document.querySelectorAll("[data-theme-color]");
+const newThemeButton = document.querySelector("#new-theme");
+const copyThemeButton = document.querySelector("#copy-theme");
+const resetThemesButton = document.querySelector("#reset-themes");
+const saveThemesButton = document.querySelector("#save-themes");
+const saveThemesSpinner = document.querySelector("#save-themes-spinner");
+const saveThemesIcon = document.querySelector("#save-themes-icon");
+const activateThemeButton = document.querySelector("#activate-theme");
+const deleteThemeButton = document.querySelector("#delete-theme");
+const themePreview = document.querySelector("#theme-preview");
 
 let refreshTimer;
 let activeMonitorStream;
@@ -85,8 +112,10 @@ let latestResults = [];
 let latestCategories = [];
 let activeFilter = "all";
 let activeSearch = "";
+let activeFacility = "";
 let autoRefreshEnabled = false;
 let hasCompletedFullCheck = false;
+let activeRunFacility = "";
 let activeRunCategory = "";
 let activeRunDeviceName = "";
 let activeRunDeviceIp = "";
@@ -96,26 +125,50 @@ let activeRunPreservesDashboard = false;
 let currentRoute = normalizeRoute(location.pathname);
 let hasLoadedDashboardGroups = false;
 let hasLoadedConfig = false;
+let hasLoadedThemes = false;
 let activeConfigSearch = "";
 const defaultAutoFullCheckIntervalSeconds = 60;
 const maxConfigImportBytes = 5 * 1024 * 1024;
 let configState = createEmptyConfiguration();
+let themeState = createDefaultThemeState();
+let editingThemeId = "default";
+let pendingThemeAction = "new";
+let pendingThemeSourceId = "";
 let pendingDeleteIndex = null;
 const expandedCategoryNames = new Set();
 const mobileSidebarQuery = window.matchMedia("(max-width: 991.98px)");
+const themeCssVariables = {
+  appBackground: "--nw-app-bg",
+  surface: "--nw-surface",
+  sidebarBackground: "--nw-sidebar-bg",
+  sidebarText: "--nw-sidebar-text",
+  primary: "--nw-primary",
+  success: "--nw-success",
+  warning: "--nw-warning",
+  danger: "--nw-danger",
+  text: "--nw-text",
+  mutedText: "--nw-muted-text",
+  border: "--nw-border",
+  categoryHealthy: "--nw-category-healthy",
+  categoryProblem: "--nw-category-problem",
+  categoryRunning: "--nw-category-running",
+  autoRefreshOn: "--nw-auto-refresh-on",
+  autoRefreshOff: "--nw-auto-refresh-off",
+  runFullCheck: "--nw-run-full-check"
+};
 
-function loadResults({ showErrors = true, category = "", device = null, devices = [] } = {}) {
-  return streamFullCheck({ showErrors, category, device, devices });
+function loadResults({ showErrors = true, facility = "", category = "", device = null, devices = [] } = {}) {
+  return streamFullCheck({ showErrors, facility, category, device, devices });
 }
 
 /**
  * Opens the Server-Sent Events monitoring stream and routes each event to the
  * dashboard renderer. This keeps large inventories responsive because each
  * device result is shown as soon as the backend finishes it.
- * @param {{ showErrors?: boolean, category?: string, device?: object | null, devices?: Array<object> }} options Controls whether stream errors are displayed and optional execution scope.
+ * @param {{ showErrors?: boolean, facility?: string, category?: string, device?: object | null, devices?: Array<object> }} options Controls whether stream errors are displayed and optional execution scope.
  * @returns {Promise<void>} Resolves when the stream completes, reports busy, or fails.
  */
-function streamFullCheck({ showErrors = true, category = "", device = null, devices = [] } = {}) {
+function streamFullCheck({ showErrors = true, facility = "", category = "", device = null, devices = [] } = {}) {
   if (activeMonitorStream) {
     lastCheck.textContent = "A monitoring execution is already running.";
     return Promise.resolve();
@@ -124,6 +177,10 @@ function streamFullCheck({ showErrors = true, category = "", device = null, devi
   return new Promise(resolve => {
     let settled = false;
     const streamParams = new URLSearchParams();
+
+    if (facility) {
+      streamParams.set("facility", facility);
+    }
 
     if (category) {
       streamParams.set("category", category);
@@ -151,13 +208,14 @@ function streamFullCheck({ showErrors = true, category = "", device = null, devi
 
     source.addEventListener("started", event => {
       const payload = JSON.parse(event.data);
+      activeRunFacility = facility;
       activeRunCategory = category;
       activeRunDeviceName = device?.name || "";
       activeRunDeviceIp = device?.ip || "";
       activeRunFailedIps = new Set(devices.map(scopedDevice => scopedDevice.ip).filter(Boolean));
-      activeRunKeepsDashboardStable = Boolean((category || device || devices.length > 0) && latestResults.length > 0);
-      activeRunPreservesDashboard = Boolean(!category && !device && devices.length === 0 && autoRefreshEnabled && latestResults.length > 0);
-      resetStreamingDashboard(payload, getExecutionScopeLabel(category, device, devices));
+      activeRunKeepsDashboardStable = Boolean((facility || category || device || devices.length > 0) && latestResults.length > 0);
+      activeRunPreservesDashboard = Boolean(!facility && !category && !device && devices.length === 0 && autoRefreshEnabled && latestResults.length > 0);
+      resetStreamingDashboard(payload, getExecutionScopeLabel(facility, category, device, devices));
     });
 
     source.addEventListener("result", event => {
@@ -182,14 +240,15 @@ function streamFullCheck({ showErrors = true, category = "", device = null, devi
         renderScopedDevicesPayload(completedPayload, devices);
       } else if (device) {
         renderScopedDevicePayload(completedPayload, device);
-      } else if (category) {
-        renderScopedMonitorPayload(completedPayload, category);
+      } else if (facility || category) {
+        renderScopedMonitorPayload(completedPayload, { facility, category });
       } else {
         hasCompletedFullCheck = true;
         expandedCategoryNames.clear();
         renderMonitorPayload(completedPayload);
       }
 
+      activeRunFacility = "";
       activeRunCategory = "";
       activeRunDeviceName = "";
       activeRunDeviceIp = "";
@@ -203,6 +262,7 @@ function streamFullCheck({ showErrors = true, category = "", device = null, devi
     source.addEventListener("busy", event => {
       const payload = JSON.parse(event.data);
       closeMonitorStream();
+      activeRunFacility = "";
       activeRunCategory = "";
       activeRunDeviceName = "";
       activeRunDeviceIp = "";
@@ -222,7 +282,7 @@ function streamFullCheck({ showErrors = true, category = "", device = null, devi
       const payload = JSON.parse(event.data);
       handleMonitorStreamFailure(
         payload.message || "Unable to stream monitoring results.",
-        getExecutionScopeLabel(category, device, devices),
+        getExecutionScopeLabel(facility, category, device, devices),
         showErrors);
       settled = true;
       resolve();
@@ -233,7 +293,7 @@ function streamFullCheck({ showErrors = true, category = "", device = null, devi
         return;
       }
 
-      handleMonitorStreamFailure("Unable to stream monitoring results.", getExecutionScopeLabel(category, device, devices), showErrors);
+      handleMonitorStreamFailure("Unable to stream monitoring results.", getExecutionScopeLabel(facility, category, device, devices), showErrors);
 
       console.error(error);
       settled = true;
@@ -248,6 +308,7 @@ function handleMonitorStreamFailure(message, scopeLabel, showErrors) {
     || Boolean(scopeLabel && latestResults.length > 0);
 
   closeMonitorStream();
+  activeRunFacility = "";
   activeRunCategory = "";
   activeRunDeviceName = "";
   activeRunDeviceIp = "";
@@ -280,7 +341,8 @@ function renderMonitorPayload(payload) {
   latestResults = payload.results ?? [];
   latestCategories = payload.categories ?? groupResultsByCategory(payload.results ?? []);
   hasCompletedFullCheck = payload.executionStatus === "Completed" || hasCompletedFullCheck;
-  renderSummary(payload.summary ?? createSummaryFromCategories(latestCategories));
+  renderFacilityTabs();
+  renderSummary(createSummaryFromResults(getVisibleResults()));
   renderFilteredCategories();
   updateRunFailedButton();
   scheduleRefresh();
@@ -289,21 +351,34 @@ function renderMonitorPayload(payload) {
   updateProgressPanel(payload.results?.length ?? 0, payload.results?.length ?? 0, "Completed", false);
 }
 
-function renderScopedMonitorPayload(payload, category) {
+function renderScopedMonitorPayload(payload, { facility = "", category = "" } = {}) {
   const scopedResults = payload.results ?? [];
+  const scopedFacility = facility.toLowerCase();
   const scopedCategory = category.toLowerCase();
-  const remainingResults = latestResults.filter(result =>
-    String(result.category ?? "Uncategorized").toLowerCase() !== scopedCategory);
+  const remainingResults = latestResults.filter(result => {
+    const matchesFacility = scopedFacility
+      && String(result.facility ?? "Unassigned").toLowerCase() === scopedFacility;
+    const matchesCategory = scopedCategory
+      && String(result.category ?? "Uncategorized").toLowerCase() === scopedCategory;
+
+    if (scopedFacility && scopedCategory) {
+      return !(matchesFacility && matchesCategory);
+    }
+
+    return scopedFacility ? !matchesFacility : !matchesCategory;
+  });
 
   latestResults = [...remainingResults, ...scopedResults];
   latestCategories = groupResultsByCategory(latestResults);
   hasCompletedFullCheck = true;
+  activeRunFacility = "";
   activeRunCategory = "";
-  renderSummary(createSummaryFromCategories(latestCategories));
+  renderFacilityTabs();
+  renderSummary(createSummaryFromResults(getVisibleResults()));
   renderFilteredCategories();
   updateRunFailedButton();
   executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
-  lastCheck.textContent = `Last ${category} execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
+  lastCheck.textContent = `Last ${facility || category} execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
   updateProgressPanel(scopedResults.length, scopedResults.length, "Completed", false);
   activeRunKeepsDashboardStable = false;
 }
@@ -317,11 +392,12 @@ function renderScopedDevicesPayload(payload, requestedDevices) {
 
   latestCategories = groupResultsByCategory(latestResults);
   hasCompletedFullCheck = true;
+  renderFacilityTabs();
   activeRunCategory = "";
   activeRunDeviceName = "";
   activeRunDeviceIp = "";
   activeRunFailedIps = new Set();
-  renderSummary(createSummaryFromCategories(latestCategories));
+  renderSummary(createSummaryFromResults(getVisibleResults()));
   renderFilteredCategories();
   updateRunFailedButton();
   executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
@@ -342,10 +418,11 @@ function renderScopedDevicePayload(payload, requestedDevice) {
 
   latestCategories = groupResultsByCategory(latestResults);
   hasCompletedFullCheck = true;
+  renderFacilityTabs();
   activeRunCategory = "";
   activeRunDeviceName = "";
   activeRunDeviceIp = "";
-  renderSummary(createSummaryFromCategories(latestCategories));
+  renderSummary(createSummaryFromResults(getVisibleResults()));
   renderFilteredCategories();
   executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
   lastCheck.textContent = result
@@ -372,7 +449,7 @@ function resetStreamingDashboard(payload, scopeLabel = "") {
   }
 
   renderSummary((scopedRun && latestResults.length > 0) || activeRunPreservesDashboard
-    ? createSummaryFromCategories(latestCategories)
+    ? createSummaryFromResults(getVisibleResults())
     : payload.summary ?? createProgressSummary([], payload.totalDevices ?? 0));
   if (activeRunKeepsDashboardStable) {
     monitorProgress.hidden = true;
@@ -405,8 +482,9 @@ function renderStreamingResult(payload) {
   }
 
   latestCategories = groupResultsByCategory(latestResults);
-  renderSummary(activeRunCategory || activeRunDeviceName || activeRunFailedIps.size > 0 || activeRunPreservesDashboard
-    ? createSummaryFromCategories(latestCategories)
+  renderFacilityTabs();
+  renderSummary(activeRunFacility || activeRunCategory || activeRunDeviceName || activeRunFailedIps.size > 0 || activeRunPreservesDashboard
+    ? createSummaryFromResults(getVisibleResults())
     : payload.summary ?? createProgressSummary(latestResults, payload.totalDevices ?? latestResults.length));
   if (activeRunKeepsDashboardStable) {
     monitorProgress.hidden = true;
@@ -418,6 +496,8 @@ function renderStreamingResult(payload) {
         ? "Checking failed devices..."
         : activeRunDeviceName
         ? `Checking ${activeRunDeviceName}...`
+        : activeRunFacility
+        ? `Checking ${activeRunFacility} devices...`
         : activeRunCategory ? `Checking ${activeRunCategory} devices...` : "Checking devices...",
       true);
   }
@@ -427,6 +507,8 @@ function renderStreamingResult(payload) {
     ? `Checking failed devices ${payload.completedDevices}/${payload.totalDevices}...`
     : activeRunDeviceName
     ? `Checking ${activeRunDeviceName} ${payload.completedDevices}/${payload.totalDevices}...`
+    : activeRunFacility
+    ? `Checking ${activeRunFacility} devices ${payload.completedDevices}/${payload.totalDevices}...`
     : activeRunCategory
     ? `Checking ${activeRunCategory} devices ${payload.completedDevices}/${payload.totalDevices}...`
     : `Checking devices ${payload.completedDevices}/${payload.totalDevices}...`;
@@ -437,8 +519,8 @@ function renderStreamingResult(payload) {
  * @param {object} result Completed device result received from the backend stream.
  */
 function upsertLatestResult(result) {
-  const resultIndex = latestResults.findIndex(device =>
-    device.name === result.name && device.ip === result.ip);
+  const resultKey = createDeviceKey(result);
+  const resultIndex = latestResults.findIndex(device => createDeviceKey(device) === resultKey);
 
   if (resultIndex >= 0) {
     latestResults[resultIndex] = result;
@@ -449,7 +531,7 @@ function upsertLatestResult(result) {
 }
 
 function getProblemDevices() {
-  return latestResults.filter(result =>
+  return getVisibleResults().filter(result =>
     result.status === "Degraded" || result.status === "Down");
 }
 
@@ -505,6 +587,10 @@ function createSummaryFromCategories(categories) {
   return createProgressSummary(devices, devices.length);
 }
 
+function createSummaryFromResults(results) {
+  return createProgressSummary(results, results.length);
+}
+
 function createProgressSummary(devices, totalDevices = devices.length) {
   const expectedTotal = Number(totalDevices) || devices.length;
   const healthyDevices = devices.filter(device => device.status === "Healthy").length;
@@ -526,7 +612,26 @@ function createProgressSummary(devices, totalDevices = devices.length) {
 }
 
 function renderFilteredCategories() {
-  renderCategories(filterCategories(latestCategories));
+  renderSummary(createSummaryFromResults(getVisibleResults()));
+  renderFacilityTabs();
+  const visibleResults = getVisibleResults();
+
+  if (activeFacility) {
+    renderCategories(filterCategories(groupResultsByCategory(visibleResults)), activeFacility);
+    return;
+  }
+
+  renderFacilities(groupResultsByFacility(visibleResults));
+}
+
+function getVisibleResults() {
+  if (!activeFacility) {
+    return latestResults;
+  }
+
+  const selectedFacility = activeFacility.toLowerCase();
+  return latestResults.filter(result =>
+    String(result.facility ?? "Unassigned").toLowerCase() === selectedFacility);
 }
 
 function filterCategories(categories) {
@@ -557,7 +662,89 @@ function matchesSearch(device, search) {
   return String(device.name ?? "").toLowerCase().includes(search)
     || String(device.ip ?? "").toLowerCase().includes(search)
     || String(device.hostname ?? "").toLowerCase().includes(search)
+    || String(device.facility ?? "").toLowerCase().includes(search)
+    || String(device.category ?? "").toLowerCase().includes(search)
     || String(device.websiteUrl ?? "").toLowerCase().includes(search);
+}
+
+function renderFacilityTabs() {
+  const facilitySource = latestResults.length > 0 ? latestResults : getConfiguredFacilityDevices();
+  const facilitySummaries = getFacilitySummaries(facilitySource);
+
+  if (!facilitySummaries.some(facility => facility.name === activeFacility)) {
+    activeFacility = "";
+  }
+
+  const hasActiveFacility = Boolean(activeFacility);
+  activeFacilityLabel.textContent = activeFacility
+    ? `Showing ${activeFacility}`
+    : "Showing all facilities";
+  runFacilityCheckButton.disabled = !activeFacility;
+  runFacilityCheckButton.title = activeFacility
+    ? `Run checks for ${activeFacility}`
+    : "Select a facility first";
+
+  facilityTabs.innerHTML = [
+    renderFacilityButton({
+      name: "",
+      label: "All Facilities",
+      totalDevices: facilitySource.length,
+      onlineDevices: facilitySource.filter(device => device.isOnline).length,
+      problemDevices: facilitySource.filter(device => device.status === "Degraded" || device.status === "Down").length
+    }, !hasActiveFacility),
+    ...facilitySummaries.map(facility => renderFacilityButton(facility, facility.name === activeFacility))
+  ].join("");
+}
+
+function getConfiguredFacilityDevices() {
+  return (configState.devices ?? [])
+    .filter(device => device.enabled !== false)
+    .map(device => ({
+      ...device,
+      facility: device.facility || "Unassigned",
+      isOnline: false,
+      status: "Pending"
+    }));
+}
+
+function getFacilitySummaries(results) {
+  const groups = new Map();
+
+  for (const result of results) {
+    const facilityName = result.facility || "Unassigned";
+
+    if (!groups.has(facilityName)) {
+      groups.set(facilityName, []);
+    }
+
+    groups.get(facilityName).push(result);
+  }
+
+  return Array.from(groups.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, devices]) => ({
+      name,
+      label: name,
+      totalDevices: devices.length,
+      onlineDevices: devices.filter(device => device.isOnline).length,
+      problemDevices: devices.filter(device => device.status === "Degraded" || device.status === "Down").length
+    }));
+}
+
+function renderFacilityButton(facility, isActive) {
+  const problemClass = facility.problemDevices > 0 ? "facility-tab-problem" : "facility-tab-healthy";
+  const activeClass = isActive ? "active" : "";
+  const value = facility.name || "";
+
+  return `
+    <button
+      class="facility-tab ${activeClass} ${problemClass}"
+      type="button"
+      data-facility-filter="${escapeHtml(value)}">
+      <span class="facility-tab-name">${escapeHtml(facility.label)}</span>
+      <span class="facility-tab-meta">${facility.totalDevices} devices</span>
+      <span class="facility-tab-status">${facility.onlineDevices} online / ${facility.problemDevices} issues</span>
+    </button>`;
 }
 
 function matchesFilter(device, filter) {
@@ -576,7 +763,55 @@ function matchesFilter(device, filter) {
   return true;
 }
 
-function renderCategories(categories) {
+function renderFacilities(facilities) {
+  const filteredFacilities = facilities
+    .map(facility => ({
+      ...facility,
+      categories: filterCategories(facility.categories)
+    }))
+    .filter(facility => facility.categories.length > 0);
+
+  if (filteredFacilities.length === 0) {
+    resultsBody.innerHTML = `
+      <div class="text-center text-secondary py-4">
+        No devices match the current filters.
+      </div>`;
+    return;
+  }
+
+  resultsBody.innerHTML = filteredFacilities.map(renderFacilitySection).join("");
+}
+
+function renderFacilitySection(facility, facilityIndex) {
+  const totalDevices = facility.categories.reduce((total, category) => total + (category.totalDevices ?? 0), 0);
+  const onlineDevices = facility.categories.reduce((total, category) => total + (category.onlineDevices ?? 0), 0);
+  const problemDevices = facility.categories
+    .flatMap(category => category.stateDevices ?? category.devices ?? [])
+    .filter(device => device.status === "Degraded" || device.status === "Down")
+    .length;
+
+  return `
+    <section class="facility-section mb-3">
+      <div class="facility-section-header">
+        <div>
+          <h2 class="h5 mb-0">${escapeHtml(facility.name)}</h2>
+          <span class="small text-secondary">${totalDevices} devices across ${facility.categories.length} categories</span>
+        </div>
+        <div class="facility-section-summary">
+          <span class="badge text-bg-${problemDevices > 0 ? "warning" : "success"}">
+            ${problemDevices > 0 ? `${problemDevices} issues` : "Healthy"}
+          </span>
+          <span class="text-secondary small">${onlineDevices} online / ${totalDevices - onlineDevices} offline</span>
+        </div>
+      </div>
+      <div class="facility-category-stack">
+        ${facility.categories.map((category, categoryIndex) =>
+          renderCategory(category, `${facilityIndex}-${categoryIndex}`, facility.name)).join("")}
+      </div>
+    </section>`;
+}
+
+function renderCategories(categories, facilityName = "") {
   if (categories.length === 0) {
     resultsBody.innerHTML = `
       <div class="text-center text-secondary py-4">
@@ -585,10 +820,10 @@ function renderCategories(categories) {
     return;
   }
 
-  resultsBody.innerHTML = categories.map(renderCategory).join("");
+  resultsBody.innerHTML = categories.map((category, index) => renderCategory(category, index, facilityName)).join("");
 }
 
-function renderCategory(category, index) {
+function renderCategory(category, index, facilityName = "") {
   const devices = category.devices ?? [];
   const totalDevices = category.totalDevices ?? devices.length;
   const onlineDevices = category.onlineDevices ?? devices.filter(device => device.isOnline).length;
@@ -599,8 +834,10 @@ function renderCategory(category, index) {
   const problemDevices = stateDevices.filter(device => device.status === "Degraded" || device.status === "Down").length;
   const categoryPercent = stateTotalDevices === 0 ? 100 : Math.round((healthyDevices / stateTotalDevices) * 100);
   const isHealthyCategory = stateTotalDevices > 0 && problemDevices === 0 && healthyDevices === stateTotalDevices;
+  const categoryFacility = facilityName || activeFacility || "";
   const isRunningCategory = activeRunCategory
-    && activeRunCategory.toLowerCase() === String(category.name ?? "").toLowerCase();
+    && activeRunCategory.toLowerCase() === String(category.name ?? "").toLowerCase()
+    && (!activeRunFacility || !categoryFacility || activeRunFacility.toLowerCase() === categoryFacility.toLowerCase());
   const stateClass = isRunningCategory
     ? "category-section-running"
     : hasCompletedFullCheck
@@ -616,8 +853,9 @@ function renderCategory(category, index) {
     : hasCompletedFullCheck
     ? isHealthyCategory ? "Healthy" : "Needs attention"
     : "Checking";
-  const categoryId = `category-${index}-${slugify(category.name)}`;
-  const isExpanded = expandedCategoryNames.has(category.name);
+  const categoryKey = createCategoryKey(categoryFacility, category.name);
+  const categoryId = `category-${index}-${slugify(categoryFacility)}-${slugify(category.name)}`;
+  const isExpanded = expandedCategoryNames.has(categoryKey);
   const expandedClass = isExpanded ? "category-section-expanded" : "";
 
   return `
@@ -646,7 +884,11 @@ function renderCategory(category, index) {
           <span class="category-counts">
             ${onlineDevices} online / ${offlineDevices} offline
           </span>
-          <button class="btn btn-sm btn-light category-run-button" type="button" data-run-category="${escapeHtml(category.name)}">
+          <button
+            class="btn btn-sm btn-light category-run-button"
+            type="button"
+            data-run-category="${escapeHtml(category.name)}"
+            data-run-facility="${escapeHtml(categoryFacility)}">
             <i class="fa-solid fa-play me-1"></i>Run
           </button>
         </div>
@@ -654,7 +896,7 @@ function renderCategory(category, index) {
       <div
         class="collapse ${isExpanded ? "show" : ""}"
         id="${categoryId}"
-        data-category-name="${escapeHtml(category.name)}">
+        data-category-key="${escapeHtml(categoryKey)}">
         <div class="table-responsive border rounded-bottom">
           <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
@@ -696,6 +938,7 @@ function renderRow(result) {
     <tr>
       <td class="fw-semibold">
         <div>${escapeHtml(result.name)}</div>
+        ${!activeFacility ? `<div class="text-secondary small">${escapeHtml(result.facility || "Unassigned")} · ${escapeHtml(result.category || "Uncategorized")}</div>` : ""}
         ${renderWebsiteLink(result.websiteUrl)}
       </td>
       <td>
@@ -729,6 +972,7 @@ function renderDeviceRunButton(result, isRunning = false) {
       ${isRunning ? "disabled" : ""}
       data-run-device-name="${escapeHtml(result.name)}"
       data-run-device-ip="${escapeHtml(result.ip)}"
+      data-run-device-facility="${escapeHtml(result.facility || "")}"
       data-run-device-category="${escapeHtml(result.category || "")}">
       ${isRunning
         ? `<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Checking`
@@ -739,7 +983,8 @@ function renderDeviceRunButton(result, isRunning = false) {
 function isActiveRunDevice(result) {
   return Boolean(activeRunDeviceName && activeRunDeviceIp)
     && result.name === activeRunDeviceName
-    && result.ip === activeRunDeviceIp;
+    && result.ip === activeRunDeviceIp
+    && (!activeRunFacility || activeRunFacility === (result.facility || "Unassigned"));
 }
 
 function formatPingFailureText(pingCheck) {
@@ -815,7 +1060,28 @@ function groupResultsByCategory(results) {
       totalDevices: devices.length,
       onlineDevices: devices.filter(device => device.isOnline).length,
       offlineDevices: devices.filter(device => !device.isOnline).length,
-      devices: devices.sort((left, right) => left.name.localeCompare(right.name))
+      devices: devices.sort(compareDevices)
+    }));
+}
+
+function groupResultsByFacility(results) {
+  const groups = new Map();
+
+  for (const result of results) {
+    const facilityName = result.facility || "Unassigned";
+
+    if (!groups.has(facilityName)) {
+      groups.set(facilityName, []);
+    }
+
+    groups.get(facilityName).push(result);
+  }
+
+  return Array.from(groups.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, devices]) => ({
+      name,
+      categories: groupResultsByCategory(devices)
     }));
 }
 
@@ -1008,6 +1274,29 @@ async function runFullCheck() {
   }
 }
 
+async function runSelectedFacilityCheck() {
+  if (!activeFacility) {
+    return;
+  }
+
+  setButtonLoading(runFacilityCheckButton, runFacilityCheckSpinner, runFacilityCheckIcon, true);
+  runFullCheckButton.disabled = true;
+  runGroupCheckButton.disabled = true;
+  runFailedCheckButton.disabled = true;
+  setDashboardRunButtonsDisabled(true);
+
+  try {
+    await loadResults({ facility: activeFacility });
+  } finally {
+    setButtonLoading(runFacilityCheckButton, runFacilityCheckSpinner, runFacilityCheckIcon, false);
+    runFacilityCheckButton.disabled = !activeFacility;
+    runFullCheckButton.disabled = false;
+    runGroupCheckButton.disabled = !groupCheckSelect.value;
+    runFailedCheckButton.disabled = false;
+    setDashboardRunButtonsDisabled(false);
+  }
+}
+
 async function runSelectedGroupCheck() {
   const category = groupCheckSelect.value;
 
@@ -1018,15 +1307,18 @@ async function runSelectedGroupCheck() {
   await runGroupCheck(category);
 }
 
-async function runGroupCheck(category) {
+async function runGroupCheck(category, facility = activeFacility) {
+  const previousRunFacility = activeRunFacility;
+  activeRunFacility = facility || "";
   setButtonLoading(runGroupCheckButton, runGroupCheckSpinner, runGroupCheckIcon, true);
   runFullCheckButton.disabled = true;
   runFailedCheckButton.disabled = true;
   setDashboardRunButtonsDisabled(true);
 
   try {
-    await loadResults({ category });
+    await loadResults({ facility, category });
   } finally {
+    activeRunFacility = previousRunFacility;
     setButtonLoading(runGroupCheckButton, runGroupCheckSpinner, runGroupCheckIcon, false);
     runGroupCheckButton.disabled = !groupCheckSelect.value;
     runFullCheckButton.disabled = false;
@@ -1042,6 +1334,7 @@ async function runDeviceCheck(device) {
 
   activeRunDeviceName = device.name;
   activeRunDeviceIp = device.ip;
+  activeRunFacility = device.facility || "";
   runFullCheckButton.disabled = true;
   runGroupCheckButton.disabled = true;
   runFailedCheckButton.disabled = true;
@@ -1049,10 +1342,11 @@ async function runDeviceCheck(device) {
   setOtherDashboardRunButtonsDisabled(true, device);
 
   try {
-    await loadResults({ device });
+    await loadResults({ facility: device.facility || "", device });
   } finally {
     activeRunDeviceName = "";
     activeRunDeviceIp = "";
+    activeRunFacility = "";
     runFullCheckButton.disabled = false;
     runGroupCheckButton.disabled = !groupCheckSelect.value;
     runFailedCheckButton.disabled = false;
@@ -1205,6 +1499,7 @@ function applyConfigPayload(payload) {
   delete configState.settings.useHostnameForPing;
   configState.devices = configState.devices.map(device => ({
     ...device,
+    facility: device.facility || "Unassigned",
     useHostnameForPing: device.useHostnameForPing ?? legacyUseHostnameForPing
   }));
   if (intervalSecondsInput) {
@@ -1263,6 +1558,7 @@ async function loadDashboardGroups() {
 
     applyConfigPayload(payload);
     renderGroupCheckOptions(payload.devices);
+    renderFacilityTabs();
     hasLoadedDashboardGroups = true;
   } catch (error) {
     console.error(error);
@@ -1272,8 +1568,11 @@ async function loadDashboardGroups() {
 }
 
 function renderGroupCheckOptions(devices) {
+  const scopedDevices = activeFacility
+    ? (devices ?? []).filter(device => (device.facility || "Unassigned") === activeFacility)
+    : devices ?? [];
   const categories = Array.from(new Set(
-    (devices ?? [])
+    scopedDevices
       .filter(device => device.enabled !== false)
       .map(device => device.category || "Uncategorized")))
     .sort((left, right) => left.localeCompare(right));
@@ -1284,6 +1583,14 @@ function renderGroupCheckOptions(devices) {
   runGroupCheckButton.disabled = true;
 }
 
+function selectFacility(facilityName) {
+  activeFacility = facilityName || "";
+  groupCheckSelect.value = "";
+  runGroupCheckButton.disabled = true;
+  renderGroupCheckOptions(configState.devices);
+  renderFilteredCategories();
+}
+
 function renderConfigDevices() {
   const devices = filterConfigDevices(configState.devices ?? []);
   const hasSearch = activeConfigSearch.trim().length > 0;
@@ -1291,35 +1598,48 @@ function renderConfigDevices() {
   if (devices.length === 0) {
     configDevicesBody.innerHTML = `
       <tr>
-        <td colspan="6" class="text-center text-secondary py-4">${hasSearch ? "No devices match the current filter." : "No devices configured."}</td>
+        <td colspan="7" class="text-center text-secondary py-4">${hasSearch ? "No devices match the current filter." : "No devices configured."}</td>
       </tr>`;
     return;
   }
 
-  configDevicesBody.innerHTML = groupConfigDevicesByCategory(devices)
-    .map((group, groupIndex) => {
-      const groupId = `config-category-${groupIndex}-${slugify(group.name)}`;
+  configDevicesBody.innerHTML = groupConfigDevicesByFacility(devices)
+    .map((facility, facilityIndex) => {
+      const facilityId = `config-facility-${facilityIndex}-${slugify(facility.name)}`;
 
       return `
-      <tr class="config-category-row">
-        <td colspan="6">
+      <tr class="config-facility-row">
+        <td colspan="7">
           <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-            <div class="d-flex align-items-center gap-2">
-              <button
-                class="btn btn-sm btn-outline-secondary category-toggle"
-                type="button"
-                data-config-category-toggle="${groupId}"
-                aria-expanded="false"
-                aria-controls="${groupId}">
-                <i class="fa-solid fa-chevron-down"></i>
-              </button>
-              <span class="fw-semibold">${escapeHtml(group.name)}</span>
-            </div>
-            <span class="badge text-bg-secondary">${group.devices.length} devices</span>
+            <span class="fw-semibold"><i class="fa-solid fa-location-dot me-2"></i>${escapeHtml(facility.name)}</span>
+            <span class="badge text-bg-dark">${facility.devices.length} devices</span>
           </div>
         </td>
       </tr>
-      ${group.devices.map(({ device, index }) => renderConfigDeviceRow(device, index, groupId)).join("")}`;
+      ${facility.categories.map((category, categoryIndex) => {
+        const categoryId = `${facilityId}-category-${categoryIndex}-${slugify(category.name)}`;
+
+        return `
+          <tr class="config-category-row">
+            <td colspan="7">
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 ps-3">
+                <div class="d-flex align-items-center gap-2">
+                  <button
+                    class="btn btn-sm btn-outline-secondary category-toggle"
+                    type="button"
+                    data-config-category-toggle="${categoryId}"
+                    aria-expanded="false"
+                    aria-controls="${categoryId}">
+                    <i class="fa-solid fa-chevron-down"></i>
+                  </button>
+                  <span class="fw-semibold">${escapeHtml(category.name)}</span>
+                </div>
+                <span class="badge text-bg-secondary">${category.devices.length} devices</span>
+              </div>
+            </td>
+          </tr>
+          ${category.devices.map(({ device, index }) => renderConfigDeviceRow(device, index, categoryId)).join("")}`;
+      }).join("")}`;
     })
     .join("");
 }
@@ -1336,35 +1656,78 @@ function filterConfigDevices(devices) {
     String(device.name ?? "").toLowerCase().includes(search)
       || String(device.ip ?? "").toLowerCase().includes(search)
       || String(device.hostname ?? "").toLowerCase().includes(search)
+      || String(device.facility ?? "").toLowerCase().includes(search)
+      || String(device.category ?? "").toLowerCase().includes(search)
       || String(device.websiteUrl ?? "").toLowerCase().includes(search));
 }
 
 /**
- * Groups configuration devices by category while preserving their original
+ * Groups configuration devices by facility and category while preserving their original
  * array index so edit/delete actions still target the correct JSON entry.
  * @param {Array<{device: object, index: number}>} devices Devices with their original configuration indexes.
- * @returns {Array<{name: string, devices: Array<{device: object, index: number}>}>} Sorted category groups.
+ * @returns {Array<{name: string, devices: Array<{device: object, index: number}>, categories: Array<{name: string, devices: Array<{device: object, index: number}>}>}>} Sorted facility groups.
  */
-function groupConfigDevicesByCategory(devices) {
-  const groups = new Map();
+function groupConfigDevicesByFacility(devices) {
+  const facilityGroups = new Map();
 
   devices.forEach(({ device, index }) => {
+    const facilityName = device.facility || "Unassigned";
     const categoryName = device.category || "Uncategorized";
 
-    if (!groups.has(categoryName)) {
-      groups.set(categoryName, []);
+    if (!facilityGroups.has(facilityName)) {
+      facilityGroups.set(facilityName, {
+        devices: [],
+        categories: new Map()
+      });
     }
 
-    groups.get(categoryName).push({ device, index });
+    const facility = facilityGroups.get(facilityName);
+    facility.devices.push({ device, index });
+
+    if (!facility.categories.has(categoryName)) {
+      facility.categories.set(categoryName, []);
+    }
+
+    facility.categories.get(categoryName).push({ device, index });
   });
 
-  return Array.from(groups.entries())
+  return Array.from(facilityGroups.entries())
     .sort(([left], [right]) => left.localeCompare(right))
-    .map(([name, groupedDevices]) => ({
+    .map(([name, group]) => ({
       name,
-      devices: groupedDevices.sort((left, right) =>
-        String(left.device.name ?? "").localeCompare(String(right.device.name ?? "")))
+      devices: group.devices.sort(compareConfigDevices),
+      categories: Array.from(group.categories.entries())
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([categoryName, groupedDevices]) => ({
+          name: categoryName,
+          devices: groupedDevices.sort(compareConfigDevices)
+        }))
     }));
+}
+
+function compareConfigDevices(left, right) {
+  return String(left.device.name ?? "").localeCompare(String(right.device.name ?? ""))
+    || String(left.device.ip ?? "").localeCompare(String(right.device.ip ?? ""));
+}
+
+function createDeviceKey(device) {
+  return [
+    device.facility || "Unassigned",
+    device.category || "Uncategorized",
+    device.name || "",
+    device.ip || ""
+  ].join("\u001f").toLowerCase();
+}
+
+function createCategoryKey(facility, category) {
+  return `${facility || "All Facilities"}\u001f${category || "Uncategorized"}`.toLowerCase();
+}
+
+function compareDevices(left, right) {
+  return String(left.facility ?? "").localeCompare(String(right.facility ?? ""))
+    || String(left.category ?? "").localeCompare(String(right.category ?? ""))
+    || String(left.name ?? "").localeCompare(String(right.name ?? ""))
+    || String(left.ip ?? "").localeCompare(String(right.ip ?? ""));
 }
 
 /**
@@ -1383,13 +1746,17 @@ function renderConfigDeviceRow(device, index, groupId) {
         <div class="fw-semibold">${escapeHtml(device.name)}</div>
         <div class="text-secondary small">${device.enabled === false ? "Disabled" : "Enabled"}</div>
       </td>
+      <td>${escapeHtml(device.facility || "Unassigned")}</td>
       <td><code>${escapeHtml(device.ip)}</code></td>
       <td>${device.hostname ? `<code>${escapeHtml(device.hostname)}</code>` : `<span class="text-secondary">Not set</span>`}</td>
       <td><span class="badge text-bg-${device.useHostnameForPing ? "primary" : "secondary"}">${pingModeLabel}</span></td>
       <td>${device.checks?.length ?? 0}</td>
       <td class="text-end">
-        <button class="btn btn-outline-primary btn-sm" type="button" data-edit-device="${index}">
+        <button class="btn btn-outline-primary btn-sm me-1" type="button" data-edit-device="${index}">
           <i class="fa-solid fa-pen-to-square me-1"></i>Edit
+        </button>
+        <button class="btn btn-outline-secondary btn-sm me-1" type="button" data-copy-device="${index}">
+          <i class="fa-solid fa-copy me-1"></i>Copy
         </button>
         <button class="btn btn-outline-danger btn-sm" type="button" data-delete-device="${index}">
           <i class="fa-solid fa-trash me-1"></i>Delete
@@ -1429,11 +1796,35 @@ function editDevice(index) {
   }
 
   editingDeviceIndex.value = String(index);
-  showDeviceForm();
   deviceFormTitle.textContent = "Edit Device";
   submitDeviceButton.textContent = "Update Device";
+  populateDeviceForm(device);
+  showDeviceForm();
+  deviceNameInput.focus();
+}
+
+function copyDevice(index) {
+  const device = configState.devices[index];
+
+  if (!device) {
+    return;
+  }
+
+  const copiedDevice = structuredClone(device);
+  copiedDevice.name = createCopyDeviceName(device.name);
+  editingDeviceIndex.value = "";
+  deviceFormTitle.textContent = "Copy Device";
+  submitDeviceButton.textContent = "Add Copy";
+  populateDeviceForm(copiedDevice);
+  showDeviceForm();
+  deviceNameInput.focus();
+  deviceNameInput.select();
+}
+
+function populateDeviceForm(device) {
   deviceNameInput.value = device.name ?? "";
   deviceAddressInput.value = device.ip ?? "";
+  deviceFacilityInput.value = device.facility ?? "";
   deviceHostnameInput.value = device.hostname ?? "";
   deviceUseHostnameForPingInput.checked = Boolean(device.useHostnameForPing);
   deviceWebsiteUrlInput.value = device.websiteUrl ?? "";
@@ -1448,8 +1839,11 @@ function editDevice(index) {
   if (checksList.children.length === 0) {
     addCheckRow({ type: "ping" });
   }
+}
 
-  deviceNameInput.focus();
+function createCopyDeviceName(name) {
+  const baseName = String(name || "Device").trim() || "Device";
+  return /\bcopy\b/i.test(baseName) ? baseName : `${baseName} Copy`;
 }
 
 async function submitDevice(event) {
@@ -1494,6 +1888,7 @@ function readDeviceForm() {
   return {
     name: deviceNameInput.value.trim(),
     ip: deviceAddressInput.value.trim(),
+    facility: deviceFacilityInput.value.trim() || "Unassigned",
     hostname: deviceHostnameInput.value.trim() || null,
     useHostnameForPing: deviceUseHostnameForPingInput.checked,
     websiteUrl: websiteUrl || null,
@@ -1534,6 +1929,7 @@ function resetDeviceForm() {
   deviceForm.reset();
   deviceEnabledInput.checked = true;
   deviceUseHostnameForPingInput.checked = false;
+  deviceFacilityInput.value = "";
   deviceFormTitle.textContent = "Add Device";
   submitDeviceButton.textContent = "Add Device";
   checksList.innerHTML = "";
@@ -1712,6 +2108,380 @@ function createEmptyConfiguration() {
   };
 }
 
+function createDefaultThemeState() {
+  return {
+    activeThemeId: "default",
+    themes: [
+      {
+        id: "default",
+        name: "NetWatch Default",
+        builtIn: true,
+        colors: {
+          appBackground: "#f7f8fa",
+          surface: "#ffffff",
+          sidebarBackground: "#111827",
+          sidebarText: "#e5e7eb",
+          primary: "#0d6efd",
+          success: "#198754",
+          warning: "#ffc107",
+          danger: "#dc3545",
+          text: "#17212b",
+          mutedText: "#657182",
+          border: "#dee2e6",
+          categoryHealthy: "#3b9b40",
+          categoryProblem: "#be302b",
+          categoryRunning: "#465464",
+          autoRefreshOn: "#198754",
+          autoRefreshOff: "#dc3545",
+          runFullCheck: "#ffc107"
+        }
+      }
+    ]
+  };
+}
+
+async function loadThemes({ showBusy = false, showErrors = false } = {}) {
+  setThemeBusy(showBusy);
+
+  try {
+    const response = await fetch("/api/themes");
+    const payload = await readJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(payload.error || payload.detail || `Unable to load themes. HTTP ${response.status}`);
+    }
+
+    applyThemeState(payload);
+    hasLoadedThemes = true;
+  } catch (error) {
+    applyThemeState(createDefaultThemeState());
+    if (showErrors) {
+      showThemeAlert("danger", error.message || "Unable to load themes.");
+    }
+    console.error(error);
+  } finally {
+    setThemeBusy(false);
+  }
+}
+
+async function saveThemes(successMessage = "Themes saved to themes.json.") {
+  if (!syncThemeEditorToState()) {
+    return;
+  }
+
+  setThemeBusy(true);
+  clearThemeAlert();
+
+  try {
+    const response = await fetch("/api/themes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(themeState)
+    });
+    const payload = await readJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(payload.error || payload.detail || `Theme save failed with ${response.status}`);
+    }
+
+    applyThemeState(payload.configuration);
+    showThemeAlert("success", successMessage);
+  } catch (error) {
+    showThemeAlert("danger", error.message || "Unable to save themes.");
+    console.error(error);
+  } finally {
+    setThemeBusy(false);
+  }
+}
+
+async function resetThemes() {
+  if (!window.confirm("Reset themes to the built-in default? Custom themes will be removed.")) {
+    return;
+  }
+
+  setThemeBusy(true);
+  clearThemeAlert();
+
+  try {
+    const response = await fetch("/api/themes/reset", { method: "POST" });
+    const payload = await readJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(payload.error || payload.detail || `Theme reset failed with ${response.status}`);
+    }
+
+    applyThemeState(payload.configuration);
+    showThemeAlert("success", "Themes reset to NetWatch Default.");
+  } catch (error) {
+    showThemeAlert("danger", error.message || "Unable to reset themes.");
+    console.error(error);
+  } finally {
+    setThemeBusy(false);
+  }
+}
+
+function applyThemeState(payload) {
+  themeState = payload ?? createDefaultThemeState();
+  themeState.themes ??= [];
+  themeState.activeThemeId ||= "default";
+
+  if (themeState.themes.length === 0) {
+    themeState = createDefaultThemeState();
+  }
+
+  if (!themeState.themes.some(theme => theme.id === themeState.activeThemeId)) {
+    themeState.activeThemeId = themeState.themes[0].id;
+  }
+
+  if (!themeState.themes.some(theme => theme.id === editingThemeId)) {
+    editingThemeId = themeState.activeThemeId;
+  }
+
+  renderThemeSelect();
+  renderThemeEditor();
+  applyActiveTheme();
+}
+
+function renderThemeSelect() {
+  themeSelect.innerHTML = themeState.themes
+    .map(theme => `
+      <option value="${escapeHtml(theme.id)}" ${theme.id === editingThemeId ? "selected" : ""}>
+        ${escapeHtml(theme.name)}${theme.id === themeState.activeThemeId ? " (active)" : ""}
+      </option>`)
+    .join("");
+}
+
+function renderThemeEditor() {
+  const theme = getEditingTheme();
+
+  if (!theme) {
+    return;
+  }
+
+  deleteThemeButton.disabled = Boolean(theme.builtIn);
+  activateThemeButton.disabled = theme.id === themeState.activeThemeId;
+
+  for (const input of themeColorInputs) {
+    const key = input.dataset.themeColor;
+    input.value = theme.colors?.[key] || createDefaultThemeState().themes[0].colors[key] || "#000000";
+    input.disabled = Boolean(theme.builtIn);
+  }
+}
+
+function syncThemeEditorToState() {
+  const theme = getEditingTheme();
+
+  if (!theme) {
+    showThemeAlert("warning", "Select a theme first.");
+    return false;
+  }
+
+  theme.colors ??= {};
+
+  for (const input of themeColorInputs) {
+    theme.colors[input.dataset.themeColor] = input.value;
+  }
+
+  applyThemePreview(theme);
+  return true;
+}
+
+function applyActiveTheme() {
+  const activeTheme = themeState.themes.find(theme => theme.id === themeState.activeThemeId)
+    ?? themeState.themes[0];
+
+  applyThemeColors(activeTheme);
+  applyThemePreview(getEditingTheme() ?? activeTheme);
+}
+
+function applyThemeColors(theme) {
+  const defaultColors = createDefaultThemeState().themes[0].colors;
+  const colors = theme?.colors ?? defaultColors;
+
+  for (const [key, cssVariable] of Object.entries(themeCssVariables)) {
+    document.documentElement.style.setProperty(cssVariable, colors[key] || defaultColors[key]);
+  }
+}
+
+function applyThemePreview(theme) {
+  const defaultColors = createDefaultThemeState().themes[0].colors;
+  const colors = theme?.colors ?? defaultColors;
+
+  for (const [key, cssVariable] of Object.entries(themeCssVariables)) {
+    themePreview.style.setProperty(cssVariable, colors[key] || defaultColors[key]);
+  }
+}
+
+function startNewTheme() {
+  pendingThemeAction = "new";
+  pendingThemeSourceId = "";
+  themeFormTitle.textContent = "New Theme";
+  submitThemeButton.textContent = "Create Theme";
+  themeNameInput.value = "";
+  showThemeForm();
+}
+
+function startCopyTheme() {
+  const sourceTheme = getEditingTheme();
+
+  if (!sourceTheme) {
+    return;
+  }
+
+  pendingThemeAction = "copy";
+  pendingThemeSourceId = sourceTheme.id;
+  themeFormTitle.textContent = "Copy Theme";
+  submitThemeButton.textContent = "Create Copy";
+  themeNameInput.value = `${sourceTheme.name} Copy`;
+  showThemeForm();
+  themeNameInput.select();
+}
+
+function submitThemeForm(event) {
+  event.preventDefault();
+
+  const themeName = themeNameInput.value.trim();
+
+  if (!themeName) {
+    themeNameInput.focus();
+    return;
+  }
+
+  if (pendingThemeAction === "copy") {
+    copyTheme(themeName, pendingThemeSourceId);
+  } else {
+    createTheme(themeName);
+  }
+
+  hideThemeForm();
+}
+
+function createTheme(themeName) {
+  const defaultColors = structuredClone(createDefaultThemeState().themes[0].colors);
+  const theme = {
+    id: createThemeId(themeName),
+    name: themeName,
+    builtIn: false,
+    colors: defaultColors
+  };
+
+  themeState.themes.push(theme);
+  editingThemeId = theme.id;
+  renderThemeSelect();
+  renderThemeEditor();
+  clearThemeAlert();
+}
+
+function copyTheme(themeName, sourceThemeId = editingThemeId) {
+  const sourceTheme = themeState.themes.find(theme => theme.id === sourceThemeId) ?? getEditingTheme();
+
+  if (!sourceTheme) {
+    return;
+  }
+
+  const theme = {
+    id: createThemeId(themeName),
+    name: themeName,
+    builtIn: false,
+    colors: structuredClone(sourceTheme.colors)
+  };
+
+  themeState.themes.push(theme);
+  editingThemeId = theme.id;
+  renderThemeSelect();
+  renderThemeEditor();
+  clearThemeAlert();
+}
+
+function showThemeForm() {
+  if (themeFormModal) {
+    themeFormModal.show();
+  }
+}
+
+function hideThemeForm() {
+  if (themeFormModal) {
+    themeFormModal.hide();
+  }
+}
+
+function activateTheme() {
+  if (!getEditingTheme()) {
+    return;
+  }
+
+  themeState.activeThemeId = editingThemeId;
+  renderThemeSelect();
+  renderThemeEditor();
+  applyActiveTheme();
+}
+
+function deleteTheme() {
+  const theme = getEditingTheme();
+
+  if (!theme || theme.builtIn) {
+    return;
+  }
+
+  if (!window.confirm(`Delete theme '${theme.name}'?`)) {
+    return;
+  }
+
+  themeState.themes = themeState.themes.filter(currentTheme => currentTheme.id !== theme.id);
+
+  if (themeState.activeThemeId === theme.id) {
+    themeState.activeThemeId = "default";
+  }
+
+  editingThemeId = themeState.activeThemeId;
+  renderThemeSelect();
+  renderThemeEditor();
+  applyActiveTheme();
+}
+
+function getEditingTheme() {
+  return themeState.themes.find(theme => theme.id === editingThemeId)
+    ?? themeState.themes[0];
+}
+
+function createThemeId(seed) {
+  const baseId = slugify(seed || "theme") || "theme";
+  let candidate = baseId;
+  let suffix = 2;
+
+  while (themeState.themes.some(theme => theme.id === candidate)) {
+    candidate = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+
+  return candidate;
+}
+
+function setThemeBusy(isBusy) {
+  saveThemesButton.disabled = isBusy;
+  newThemeButton.disabled = isBusy;
+  copyThemeButton.disabled = isBusy;
+  resetThemesButton.disabled = isBusy;
+  activateThemeButton.disabled = isBusy || editingThemeId === themeState.activeThemeId;
+  deleteThemeButton.disabled = isBusy || Boolean(getEditingTheme()?.builtIn);
+  saveThemesSpinner.classList.toggle("d-none", !isBusy);
+  saveThemesIcon.classList.toggle("d-none", isBusy);
+}
+
+function showThemeAlert(type, message) {
+  themeAlert.innerHTML = `
+    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+      ${escapeHtml(message)}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>`;
+}
+
+function clearThemeAlert() {
+  themeAlert.innerHTML = "";
+}
+
 function navigateTo(route, replace = false) {
   const normalizedRoute = normalizeRoute(route);
   const previousRoute = currentRoute;
@@ -1719,6 +2489,7 @@ function navigateTo(route, replace = false) {
 
   dashboardPage.hidden = normalizedRoute !== "/";
   configPage.hidden = normalizedRoute !== "/config";
+  themesPage.hidden = normalizedRoute !== "/themes";
   manualPage.hidden = normalizedRoute !== "/manual";
   aboutPage.hidden = normalizedRoute !== "/about";
   currentPageLabel.textContent = getPageLabel(normalizedRoute);
@@ -1748,13 +2519,17 @@ function navigateTo(route, replace = false) {
     loadConfig();
   }
 
+  if (normalizedRoute === "/themes" && !hasLoadedThemes) {
+    loadThemes({ showBusy: true, showErrors: true });
+  }
+
   if (normalizedRoute === "/" && !hasLoadedDashboardGroups) {
     loadDashboardGroups();
   }
 }
 
 function normalizeRoute(pathname) {
-  const knownRoutes = new Set(["/", "/config", "/manual", "/about"]);
+  const knownRoutes = new Set(["/", "/config", "/themes", "/manual", "/about"]);
   return knownRoutes.has(pathname) ? pathname : "/";
 }
 
@@ -1762,6 +2537,7 @@ function getPageLabel(route) {
   const labels = {
     "/": "Dashboard",
     "/config": "Configuration",
+    "/themes": "Themes",
     "/manual": "User Manual",
     "/about": "About"
   };
@@ -1817,13 +2593,21 @@ function setOtherDashboardRunButtonsDisabled(isDisabled, activeDevice = null) {
     });
 }
 
-function getExecutionScopeLabel(category, device, devices = []) {
+function getExecutionScopeLabel(facility, category, device, devices = []) {
   if (devices.length > 0) {
     return "failed devices";
   }
 
   if (device?.name) {
     return `device ${device.name}`;
+  }
+
+  if (facility && category) {
+    return `${facility} / ${category} devices`;
+  }
+
+  if (facility) {
+    return `${facility} devices`;
   }
 
   return category ? `${category} devices` : "";
@@ -1893,10 +2677,18 @@ function isHttpUrl(value) {
 
 autoRefreshToggle.addEventListener("click", toggleAutoRefresh);
 runFullCheckButton.addEventListener("click", runFullCheck);
+runFacilityCheckButton.addEventListener("click", runSelectedFacilityCheck);
 runGroupCheckButton.addEventListener("click", runSelectedGroupCheck);
 runFailedCheckButton.addEventListener("click", runFailedChecks);
 groupCheckSelect.addEventListener("change", () => {
   runGroupCheckButton.disabled = !groupCheckSelect.value;
+});
+facilityTabs.addEventListener("click", event => {
+  const facilityButton = event.target.closest("[data-facility-filter]");
+
+  if (facilityButton) {
+    selectFacility(facilityButton.dataset.facilityFilter || "");
+  }
 });
 sidebarToggle.addEventListener("click", toggleSidebar);
 sidebarBackdrop.addEventListener("click", closeSidebar);
@@ -1907,17 +2699,17 @@ navLinks.forEach(link => {
   });
 });
 resultsBody.addEventListener("hidden.bs.collapse", event => {
-  const categoryName = event.target.dataset.categoryName;
+  const categoryKey = event.target.dataset.categoryKey;
 
-  if (categoryName) {
-    expandedCategoryNames.delete(categoryName);
+  if (categoryKey) {
+    expandedCategoryNames.delete(categoryKey);
   }
 });
 resultsBody.addEventListener("shown.bs.collapse", event => {
-  const categoryName = event.target.dataset.categoryName;
+  const categoryKey = event.target.dataset.categoryKey;
 
-  if (categoryName) {
-    expandedCategoryNames.add(categoryName);
+  if (categoryKey) {
+    expandedCategoryNames.add(categoryKey);
   }
 });
 resultsBody.addEventListener("click", event => {
@@ -1925,7 +2717,7 @@ resultsBody.addEventListener("click", event => {
   const runDeviceButton = event.target.closest("[data-run-device-name]");
 
   if (runCategoryButton) {
-    runGroupCheck(runCategoryButton.dataset.runCategory);
+    runGroupCheck(runCategoryButton.dataset.runCategory, runCategoryButton.dataset.runFacility || activeFacility);
     return;
   }
 
@@ -1933,6 +2725,7 @@ resultsBody.addEventListener("click", event => {
     runDeviceCheck({
       name: runDeviceButton.dataset.runDeviceName,
       ip: runDeviceButton.dataset.runDeviceIp,
+      facility: runDeviceButton.dataset.runDeviceFacility,
       category: runDeviceButton.dataset.runDeviceCategory
     });
   }
@@ -1994,6 +2787,7 @@ checksList.addEventListener("click", event => {
 configDevicesBody.addEventListener("click", event => {
   const categoryToggle = event.target.closest("[data-config-category-toggle]");
   const editButton = event.target.closest("[data-edit-device]");
+  const copyButton = event.target.closest("[data-copy-device]");
   const deleteButton = event.target.closest("[data-delete-device]");
 
   if (categoryToggle) {
@@ -2003,6 +2797,12 @@ configDevicesBody.addEventListener("click", event => {
 
   if (editButton) {
     editDevice(Number(editButton.dataset.editDevice));
+    return;
+  }
+
+  if (copyButton) {
+    copyDevice(Number(copyButton.dataset.copyDevice));
+    return;
   }
 
   if (deleteButton) {
@@ -2015,8 +2815,33 @@ if (deviceFormModalElement) {
     deviceNameInput.focus();
   });
 }
+if (themeFormModalElement) {
+  themeFormModalElement.addEventListener("shown.bs.modal", () => {
+    themeNameInput.focus();
+    themeNameInput.select();
+  });
+}
+themeSelect.addEventListener("change", event => {
+  syncThemeEditorToState();
+  editingThemeId = event.target.value;
+  renderThemeEditor();
+  clearThemeAlert();
+});
+themeColorInputs.forEach(input => {
+  input.addEventListener("input", () => {
+    syncThemeEditorToState();
+  });
+});
+themeForm.addEventListener("submit", submitThemeForm);
+newThemeButton.addEventListener("click", startNewTheme);
+copyThemeButton.addEventListener("click", startCopyTheme);
+activateThemeButton.addEventListener("click", activateTheme);
+deleteThemeButton.addEventListener("click", deleteTheme);
+saveThemesButton.addEventListener("click", () => saveThemes());
+resetThemesButton.addEventListener("click", resetThemes);
 window.addEventListener("popstate", () => navigateTo(location.pathname, true));
 
+void loadThemes({ showBusy: false, showErrors: false });
 navigateTo(currentRoute, true);
 
 function scheduleRefresh() {

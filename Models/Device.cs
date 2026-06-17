@@ -39,6 +39,12 @@ public sealed class Device
     public string? WebsiteUrl { get; init; }
 
     /// <summary>
+    /// Physical site or branch where the device is located, for example Miami Warehouse or Orlando Office.
+    /// </summary>
+    [JsonPropertyName("facility")]
+    public string Facility { get; init; } = "Unassigned";
+
+    /// <summary>
     /// Logical dashboard group, for example Servers, IP Cameras, Power Devices, or Critical Workstations.
     /// </summary>
     [JsonPropertyName("category")]

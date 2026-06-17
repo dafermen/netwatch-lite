@@ -2,6 +2,16 @@
 
 All notable changes to NetWatch-Lite are documented here.
 
+## v0.5.0 - 2026-06-17
+
+- Added per-device `facility` support for site/warehouse grouping.
+- Added dashboard facility tabs and a `Run Facility` action for running one site at a time.
+- Added facility editing, filtering, normalization, and documentation while preserving category grouping inside each facility.
+- Improved large-inventory views so Dashboard and Configuration group devices by facility before category, avoiding ambiguity when facilities reuse device names.
+- Added a `Copy` action in Configuration that opens a prefilled add-device form for quickly creating similar devices.
+- Added a Themes page backed by `themes.json` so operators can create, copy, activate, delete, and reset GUI color templates.
+- Moved theme creation/copy naming into a modal and added theme colors for `Auto Refresh: ON`, `Auto Refresh: OFF`, and `Run Full Check`.
+
 ## v0.4.1 - 2026-06-06
 
 - Added automatic retry settings for ping and TCP checks with configurable retry count and delay.
