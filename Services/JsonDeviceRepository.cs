@@ -21,6 +21,7 @@ public sealed class JsonDeviceRepository
 
     private readonly IWebHostEnvironment _environment;
     private readonly NetworkMonitorOptions _options;
+    private readonly JsonRegionProfileRepository _profileRepository;
     private readonly SemaphoreSlim _reloadLock = new(1, 1);
     private MonitorConfiguration _configuration = new();
 
@@ -29,12 +30,15 @@ public sealed class JsonDeviceRepository
     /// </summary>
     /// <param name="environment">ASP.NET Core hosting environment used to resolve relative file paths.</param>
     /// <param name="options">Network monitor options bound from appsettings.json.</param>
+    /// <param name="profileRepository">Repository that resolves the active region profile JSON file.</param>
     public JsonDeviceRepository(
         IWebHostEnvironment environment,
-        IOptions<NetworkMonitorOptions> options)
+        IOptions<NetworkMonitorOptions> options,
+        JsonRegionProfileRepository profileRepository)
     {
         _environment = environment;
         _options = options.Value;
+        _profileRepository = profileRepository;
     }
 
     /// <summary>
@@ -66,17 +70,18 @@ public sealed class JsonDeviceRepository
 
         try
         {
-            var filePath = ResolveDeviceFilePath();
+            var filePath = await ResolveDeviceFilePathAsync(cancellationToken);
+            var activeProfile = await ResolveActiveProfileAsync(cancellationToken);
 
             if (!File.Exists(filePath))
             {
                 var starterConfiguration = CreateStarterConfiguration();
                 await SaveNormalizedConfigurationAsync(
                     filePath,
-                    Normalize(starterConfiguration),
+                    Normalize(starterConfiguration, activeProfile.Region, activeProfile.SupportGroup),
                     createBackup: false,
                     cancellationToken);
-                _configuration = Normalize(starterConfiguration);
+                _configuration = Normalize(starterConfiguration, activeProfile.Region, activeProfile.SupportGroup);
                 return _configuration;
             }
 
@@ -87,7 +92,7 @@ public sealed class JsonDeviceRepository
                 cancellationToken);
 
             Validate(configuration);
-            _configuration = Normalize(configuration);
+            _configuration = Normalize(configuration, activeProfile.Region, activeProfile.SupportGroup);
             return _configuration;
         }
         catch (JsonException ex)
@@ -117,9 +122,58 @@ public sealed class JsonDeviceRepository
         {
             Validate(configuration);
 
-            var normalized = Normalize(configuration);
+            var activeProfile = await ResolveActiveProfileAsync(cancellationToken);
+            var normalized = Normalize(configuration, activeProfile.Region, activeProfile.SupportGroup);
             await SaveNormalizedConfigurationAsync(
-                ResolveDeviceFilePath(),
+                await ResolveDeviceFilePathAsync(cancellationToken),
+                normalized,
+                createBackup: true,
+                cancellationToken);
+            _configuration = normalized;
+            return _configuration;
+        }
+        finally
+        {
+            _reloadLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Updates one device in the active support group configuration and persists the JSON file.
+    /// </summary>
+    /// <param name="deviceIndex">Zero-based device index in the active configuration.</param>
+    /// <param name="device">Replacement device submitted by the UI.</param>
+    /// <param name="cancellationToken">Token used to cancel file operations.</param>
+    /// <returns>The normalized configuration after the row update is saved.</returns>
+    public async Task<MonitorConfiguration> UpdateDeviceAsync(
+        int deviceIndex,
+        Device device,
+        CancellationToken cancellationToken = default)
+    {
+        await _reloadLock.WaitAsync(cancellationToken);
+
+        try
+        {
+            if (deviceIndex < 0 || deviceIndex >= _configuration.Devices.Count)
+            {
+                throw new InvalidDataException("Device was not found in the active configuration.");
+            }
+
+            var devices = _configuration.Devices.ToList();
+            devices[deviceIndex] = device;
+
+            var candidate = new MonitorConfiguration
+            {
+                Settings = _configuration.Settings,
+                Devices = devices
+            };
+
+            Validate(candidate);
+
+            var activeProfile = await ResolveActiveProfileAsync(cancellationToken);
+            var normalized = Normalize(candidate, activeProfile.Region, activeProfile.SupportGroup);
+            await SaveNormalizedConfigurationAsync(
+                await ResolveDeviceFilePathAsync(cancellationToken),
                 normalized,
                 createBackup: true,
                 cancellationToken);
@@ -136,8 +190,15 @@ public sealed class JsonDeviceRepository
     /// Resolves the configured JSON path to an absolute filesystem path.
     /// </summary>
     /// <returns>Absolute path to config.json.</returns>
-    private string ResolveDeviceFilePath()
+    private async Task<string> ResolveDeviceFilePathAsync(CancellationToken cancellationToken)
     {
+        var activeProfilePath = await _profileRepository.GetActiveDeviceFilePathAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(activeProfilePath))
+        {
+            return activeProfilePath;
+        }
+
         if (Path.IsPathRooted(_options.DeviceFilePath))
         {
             return _options.DeviceFilePath;
@@ -160,6 +221,14 @@ public sealed class JsonDeviceRepository
         return Directory.Exists(Path.Combine(_environment.ContentRootPath, "Data"))
             ? developmentDataPath
             : contentRootPath;
+    }
+
+    private async Task<(string Region, string SupportGroup)> ResolveActiveProfileAsync(CancellationToken cancellationToken)
+    {
+        var profile = await _profileRepository.GetActiveProfileAsync(cancellationToken);
+        var supportGroup = string.IsNullOrWhiteSpace(profile.Name) ? "Unassigned" : profile.Name;
+        var region = string.IsNullOrWhiteSpace(profile.Region) ? "Sample Region" : profile.Region;
+        return (region, supportGroup);
     }
 
     /// <summary>
@@ -218,6 +287,8 @@ public sealed class JsonDeviceRepository
                     Ip = "127.0.0.1",
                     Hostname = "localhost",
                     UseHostnameForPing = false,
+                    Region = "Local",
+                    SupportGroup = "Local",
                     Facility = "Local",
                     Category = "Getting Started",
                     Enabled = true,
@@ -248,8 +319,13 @@ public sealed class JsonDeviceRepository
     /// Cleans and filters a parsed configuration so downstream services receive predictable data.
     /// </summary>
     /// <param name="configuration">Configuration parsed from JSON, or null when deserialization produced no object.</param>
+    /// <param name="defaultRegion">Region label to assign when legacy devices do not include a region field.</param>
+    /// <param name="defaultSupportGroup">Support group label to assign when legacy devices do not include a support group field.</param>
     /// <returns>A configuration with valid devices, normalized categories, and supported checks only.</returns>
-    private static MonitorConfiguration Normalize(MonitorConfiguration? configuration)
+    private static MonitorConfiguration Normalize(
+        MonitorConfiguration? configuration,
+        string defaultRegion = "Sample Region",
+        string defaultSupportGroup = "Unassigned")
     {
         if (configuration is null)
         {
@@ -266,6 +342,8 @@ public sealed class JsonDeviceRepository
                 Hostname = NormalizeOptionalText(device.Hostname),
                 UseHostnameForPing = device.UseHostnameForPing ?? legacyUseHostnameForPing,
                 WebsiteUrl = NormalizeOptionalText(device.WebsiteUrl),
+                Region = NormalizeRegion(device.Region, defaultRegion, defaultSupportGroup),
+                SupportGroup = NormalizeFacility(defaultSupportGroup),
                 Facility = NormalizeFacility(device.Facility),
                 Category = NormalizeCategory(device.Category),
                 Enabled = device.Enabled,
@@ -481,6 +559,22 @@ public sealed class JsonDeviceRepository
         return string.IsNullOrWhiteSpace(facility)
             ? "Unassigned"
             : facility.Trim();
+    }
+
+    /// <summary>
+    /// Converts missing or whitespace region values into a stable fallback group name.
+    /// </summary>
+    /// <param name="region">Region value from JSON.</param>
+    /// <param name="defaultRegion">Fallback region supplied by the active profile.</param>
+    /// <param name="defaultSupportGroup">Fallback support group supplied by the active profile.</param>
+    /// <returns>A trimmed region or Unassigned when no value was supplied.</returns>
+    private static string NormalizeRegion(string? region, string defaultRegion, string defaultSupportGroup)
+    {
+        return string.IsNullOrWhiteSpace(region)
+            || string.Equals(region.Trim(), "Unassigned", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(region.Trim(), defaultSupportGroup, StringComparison.OrdinalIgnoreCase)
+            ? NormalizeFacility(defaultRegion)
+            : region.Trim();
     }
 
     /// <summary>

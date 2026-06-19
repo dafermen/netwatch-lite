@@ -7,6 +7,7 @@ const currentPageLabel = document.querySelector("#current-page-label");
 
 const dashboardPage = document.querySelector("#dashboard-page");
 const configPage = document.querySelector("#config-page");
+const regionsPage = document.querySelector("#regions-page");
 const themesPage = document.querySelector("#themes-page");
 const manualPage = document.querySelector("#manual-page");
 const aboutPage = document.querySelector("#about-page");
@@ -16,6 +17,8 @@ const executionMode = document.querySelector("#execution-mode");
 const autoRefreshToggle = document.querySelector("#auto-refresh-toggle");
 const autoRefreshLabel = document.querySelector("#auto-refresh-label");
 const facilityTabs = document.querySelector("#facility-tabs");
+const dashboardRegionTitle = document.querySelector("#dashboard-region-title");
+const dashboardSupportGroupLabel = document.querySelector("#dashboard-support-group-label");
 const activeFacilityLabel = document.querySelector("#active-facility-label");
 const runFacilityCheckButton = document.querySelector("#run-facility-check");
 const runFacilityCheckSpinner = document.querySelector("#run-facility-check-spinner");
@@ -44,6 +47,12 @@ const metricAvailability = document.querySelector("#metric-availability");
 
 const configAlert = document.querySelector("#config-alert");
 const configDevicesBody = document.querySelector("#config-devices-body");
+const configNormalViewButton = document.querySelector("#config-normal-view");
+const configBulkViewButton = document.querySelector("#config-bulk-view");
+const configDevicesTableWrapper = document.querySelector("#config-devices-table-wrapper");
+const bulkEditPanel = document.querySelector("#bulk-edit-panel");
+const bulkDevicesBody = document.querySelector("#bulk-devices-body");
+const bulkEditSummary = document.querySelector("#bulk-edit-summary");
 const reloadConfigButton = document.querySelector("#reload-config");
 const exportConfigButton = document.querySelector("#export-config");
 const importConfigButton = document.querySelector("#import-config");
@@ -83,6 +92,28 @@ const deleteDeviceModal = typeof bootstrap !== "undefined" && deleteDeviceModalE
   : null;
 const deleteDeviceName = document.querySelector("#delete-device-name");
 const confirmDeleteDeviceButton = document.querySelector("#confirm-delete-device");
+const regionAlert = document.querySelector("#region-alert");
+const regionSelect = document.querySelector("#region-select");
+const regionDetails = document.querySelector("#region-details");
+const regionsBody = document.querySelector("#regions-body");
+const newRegionButton = document.querySelector("#new-region");
+const copyRegionButton = document.querySelector("#copy-region");
+const renameRegionButton = document.querySelector("#rename-region");
+const activateRegionButton = document.querySelector("#activate-region");
+const activateRegionSpinner = document.querySelector("#activate-region-spinner");
+const activateRegionIcon = document.querySelector("#activate-region-icon");
+const deleteRegionButton = document.querySelector("#delete-region");
+const regionFormModalElement = document.querySelector("#region-form-modal");
+const regionFormModal = typeof bootstrap !== "undefined" && regionFormModalElement
+  ? new bootstrap.Modal(regionFormModalElement)
+  : null;
+const regionForm = document.querySelector("#region-form");
+const regionFormTitle = document.querySelector("#region-form-title");
+const regionNameInput = document.querySelector("#region-name");
+const regionValueInput = document.querySelector("#region-value");
+const regionCopyWrapper = document.querySelector("#region-copy-wrapper");
+const regionCopyActiveInput = document.querySelector("#region-copy-active");
+const submitRegionButton = document.querySelector("#submit-region");
 const themeAlert = document.querySelector("#theme-alert");
 const themeSelect = document.querySelector("#theme-select");
 const themeNameInput = document.querySelector("#theme-name");
@@ -123,14 +154,16 @@ let activeRunKeepsDashboardStable = false;
 let activeRunPreservesDashboard = false;
 let currentRoute = normalizeRoute(location.pathname);
 let hasLoadedDashboardGroups = false;
-let hasLoadedConfig = false;
-let hasLoadedThemes = false;
 let dashboardConfigStale = false;
 let activeConfigSearch = "";
+let activeConfigView = "normal";
 const defaultAutoFullCheckIntervalSeconds = 60;
 const maxConfigImportBytes = 5 * 1024 * 1024;
 let configState = createEmptyConfiguration();
+let regionState = createDefaultRegionState();
 let themeState = createDefaultThemeState();
+let editingRegionId = "";
+let pendingRegionAction = "new";
 let editingThemeId = "default";
 let pendingThemeAction = "new";
 let pendingThemeSourceId = "";
@@ -1206,7 +1239,7 @@ async function reloadJson() {
 
     await loadConfig({ clearAlert: false, showBusy: false });
     markDashboardConfigurationStale();
-    showConfigAlert("success", `Reloaded config.json from disk. ${formatNumber(payload.count)} devices loaded.`);
+    showConfigAlert("success", `Reloaded active support group JSON from disk. ${formatNumber(payload.count)} devices loaded.`);
   } catch (error) {
     showConfigAlert("danger", `JSON reload failed: ${error.message}`);
     console.error(error);
@@ -1312,11 +1345,10 @@ async function importConfigFile(file) {
     }
 
     applyConfigPayload(payload.configuration);
-    hasLoadedConfig = true;
     renderConfigDevices();
     resetDeviceForm();
     markDashboardConfigurationStale();
-    showConfigAlert("success", `Imported config.json. ${formatNumber(payload.count)} devices loaded.`);
+    showConfigAlert("success", `Imported JSON into the active support group. ${formatNumber(payload.count)} devices loaded.`);
   } catch (error) {
     showConfigAlert("danger", `JSON import failed: ${error.message}`);
     console.error(error);
@@ -1489,8 +1521,8 @@ async function loadConfig({ clearAlert = true, showBusy = true } = {}) {
     }
 
     applyConfigPayload(payload);
-    hasLoadedConfig = true;
     renderConfigDevices();
+    renderBulkEditDevices();
     resetDeviceForm();
   } catch (error) {
     showConfigAlert("danger", error.message || "Unable to load configuration.");
@@ -1520,15 +1552,14 @@ async function refreshConfigurationForRun() {
   applyConfigPayload(configPayload);
   renderGroupCheckOptions(configState.devices);
   renderFacilityTabs();
-  hasLoadedConfig = true;
   hasLoadedDashboardGroups = true;
   dashboardConfigStale = false;
 }
 
-async function saveConfig(successMessage = "Settings saved to config.json. Previous config was backed up as config.backup.json.") {
+async function saveConfig(successMessage = "Settings saved to the active support group JSON. The previous file was backed up.") {
   const resolvedSuccessMessage = typeof successMessage === "string"
     ? successMessage
-    : "Settings saved to config.json. Previous config was backed up as config.backup.json.";
+    : "Settings saved to the active support group JSON. The previous file was backed up.";
 
   setConfigBusy(true);
   clearConfigAlert();
@@ -1554,6 +1585,7 @@ async function saveConfig(successMessage = "Settings saved to config.json. Previ
 
     applyConfigPayload(payload.configuration);
     renderConfigDevices();
+    renderBulkEditDevices();
     resetDeviceForm();
     markDashboardConfigurationStale();
     if (autoRefreshEnabled) {
@@ -1584,7 +1616,7 @@ function markDashboardConfigurationStale() {
     renderFacilityTabs();
     renderSummary(createProgressSummary([], 0));
     renderFilteredCategories();
-    lastCheck.textContent = "Configuration changed. Run All Facilities to refresh with the latest config.json.";
+    lastCheck.textContent = "Configuration changed. Run All Facilities to refresh with the latest active support group JSON.";
   }
 }
 
@@ -1607,6 +1639,8 @@ function applyConfigPayload(payload) {
   delete configState.settings.useHostnameForPing;
   configState.devices = configState.devices.map(device => ({
     ...device,
+    region: device.region || getActiveRegion()?.region || getActiveRegion()?.name || "Unassigned",
+    supportGroup: device.supportGroup || getActiveRegion()?.name || "Unassigned",
     facility: device.facility || "Unassigned",
     useHostnameForPing: device.useHostnameForPing ?? legacyUseHostnameForPing
   }));
@@ -1655,7 +1689,16 @@ function createExportFileName() {
   return `netwatch-lite-config-${timestamp}.json`;
 }
 
-async function loadDashboardGroups() {
+async function refreshDashboardFromActiveRegion() {
+  if (activeMonitorStream) {
+    return;
+  }
+
+  await loadRegions({ showBusy: false, showErrors: false });
+  await loadDashboardGroups({ resetResults: true });
+}
+
+async function loadDashboardGroups({ resetResults = false } = {}) {
   try {
     const response = await fetch("/api/config");
     const payload = await readJsonResponse(response);
@@ -1668,6 +1711,22 @@ async function loadDashboardGroups() {
     renderGroupCheckOptions(payload.devices);
     renderFacilityTabs();
     hasLoadedDashboardGroups = true;
+    dashboardConfigStale = false;
+
+    if (resetResults) {
+      latestResults = [];
+      latestCategories = [];
+      hasCompletedFullCheck = false;
+      activeRunFailedIps = new Set();
+      expandedFacilityNames.clear();
+      expandedCategoryNames.clear();
+      updateRunFailedButton();
+      renderSummary(createProgressSummary([], 0));
+      renderFilteredCategories();
+      resultsBody.innerHTML = `
+        <div class="text-center text-secondary py-4">Run a check to load monitoring results for the active support group.</div>`;
+      lastCheck.textContent = "Dashboard refreshed with the active support group JSON. Run All Facilities to load monitoring results.";
+    }
   } catch (error) {
     console.error(error);
     runGroupCheckButton.disabled = true;
@@ -1700,6 +1759,7 @@ function selectFacility(facilityName) {
 }
 
 function renderConfigDevices() {
+  renderConfigView();
   const devices = filterConfigDevices(configState.devices ?? []);
   const hasSearch = activeConfigSearch.trim().length > 0;
 
@@ -1760,6 +1820,245 @@ function renderConfigDevices() {
       }).join("")}`;
     })
     .join("");
+}
+
+function renderConfigView() {
+  const isBulkView = activeConfigView === "bulk";
+  configNormalViewButton.classList.toggle("btn-primary", !isBulkView);
+  configNormalViewButton.classList.toggle("btn-outline-primary", isBulkView);
+  configBulkViewButton.classList.toggle("btn-primary", isBulkView);
+  configBulkViewButton.classList.toggle("btn-outline-primary", !isBulkView);
+  configDevicesTableWrapper.hidden = isBulkView;
+  bulkEditPanel.hidden = !isBulkView;
+}
+
+function switchConfigView(view) {
+  activeConfigView = view === "bulk" ? "bulk" : "normal";
+  renderConfigDevices();
+  renderBulkEditDevices();
+}
+
+function renderBulkEditDevices() {
+  const devices = filterConfigDevices(configState.devices ?? []);
+  const hasSearch = activeConfigSearch.trim().length > 0;
+
+  if (!bulkDevicesBody) {
+    return;
+  }
+
+  bulkEditSummary.textContent = `${formatNumber(devices.length)} devices shown`;
+
+  if (devices.length === 0) {
+    bulkDevicesBody.innerHTML = `
+      <tr>
+        <td colspan="9" class="text-center text-secondary py-4">${hasSearch ? "No devices match the current filter." : "No devices configured."}</td>
+      </tr>`;
+    return;
+  }
+
+  bulkDevicesBody.innerHTML = devices
+    .sort(compareConfigDevices)
+    .map(({ device, index }) => renderBulkEditRow(device, index))
+    .join("");
+}
+
+function renderBulkEditRow(device, index) {
+  return `
+    <tr class="bulk-edit-row" data-bulk-index="${index}">
+      <td>
+        <input class="form-control form-control-sm" value="${escapeAttribute(device.name ?? "")}" data-bulk-field="name" required>
+        <div class="small text-danger mt-1 d-none" data-bulk-error></div>
+      </td>
+      <td><input class="form-control form-control-sm" value="${escapeAttribute(device.facility || "Unassigned")}" data-bulk-field="facility"></td>
+      <td><input class="form-control form-control-sm" value="${escapeAttribute(device.category || "Uncategorized")}" data-bulk-field="category"></td>
+      <td><input class="form-control form-control-sm font-monospace" value="${escapeAttribute(device.ip ?? "")}" data-bulk-field="ip" required></td>
+      <td><input class="form-control form-control-sm" value="${escapeAttribute(device.hostname ?? "")}" data-bulk-field="hostname"></td>
+      <td><input class="form-control form-control-sm" value="${escapeAttribute(device.websiteUrl ?? "")}" data-bulk-field="websiteUrl"></td>
+      <td class="text-center">
+        <input class="form-check-input" type="checkbox" ${device.enabled === false ? "" : "checked"} data-bulk-field="enabled">
+      </td>
+      <td class="text-center">
+        <input class="form-check-input" type="checkbox" ${device.useHostnameForPing ? "checked" : ""} data-bulk-field="useHostnameForPing">
+      </td>
+      <td class="text-end">
+        <div class="bulk-row-actions">
+          <button class="btn btn-success btn-sm" type="button" data-bulk-save="${index}" disabled>
+            <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-bulk-spinner></span>
+            <i class="fa-solid fa-floppy-disk me-1" data-bulk-save-icon></i>Save
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" type="button" data-bulk-revert="${index}" disabled>Revert</button>
+          <button class="btn btn-outline-primary btn-sm" type="button" data-bulk-advanced="${index}">Advanced</button>
+        </div>
+        <div class="small text-secondary mt-1" data-bulk-status>${device.checks?.length ?? 0} checks</div>
+      </td>
+    </tr>`;
+}
+
+function handleBulkRowChange(row) {
+  const index = Number(row.dataset.bulkIndex);
+  const currentDevice = configState.devices[index];
+  const editedDevice = readBulkRowDevice(row, { showErrors: false });
+  const isModified = Boolean(editedDevice) && !areBulkDevicesEqual(currentDevice, editedDevice);
+
+  row.classList.toggle("table-warning", isModified);
+  row.querySelector("[data-bulk-save]").disabled = !isModified;
+  row.querySelector("[data-bulk-revert]").disabled = !isModified;
+  setBulkRowStatus(row, isModified ? "Modified" : `${currentDevice?.checks?.length ?? 0} checks`, "secondary");
+}
+
+function readBulkRowDevice(row, { showErrors = true } = {}) {
+  const index = Number(row.dataset.bulkIndex);
+  const originalDevice = configState.devices[index];
+
+  if (!originalDevice) {
+    return null;
+  }
+
+  const field = name => row.querySelector(`[data-bulk-field="${name}"]`);
+  const name = field("name").value.trim();
+  const ip = field("ip").value.trim();
+  const facility = field("facility").value.trim() || "Unassigned";
+  const category = field("category").value.trim() || "Uncategorized";
+  const hostname = field("hostname").value.trim();
+  const websiteUrl = field("websiteUrl").value.trim();
+
+  clearBulkRowError(row);
+
+  if (!name) {
+    if (showErrors) {
+      showBulkRowError(row, "Name is required.");
+      field("name").focus();
+    }
+    return null;
+  }
+
+  if (!ip) {
+    if (showErrors) {
+      showBulkRowError(row, "Address is required.");
+      field("ip").focus();
+    }
+    return null;
+  }
+
+  if (websiteUrl && !isHttpUrl(websiteUrl)) {
+    if (showErrors) {
+      showBulkRowError(row, "Website URL must start with http:// or https://.");
+      field("websiteUrl").focus();
+    }
+    return null;
+  }
+
+  return {
+    ...structuredClone(originalDevice),
+    name,
+    ip,
+    region: getActiveRegion()?.region || originalDevice.region || "Sample Region",
+    supportGroup: getActiveRegion()?.name || originalDevice.supportGroup || "Unassigned",
+    facility,
+    category,
+    hostname: hostname || null,
+    websiteUrl: websiteUrl || null,
+    enabled: field("enabled").checked,
+    useHostnameForPing: field("useHostnameForPing").checked
+  };
+}
+
+function areBulkDevicesEqual(left, right) {
+  if (!left || !right) {
+    return false;
+  }
+
+  const keys = ["name", "ip", "facility", "category", "hostname", "websiteUrl", "enabled", "useHostnameForPing"];
+  return keys.every(key => normalizeBulkComparable(left[key]) === normalizeBulkComparable(right[key]));
+}
+
+function normalizeBulkComparable(value) {
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+
+  return String(value ?? "").trim();
+}
+
+async function saveBulkRow(row) {
+  const index = Number(row.dataset.bulkIndex);
+  const device = readBulkRowDevice(row);
+
+  if (!device) {
+    return;
+  }
+
+  setBulkRowBusy(row, true);
+  setBulkRowStatus(row, "Saving...", "secondary");
+
+  try {
+    const response = await fetch(`/api/config/devices/${index}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(device)
+    });
+    const payload = await readJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(payload.error || payload.detail || `Device save failed with ${response.status}`);
+    }
+
+    applyConfigPayload(payload.configuration);
+    renderConfigDevices();
+    renderBulkEditDevices();
+    markDashboardConfigurationStale();
+    const savedRow = bulkDevicesBody.querySelector(`[data-bulk-index="${payload.deviceIndex}"]`);
+    if (savedRow) {
+      setBulkRowStatus(savedRow, "Saved", "success");
+    }
+    showConfigAlert("success", `Device '${payload.device?.name || device.name}' saved.`);
+  } catch (error) {
+    showBulkRowError(row, error.message || "Unable to save this device.");
+    setBulkRowStatus(row, "Save failed", "danger");
+    console.error(error);
+  } finally {
+    const currentRow = bulkDevicesBody.querySelector(`[data-bulk-index="${index}"]`) || row;
+    setBulkRowBusy(currentRow, false);
+  }
+}
+
+function revertBulkRow(row) {
+  const index = Number(row.dataset.bulkIndex);
+  const device = configState.devices[index];
+
+  if (!device) {
+    return;
+  }
+
+  row.outerHTML = renderBulkEditRow(device, index);
+}
+
+function setBulkRowBusy(row, isBusy) {
+  row.querySelectorAll("input, button").forEach(element => {
+    element.disabled = isBusy;
+  });
+  row.querySelector("[data-bulk-spinner]")?.classList.toggle("d-none", !isBusy);
+  row.querySelector("[data-bulk-save-icon]")?.classList.toggle("d-none", isBusy);
+}
+
+function setBulkRowStatus(row, message, type) {
+  const status = row.querySelector("[data-bulk-status]");
+  status.textContent = message;
+  status.className = `small mt-1 text-${type}`;
+}
+
+function showBulkRowError(row, message) {
+  const error = row.querySelector("[data-bulk-error]");
+  error.textContent = message;
+  error.classList.remove("d-none");
+}
+
+function clearBulkRowError(row) {
+  const error = row.querySelector("[data-bulk-error]");
+  error.textContent = "";
+  error.classList.add("d-none");
 }
 
 function filterConfigDevices(devices) {
@@ -2011,10 +2310,10 @@ async function submitDevice(event) {
 
   if (indexValue === "") {
     configState.devices.push(device);
-    await saveConfig("Device added and saved to config.json.");
+    await saveConfig("Device added and saved to the active support group JSON.");
   } else {
     configState.devices[Number(indexValue)] = device;
-    await saveConfig("Device updated and saved to config.json.");
+    await saveConfig("Device updated and saved to the active support group JSON.");
   }
 }
 
@@ -2041,6 +2340,8 @@ function readDeviceForm() {
   return {
     name: deviceNameInput.value.trim(),
     ip: deviceAddressInput.value.trim(),
+    region: getActiveRegion()?.region || getActiveRegion()?.name || "Unassigned",
+    supportGroup: getActiveRegion()?.name || "Unassigned",
     facility: deviceFacilityInput.value.trim() || "Unassigned",
     hostname: deviceHostnameInput.value.trim() || null,
     useHostnameForPing: deviceUseHostnameForPingInput.checked,
@@ -2213,7 +2514,7 @@ async function confirmDeleteDevice() {
   if (deleteDeviceModal) {
     deleteDeviceModal.hide();
   }
-  await saveConfig("Device deleted and saved to config.json.");
+  await saveConfig("Device deleted and saved to the active support group JSON.");
 }
 
 function setConfigBusy(isBusy, { showSaveSpinner = true } = {}) {
@@ -2222,6 +2523,11 @@ function setConfigBusy(isBusy, { showSaveSpinner = true } = {}) {
   exportConfigButton.disabled = isBusy;
   importConfigButton.disabled = isBusy;
   addDeviceButton.disabled = isBusy;
+  configNormalViewButton.disabled = isBusy;
+  configBulkViewButton.disabled = isBusy;
+  bulkEditPanel.querySelectorAll("input, button").forEach(element => {
+    element.disabled = isBusy;
+  });
   if (intervalSecondsInput) {
     intervalSecondsInput.disabled = isBusy;
   }
@@ -2246,6 +2552,409 @@ function showConfigAlert(type, message) {
 
 function clearConfigAlert() {
   configAlert.innerHTML = "";
+}
+
+function createDefaultRegionState() {
+  return {
+    activeProfileId: "support-team-a",
+    profiles: [
+      {
+        id: "support-team-a",
+        name: "Support Team A",
+        region: "Sample Region",
+        file: "regions/support-team-a.json"
+      }
+    ]
+  };
+}
+
+async function loadRegions({ showBusy = false, showErrors = false } = {}) {
+  setRegionBusy(showBusy);
+
+  try {
+    const response = await fetch("/api/regions");
+    const payload = await readJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(payload.error || payload.detail || `Unable to load support groups. HTTP ${response.status}`);
+    }
+
+    applyRegionState(payload);
+  } catch (error) {
+    applyRegionState(createDefaultRegionState());
+    if (showErrors) {
+      showRegionAlert("danger", error.message || "Unable to load support groups.");
+    }
+    console.error(error);
+  } finally {
+    setRegionBusy(false);
+  }
+}
+
+function applyRegionState(payload, preferredEditingId = "") {
+  regionState = payload ?? createDefaultRegionState();
+  regionState.profiles ??= [];
+
+  if (regionState.profiles.length === 0) {
+    regionState = createDefaultRegionState();
+  }
+
+  regionState.activeProfileId ||= regionState.profiles[0]?.id || "sg1";
+
+  if (preferredEditingId && regionState.profiles.some(profile => profile.id === preferredEditingId)) {
+    editingRegionId = preferredEditingId;
+  } else if (!regionState.profiles.some(profile => profile.id === editingRegionId)) {
+    editingRegionId = regionState.activeProfileId;
+  }
+
+  renderRegionSelect();
+  renderRegionsTable();
+  renderDashboardRegionTitle();
+}
+
+function renderDashboardRegionTitle() {
+  const profile = getActiveRegion();
+
+  if (dashboardRegionTitle) {
+    dashboardRegionTitle.textContent = profile?.region || "Sample Region";
+  }
+
+  if (dashboardSupportGroupLabel) {
+    dashboardSupportGroupLabel.textContent = profile?.name || "No SG";
+  }
+}
+
+function renderRegionSelect() {
+  if (!regionSelect) {
+    return;
+  }
+
+  regionSelect.innerHTML = regionState.profiles
+    .map(profile => `
+      <option value="${escapeHtml(profile.id)}" ${profile.id === editingRegionId ? "selected" : ""}>
+        ${escapeHtml(profile.name)}${profile.id === regionState.activeProfileId ? " (active)" : ""}
+      </option>`)
+    .join("");
+
+  renderRegionDetails();
+}
+
+function renderRegionsTable() {
+  if (!regionsBody) {
+    return;
+  }
+
+  if (regionState.profiles.length === 0) {
+    regionsBody.innerHTML = `
+      <tr>
+        <td colspan="3" class="text-center text-secondary py-4">No support group profiles configured.</td>
+      </tr>`;
+    return;
+  }
+
+  regionsBody.innerHTML = regionState.profiles
+    .map(profile => `
+      <tr class="${profile.id === editingRegionId ? "table-active" : ""}" data-region-row="${escapeHtml(profile.id)}" role="button" tabindex="0">
+        <td>
+          <div class="fw-semibold">${escapeHtml(profile.name)}</div>
+        </td>
+        <td>${escapeHtml(profile.region || profile.name)}</td>
+        <td>
+          ${profile.id === regionState.activeProfileId ? '<span class="badge text-bg-success">Active</span>' : '<span class="badge text-bg-secondary">Available</span>'}
+          ${profile.builtIn ? '<span class="badge text-bg-info ms-1">Built-in</span>' : ""}
+        </td>
+      </tr>`)
+    .join("");
+}
+
+function selectRegion(profileId) {
+  if (!regionState.profiles.some(profile => profile.id === profileId)) {
+    return;
+  }
+
+  editingRegionId = profileId;
+  renderRegionSelect();
+  renderRegionsTable();
+  clearRegionAlert();
+}
+
+function renderRegionDetails() {
+  const profile = getEditingRegion();
+
+  if (!profile) {
+    regionDetails.textContent = "Select a support group profile.";
+    activateRegionButton.disabled = true;
+    copyRegionButton.disabled = true;
+    renameRegionButton.disabled = true;
+    deleteRegionButton.disabled = true;
+    return;
+  }
+
+  regionDetails.innerHTML = `
+    <div><strong>${escapeHtml(profile.name)}</strong></div>
+    <div>Region: ${escapeHtml(profile.region || "Sample Region")}</div>`;
+  activateRegionButton.disabled = profile.id === regionState.activeProfileId;
+  copyRegionButton.disabled = false;
+  renameRegionButton.disabled = false;
+  deleteRegionButton.disabled = Boolean(profile.builtIn) || regionState.profiles.length <= 1;
+}
+
+function getActiveRegion() {
+  return regionState.profiles.find(profile => profile.id === regionState.activeProfileId)
+    ?? regionState.profiles[0];
+}
+
+function getEditingRegion() {
+  return regionState.profiles.find(profile => profile.id === editingRegionId)
+    ?? getActiveRegion();
+}
+
+function startNewRegion() {
+  pendingRegionAction = "new";
+  regionFormTitle.textContent = "New Support Group";
+  submitRegionButton.textContent = "Create Support Group";
+  regionNameInput.value = "";
+  regionValueInput.value = getActiveRegion()?.region || "Sample Region";
+  regionCopyWrapper.hidden = false;
+  regionCopyActiveInput.checked = true;
+  showRegionForm();
+}
+
+function startRenameRegion() {
+  const profile = getEditingRegion();
+
+  if (!profile) {
+    return;
+  }
+
+  pendingRegionAction = "rename";
+  regionFormTitle.textContent = "Rename Support Group";
+  submitRegionButton.textContent = "Rename Support Group";
+  regionNameInput.value = profile.name;
+  regionValueInput.value = profile.region || profile.name;
+  regionCopyWrapper.hidden = true;
+  showRegionForm();
+}
+
+async function submitRegionForm(event) {
+  event.preventDefault();
+
+  const name = regionNameInput.value.trim();
+  const region = regionValueInput.value.trim() || name;
+
+  if (!name) {
+    showRegionAlert("warning", "Support group name is required.");
+    regionNameInput.focus();
+    return;
+  }
+
+  if (pendingRegionAction === "rename") {
+    await renameRegion(name, region);
+  } else {
+    await createRegion(name, region, regionCopyActiveInput.checked);
+  }
+}
+
+async function createRegion(name, region, copyFromActive) {
+  setRegionBusy(true);
+  clearRegionAlert();
+
+  try {
+    const response = await fetch("/api/regions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, region, copyFromActive })
+    });
+    const payload = await readJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(payload.error || payload.detail || `Support group create failed with ${response.status}`);
+    }
+
+    applyRegionState(payload.configuration, payload.configuration?.activeProfileId);
+    await reloadAfterRegionChange();
+    hideRegionForm();
+    showRegionAlert("success", `Support group '${name}' created and activated.`);
+  } catch (error) {
+    showRegionAlert("danger", error.message || "Unable to create support group.");
+    console.error(error);
+  } finally {
+    setRegionBusy(false);
+  }
+}
+
+async function renameRegion(name, region) {
+  const profile = getEditingRegion();
+
+  if (!profile) {
+    return;
+  }
+
+  setRegionBusy(true);
+  clearRegionAlert();
+
+  try {
+    const response = await fetch(`/api/regions/${encodeURIComponent(profile.id)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, region })
+    });
+    const payload = await readJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(payload.error || payload.detail || `Support group rename failed with ${response.status}`);
+    }
+
+    applyRegionState(payload.configuration, profile.id);
+    hideRegionForm();
+    showRegionAlert("success", `Support group '${name}' updated.`);
+  } catch (error) {
+    showRegionAlert("danger", error.message || "Unable to rename support group.");
+    console.error(error);
+  } finally {
+    setRegionBusy(false);
+  }
+}
+
+async function activateRegion() {
+  const profile = getEditingRegion();
+
+  if (!profile || profile.id === regionState.activeProfileId) {
+    return;
+  }
+
+  setRegionBusy(true);
+  clearRegionAlert();
+
+  try {
+    const response = await fetch(`/api/regions/${encodeURIComponent(profile.id)}/activate`, { method: "POST" });
+    const payload = await readJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(payload.error || payload.detail || `Support group activation failed with ${response.status}`);
+    }
+
+    applyRegionState(payload.configuration, payload.configuration?.activeProfileId);
+    await reloadAfterRegionChange();
+    showRegionAlert("success", `Active support group changed to '${profile.name}'.`);
+  } catch (error) {
+    showRegionAlert("danger", error.message || "Unable to activate support group.");
+    console.error(error);
+  } finally {
+    setRegionBusy(false);
+  }
+}
+
+async function copyRegion() {
+  const profile = getEditingRegion();
+
+  if (!profile) {
+    return;
+  }
+
+  setRegionBusy(true);
+  clearRegionAlert();
+
+  try {
+    const response = await fetch(`/api/regions/${encodeURIComponent(profile.id)}/duplicate`, { method: "POST" });
+    const payload = await readJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(payload.error || payload.detail || `Support group copy failed with ${response.status}`);
+    }
+
+    applyRegionState(payload.configuration, payload.configuration?.activeProfileId);
+    await reloadAfterRegionChange();
+    showRegionAlert("success", `Support group '${profile.name}' copied and activated.`);
+  } catch (error) {
+    showRegionAlert("danger", error.message || "Unable to copy support group.");
+    console.error(error);
+  } finally {
+    setRegionBusy(false);
+  }
+}
+
+async function deleteRegion() {
+  const profile = getEditingRegion();
+
+  if (!profile || profile.builtIn) {
+    return;
+  }
+
+  if (!window.confirm(`Delete only the selected support group '${profile.name}'? Its JSON file will be archived locally and other support groups will be kept.`)) {
+    return;
+  }
+
+  setRegionBusy(true);
+  clearRegionAlert();
+
+  try {
+    const response = await fetch(`/api/regions/${encodeURIComponent(profile.id)}`, { method: "DELETE" });
+    const payload = await readJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(payload.error || payload.detail || `Support group delete failed with ${response.status}`);
+    }
+
+    applyRegionState(payload.configuration, payload.configuration?.activeProfileId);
+    await reloadAfterRegionChange();
+    showRegionAlert("success", `Support group '${profile.name}' deleted.`);
+  } catch (error) {
+    showRegionAlert("danger", error.message || "Unable to delete support group.");
+    console.error(error);
+  } finally {
+    setRegionBusy(false);
+  }
+}
+
+async function reloadAfterRegionChange() {
+  hasLoadedDashboardGroups = false;
+  activeFacility = "";
+  groupCheckSelect.value = "";
+  await loadConfig({ clearAlert: false, showBusy: false });
+  markDashboardConfigurationStale();
+}
+
+function setRegionBusy(isBusy) {
+  if (!regionSelect) {
+    return;
+  }
+
+  regionSelect.disabled = isBusy;
+  newRegionButton.disabled = isBusy;
+  copyRegionButton.disabled = isBusy || !getEditingRegion();
+  renameRegionButton.disabled = isBusy || !getEditingRegion();
+  activateRegionButton.disabled = isBusy || getEditingRegion()?.id === regionState.activeProfileId;
+  deleteRegionButton.disabled = isBusy || Boolean(getEditingRegion()?.builtIn) || regionState.profiles.length <= 1;
+  regionForm?.querySelectorAll("input, button").forEach(element => {
+    element.disabled = isBusy;
+  });
+  activateRegionSpinner.classList.toggle("d-none", !isBusy);
+  activateRegionIcon.classList.toggle("d-none", isBusy);
+}
+
+function showRegionForm() {
+  if (regionFormModal) {
+    regionFormModal.show();
+  }
+}
+
+function hideRegionForm() {
+  if (regionFormModal) {
+    regionFormModal.hide();
+  }
+}
+
+function showRegionAlert(type, message) {
+  regionAlert.innerHTML = `
+    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+      ${escapeHtml(message)}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>`;
+}
+
+function clearRegionAlert() {
+  regionAlert.innerHTML = "";
 }
 
 function createEmptyConfiguration() {
@@ -2310,7 +3019,6 @@ async function loadThemes({ showBusy = false, showErrors = false } = {}) {
     }
 
     applyThemeState(payload);
-    hasLoadedThemes = true;
   } catch (error) {
     applyThemeState(createDefaultThemeState());
     if (showErrors) {
@@ -2683,6 +3391,7 @@ function navigateTo(route, replace = false) {
 
   dashboardPage.hidden = normalizedRoute !== "/";
   configPage.hidden = normalizedRoute !== "/config";
+  regionsPage.hidden = normalizedRoute !== "/regions";
   themesPage.hidden = normalizedRoute !== "/themes";
   manualPage.hidden = normalizedRoute !== "/manual";
   aboutPage.hidden = normalizedRoute !== "/about";
@@ -2709,21 +3418,110 @@ function navigateTo(route, replace = false) {
     resetDeviceForm();
   }
 
-  if (normalizedRoute === "/config" && !hasLoadedConfig) {
-    loadConfig();
+  resetRouteViewState(normalizedRoute);
+  refreshRouteData(normalizedRoute);
+}
+
+function resetRouteViewState(route) {
+  if (route === "/") {
+    resetDashboardViewState();
+    return;
   }
 
-  if (normalizedRoute === "/themes" && !hasLoadedThemes) {
-    loadThemes({ showBusy: true, showErrors: true });
+  if (route === "/config") {
+    resetConfigViewState();
+    return;
   }
 
-  if (normalizedRoute === "/" && !hasLoadedDashboardGroups) {
-    loadDashboardGroups();
+  if (route === "/regions") {
+    resetRegionsViewState();
+    return;
+  }
+
+  if (route === "/themes") {
+    resetThemesViewState();
   }
 }
 
+function resetDashboardViewState() {
+  activeSearch = "";
+  activeFilter = "all";
+  activeFacility = "";
+  activeRunCategory = "";
+  activeRunDeviceName = "";
+  activeRunDeviceIp = "";
+  activeRunFailedIps = new Set();
+
+  if (searchInput) {
+    searchInput.value = "";
+  }
+
+  filterInputs.forEach(input => {
+    input.checked = input.value === "all";
+  });
+
+  if (groupCheckSelect) {
+    groupCheckSelect.value = "";
+  }
+
+  if (runGroupCheckButton) {
+    runGroupCheckButton.disabled = true;
+  }
+}
+
+function resetConfigViewState() {
+  activeConfigSearch = "";
+  activeConfigView = "normal";
+
+  if (configDeviceSearchInput) {
+    configDeviceSearchInput.value = "";
+  }
+
+  renderConfigView();
+  resetDeviceForm();
+  clearConfigAlert();
+}
+
+function resetRegionsViewState() {
+  editingRegionId = "";
+  hideRegionForm();
+  clearRegionAlert();
+}
+
+function resetThemesViewState() {
+  editingThemeId = "";
+  hideThemeForm();
+  clearThemeAlert();
+}
+
+function refreshRouteData(route) {
+  if (route === "/") {
+    void refreshDashboardFromActiveRegion();
+    return;
+  }
+
+  if (route === "/config") {
+    void refreshConfigFromActiveRegion();
+    return;
+  }
+
+  if (route === "/regions") {
+    void loadRegions({ showBusy: true, showErrors: true });
+    return;
+  }
+
+  if (route === "/themes") {
+    void loadThemes({ showBusy: true, showErrors: true });
+  }
+}
+
+async function refreshConfigFromActiveRegion() {
+  await loadRegions({ showBusy: false, showErrors: false });
+  await loadConfig();
+}
+
 function normalizeRoute(pathname) {
-  const knownRoutes = new Set(["/", "/config", "/themes", "/manual", "/about"]);
+  const knownRoutes = new Set(["/", "/config", "/regions", "/themes", "/manual", "/about"]);
   return knownRoutes.has(pathname) ? pathname : "/";
 }
 
@@ -2731,6 +3529,7 @@ function getPageLabel(route) {
   const labels = {
     "/": "Dashboard",
     "/config": "Configuration",
+    "/regions": "Support Groups",
     "/themes": "Themes",
     "/manual": "User Manual",
     "/about": "About"
@@ -2856,6 +3655,10 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function escapeAttribute(value) {
+  return escapeHtml(value).replaceAll("`", "&#096;");
+}
+
 function isHttpUrl(value) {
   if (!value) {
     return false;
@@ -2956,9 +3759,12 @@ importConfigFileInput.addEventListener("change", event => {
   importConfigFile(event.target.files?.[0]);
 });
 saveConfigButton.addEventListener("click", () => saveConfig());
+configNormalViewButton.addEventListener("click", () => switchConfigView("normal"));
+configBulkViewButton.addEventListener("click", () => switchConfigView("bulk"));
 configDeviceSearchInput.addEventListener("input", debounce(event => {
   activeConfigSearch = event.target.value;
   renderConfigDevices();
+  renderBulkEditDevices();
 }, 150));
 if (intervalSecondsInput) {
   intervalSecondsInput.addEventListener("input", () => {
@@ -3024,10 +3830,77 @@ configDevicesBody.addEventListener("click", event => {
     requestDeleteDevice(Number(deleteButton.dataset.deleteDevice));
   }
 });
+bulkDevicesBody.addEventListener("input", event => {
+  const row = event.target.closest("[data-bulk-index]");
+
+  if (row) {
+    handleBulkRowChange(row);
+  }
+});
+bulkDevicesBody.addEventListener("change", event => {
+  const row = event.target.closest("[data-bulk-index]");
+
+  if (row) {
+    handleBulkRowChange(row);
+  }
+});
+bulkDevicesBody.addEventListener("click", event => {
+  const saveButton = event.target.closest("[data-bulk-save]");
+  const revertButton = event.target.closest("[data-bulk-revert]");
+  const advancedButton = event.target.closest("[data-bulk-advanced]");
+
+  if (saveButton) {
+    saveBulkRow(saveButton.closest("[data-bulk-index]"));
+    return;
+  }
+
+  if (revertButton) {
+    revertBulkRow(revertButton.closest("[data-bulk-index]"));
+    return;
+  }
+
+  if (advancedButton) {
+    editDevice(Number(advancedButton.dataset.bulkAdvanced));
+  }
+});
 confirmDeleteDeviceButton.addEventListener("click", confirmDeleteDevice);
 if (deviceFormModalElement) {
   deviceFormModalElement.addEventListener("shown.bs.modal", () => {
     deviceNameInput.focus();
+  });
+}
+regionSelect.addEventListener("change", event => {
+  selectRegion(event.target.value);
+});
+regionsBody.addEventListener("click", event => {
+  const row = event.target.closest("[data-region-row]");
+
+  if (row) {
+    selectRegion(row.dataset.regionRow);
+  }
+});
+regionsBody.addEventListener("keydown", event => {
+  if (event.key !== "Enter" && event.key !== " ") {
+    return;
+  }
+
+  const row = event.target.closest("[data-region-row]");
+
+  if (row) {
+    event.preventDefault();
+    selectRegion(row.dataset.regionRow);
+  }
+});
+regionForm.addEventListener("submit", submitRegionForm);
+newRegionButton.addEventListener("click", startNewRegion);
+copyRegionButton.addEventListener("click", copyRegion);
+renameRegionButton.addEventListener("click", startRenameRegion);
+activateRegionButton.addEventListener("click", activateRegion);
+deleteRegionButton.addEventListener("click", deleteRegion);
+if (regionFormModalElement) {
+  regionFormModalElement.addEventListener("shown.bs.modal", () => {
+    regionNameInput.focus();
+    regionNameInput.select();
   });
 }
 if (themeFormModalElement) {
@@ -3057,6 +3930,7 @@ saveThemesButton.addEventListener("click", () => saveThemes());
 resetThemesButton.addEventListener("click", resetThemes);
 window.addEventListener("popstate", () => navigateTo(location.pathname, true));
 
+void loadRegions({ showBusy: false, showErrors: false });
 void loadThemes({ showBusy: false, showErrors: false });
 navigateTo(currentRoute, true);
 

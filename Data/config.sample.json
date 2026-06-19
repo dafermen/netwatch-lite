@@ -12,6 +12,8 @@
       "ip": "127.0.0.1",
       "hostname": "localhost",
       "useHostnameForPing": false,
+      "region": "Sample Region",
+      "supportGroup": "Support Team A",
       "facility": "Local",
       "category": "Getting Started",
       "enabled": true,

@@ -19,10 +19,14 @@
   <ItemGroup>
     <Content Remove="Data/config.backup.json" />
     <Content Remove="Data/config.json" />
+    <Content Remove="Data/regions.json" />
+    <Content Remove="Data/regions/**" />
     <Content Remove="Data/themes.json" />
     <Content Remove="publish/**" />
     <None Remove="Data/config.backup.json" />
     <None Remove="Data/config.json" />
+    <None Remove="Data/regions.json" />
+    <None Remove="Data/regions/**" />
     <None Remove="Data/themes.json" />
     <None Remove="publish/**" />
     <Content Update="Data/config.sample.json" Link="config.sample.json">

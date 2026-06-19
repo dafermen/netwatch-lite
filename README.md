@@ -1,6 +1,6 @@
 # NetWatch-Lite
 
-NetWatch-Lite is a .NET 8 ASP.NET Core + Bootstrap network monitoring dashboard. It reads an editable JSON file, runs asynchronous ping and TCP checks, computes device health, groups results by category, and can be published as a portable Windows executable with the .NET runtime included.
+NetWatch-Lite is a .NET 8 ASP.NET Core + Bootstrap network monitoring dashboard. It reads editable JSON profiles, runs asynchronous ping and TCP checks, computes device health, groups results by region, facility, and category, and can be published as a portable Windows executable with the .NET runtime included.
 
 Full visual documentation is available at [docs/index.html](docs/index.html).
 
@@ -14,7 +14,7 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 
 Download the latest Windows x64 portable ZIP:
 
-[Download NetWatch Lite portable ZIP](https://github.com/dafermen/netwatch-lite/raw/refs/heads/main/releases/NetWatch-Lite-win-x64-portable-2026-06-17-v0.5.1-ui-themes.zip)
+[Download NetWatch Lite portable ZIP](https://github.com/dafermen/netwatch-lite/raw/refs/heads/main/releases/NetWatch-Lite-win-x64-portable-2026-06-19-v0.6.0-support-groups-bulk-edit.zip)
 
 Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The ZIP includes a safe `config.sample.json`; NetWatch Lite creates the editable runtime `config.json` and `themes.json` beside the executable on first run if they do not already exist.
 
@@ -30,7 +30,8 @@ Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The ZIP includes a safe 
 
 ## Features
 
-- Editable `config.json` inventory.
+- Editable JSON inventories, including independent Support Group profiles for multiple operational teams inside a region.
+- Support Groups manager at `/regions` for creating, copying, renaming, activating, and deleting independent JSON profiles.
 - Device categories such as `Servers`, `Critical Workstations`, `IP Cameras`, and `Power Devices`.
 - Async ping checks with latency in milliseconds.
 - Optional per-device hostname-based ping mode for networks where IP addresses can change.
@@ -59,16 +60,17 @@ Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The ZIP includes a safe 
 - Companion Windows WebView2 wallboard is maintained in the sibling `netwatch-lite-wallboard` repository.
 - Responsive layout for desktop, tablet, and mobile screens.
 - Configuration page at `/config`.
-- CRUD UI for devices and checks stored in `config.json`.
+- CRUD UI for devices and checks stored in the active support group JSON.
 - Editable auto refresh interval, timeout, max parallel check limit, and per-device ping target mode in `/config`.
 - Add, update, and delete device actions save immediately to `config.json`.
 - Copy device action opens a prefilled add form so similar devices can be created quickly.
+- Bulk Edit mode lets operators update common device fields in a spreadsheet-style table, with individual row saves and validation.
 - Theme templates can be created, copied, renamed, activated, deleted one at a time, or fully reset from the Themes page. If `themes.json` is missing, NetWatch Lite creates the default theme automatically.
 - Configuration device table grouped by facility and category for easier editing.
 - Configuration devices can be filtered by name, address, hostname, facility, or category.
 - Configuration facility and category groups are nested and collapsed by default.
 - Add/edit device form opens in a modal so large category lists do not push the editor out of view.
-- Configuration JSON export and import from `/config`, with server-side validation before imported files replace the current config.
+- Configuration JSON export and import from `/config`, with server-side validation before imported files replace the active support group config.
 - Manual mode by default.
 - Optional auto refresh toggle that runs a full check using `settings.intervalSeconds`.
 - Forced full check.
@@ -131,12 +133,13 @@ The device JSON path is configured in `appsettings.json`.
 {
   "NetworkMonitor": {
     "DeviceFilePath": "config.json",
+    "ProfileFilePath": "regions.json",
     "ThemeFilePath": "themes.json"
   }
 }
 ```
 
-During local development, `Data/config.json` is treated as a private local file and is ignored by Git. `Data/config.sample.json` is the safe starter example that can be committed. If runtime `config.json` is missing on first run or was deleted, NetWatch Lite creates a starter configuration with one `Localhost` ping device.
+During local development, `Data/config.json`, `Data/regions.json`, and `Data/regions/*.json` are treated as private local files and are ignored by Git. `Data/config.sample.json` is the safe starter example that can be committed. If runtime profile metadata is missing on first run, NetWatch Lite creates a `Support Team A` profile in `Sample Region` from the existing `config.json` when available, plus a protected `Demo` profile from `config.sample.json`. Dashboard and Configuration always operate on the active support group profile.
 
 `themes.json` stores GUI theme templates and the active theme id. It is runtime data and is ignored by Git, just like `config.json`. If it is missing, NetWatch Lite creates the built-in `NetWatch Default` theme automatically. Theme color tokens include page/surface/sidebar colors, status colors, dashboard category health colors, Configuration collapsible header colors, and dashboard action colors for `Auto Refresh: ON`, `Auto Refresh: OFF`, and the primary run button.
 
@@ -158,6 +161,8 @@ During local development, `Data/config.json` is treated as a private local file 
       "hostname": "web-server.local",
       "useHostnameForPing": true,
       "websiteUrl": "https://example.local/status",
+      "region": "Sample Region",
+      "supportGroup": "Support Team A",
       "facility": "Miami Warehouse",
       "category": "Servers",
       "enabled": true,
@@ -189,6 +194,7 @@ That project renders operational monitoring pages in native WebView2 panels for 
 | `POST` | `/api/reload` | Reloads `config.json` from disk. |
 | `GET` | `/api/config` | Returns the full editable configuration. |
 | `POST` | `/api/config` | Saves the full configuration, creates `config.backup.json`, and reloads memory. |
+| `POST` | `/api/config/devices/{deviceIndex}` | Validates and saves one device row from Bulk Edit, then reloads the active support group configuration in memory. |
 | `GET` | `/api/config/export` | Downloads the current normalized configuration as JSON. |
 | `POST` | `/api/config/import` | Imports a `.json` config file, validates it, creates `config.backup.json`, saves it, and reloads memory. |
 | `GET` | `/api/themes` | Returns normalized theme templates from `themes.json`, creating the default theme when missing. |
@@ -233,13 +239,13 @@ Open the URL printed by `dotnet run`, usually `http://localhost:5000`, `https://
 Publish a self-contained Windows x64 package:
 
 ```bash
-dotnet publish NetWatch.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o publish/win-x64-portable
+dotnet publish NetWatch.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x64-v0.6.0
 ```
 
 Expected output:
 
 ```text
-publish/win-x64-portable/
+publish/win-x64-v0.6.0/
 ├── NetWatch-Lite.exe
 ├── config.sample.json
 ├── appsettings.json
@@ -253,7 +259,8 @@ It also creates `themes.json` beside the executable if no theme file exists.
 Create a ZIP on macOS:
 
 ```bash
-ditto -c -k --sequesterRsrc --keepParent publish/win-x64-portable publish/NetWatch-Lite-win-x64-portable-2026-06-17-v0.5.1-ui-themes.zip
+cd publish/win-x64-v0.6.0
+zip -r ../../releases/NetWatch-Lite-win-x64-portable-2026-06-19-v0.6.0-support-groups-bulk-edit.zip .
 ```
 
 To run on Windows:

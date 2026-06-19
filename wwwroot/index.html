@@ -7,7 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="/netwatch-lite.svg">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
-  <link href="/styles.css?v=theme-delete-reset-20260617" rel="stylesheet">
+  <link href="/styles.css?v=regions-20260618" rel="stylesheet">
 </head>
 <body>
   <div class="app-shell">
@@ -24,6 +24,10 @@
         <a class="nav-link" href="/config" data-route="/config">
           <i class="fa-solid fa-sliders"></i>
           Configuration
+        </a>
+        <a class="nav-link" href="/regions" data-route="/regions">
+          <i class="fa-solid fa-diagram-project"></i>
+          Support Groups
         </a>
         <a class="nav-link" href="/themes" data-route="/themes">
           <i class="fa-solid fa-palette"></i>
@@ -59,16 +63,12 @@
             <div class="text-secondary small" id="execution-mode">Manual mode</div>
             <div class="text-secondary small" id="last-check">Waiting for first check...</div>
           </div>
-          <button class="btn btn-danger btn-sm" type="button" id="auto-refresh-toggle">
-            <i class="fa-solid fa-arrows-rotate me-1"></i>
-            <span id="auto-refresh-label">Auto Refresh: OFF</span>
-          </button>
         </div>
       </header>
 
       <main class="content">
         <section id="dashboard-page" data-page="/">
-          <section class="row g-3 mb-4" id="summary-cards" aria-label="Monitoring summary">
+          <section class="row g-2 mb-3" id="summary-cards" aria-label="Monitoring summary">
             <div class="col-12 col-sm-6 col-xl">
               <div class="card metric-card h-100">
                 <div class="card-body">
@@ -138,15 +138,23 @@
 
           <section class="facility-strip mb-3" aria-label="Facility filters">
             <div class="facility-strip-header">
-              <div>
-                <div class="text-secondary small text-uppercase fw-semibold">Facilities</div>
-                <div class="small text-secondary" id="active-facility-label">Showing all facilities</div>
+              <div class="facility-strip-title">
+                <span class="facility-region-title" id="dashboard-region-title">Sample Region</span>
+                <span class="badge text-bg-secondary" id="dashboard-support-group-label">Support Team A</span>
+                <span class="text-secondary small text-uppercase fw-semibold">Facilities</span>
+                <span class="small text-secondary" id="active-facility-label">Showing all facilities</span>
               </div>
-              <button class="btn btn-outline-primary btn-sm" type="button" id="run-facility-check">
-                <span class="spinner-border spinner-border-sm me-1 d-none" id="run-facility-check-spinner" aria-hidden="true"></span>
-                <i class="fa-solid fa-play me-1" id="run-facility-check-icon"></i>
-                <span id="run-facility-check-label">Run All Facilities</span>
-              </button>
+              <div class="facility-actions">
+                <button class="btn btn-danger btn-sm" type="button" id="auto-refresh-toggle">
+                  <i class="fa-solid fa-arrows-rotate me-1"></i>
+                  <span id="auto-refresh-label">Auto Refresh: OFF</span>
+                </button>
+                <button class="btn btn-outline-primary btn-sm" type="button" id="run-facility-check">
+                  <span class="spinner-border spinner-border-sm me-1 d-none" id="run-facility-check-spinner" aria-hidden="true"></span>
+                  <i class="fa-solid fa-play me-1" id="run-facility-check-icon"></i>
+                  <span id="run-facility-check-label">Run All Facilities</span>
+                </button>
+              </div>
             </div>
             <div class="facility-tabs" id="facility-tabs">
               <button class="btn btn-dark btn-sm" type="button" data-facility-filter="">All Facilities</button>
@@ -226,7 +234,7 @@
           <div class="config-toolbar d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
             <div>
               <h2 class="h4 mb-1">Configuration</h2>
-              <p class="text-secondary mb-0">Manage devices stored in config.json.</p>
+              <p class="text-secondary mb-0">Manage devices stored in the active support group JSON.</p>
             </div>
             <div class="config-actions d-flex align-items-center gap-2">
               <button class="btn btn-outline-primary btn-sm" type="button" id="export-config">
@@ -297,7 +305,13 @@
             <div class="col-12">
               <div class="card config-card">
                 <div class="card-header config-devices-header">
-                  <span class="fw-semibold">Devices</span>
+                  <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="fw-semibold">Devices</span>
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Configuration edit mode">
+                      <button class="btn btn-primary" type="button" id="config-normal-view">Normal</button>
+                      <button class="btn btn-outline-primary" type="button" id="config-bulk-view">Bulk Edit</button>
+                    </div>
+                  </div>
                   <div class="config-devices-tools">
                     <div class="input-group input-group-sm config-search-box">
                       <span class="input-group-text">
@@ -316,7 +330,7 @@
                     </button>
                   </div>
                 </div>
-                <div class="table-responsive">
+                <div class="table-responsive" id="config-devices-table-wrapper">
                   <table class="table table-hover align-middle mb-0 config-devices-table">
                     <colgroup>
                       <col class="config-col-name">
@@ -345,9 +359,109 @@
                     </tbody>
                   </table>
                 </div>
+                <div id="bulk-edit-panel" hidden>
+                  <div class="bulk-edit-summary border-bottom px-3 py-2 small text-secondary" id="bulk-edit-summary">0 devices shown</div>
+                  <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 bulk-edit-table">
+                      <thead class="table-light">
+                        <tr>
+                          <th>Name</th>
+                          <th>Facility</th>
+                          <th>Category</th>
+                          <th>Address</th>
+                          <th>Hostname</th>
+                          <th>Website URL</th>
+                          <th>Enabled</th>
+                          <th>Ping host</th>
+                          <th class="text-end">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody id="bulk-devices-body">
+                        <tr>
+                          <td colspan="9" class="text-center text-secondary py-4">Loading devices...</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
 
+          </div>
+        </section>
+
+        <section id="regions-page" data-page="/regions" hidden>
+          <div class="config-toolbar d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+            <div>
+              <h2 class="h4 mb-1">Support Groups</h2>
+              <p class="text-secondary mb-0">Manage independent JSON profiles for support groups inside each region.</p>
+            </div>
+            <div class="config-actions d-flex align-items-center gap-2">
+              <button class="btn btn-outline-primary btn-sm" type="button" id="new-region">
+                <i class="fa-solid fa-plus me-1"></i>
+                New Support Group
+              </button>
+              <button class="btn btn-outline-secondary btn-sm" type="button" id="copy-region">
+                <i class="fa-solid fa-copy me-1"></i>
+                Copy Support Group
+              </button>
+              <button class="btn btn-outline-secondary btn-sm" type="button" id="rename-region">
+                <i class="fa-solid fa-pen me-1"></i>
+                Rename
+              </button>
+            </div>
+          </div>
+
+          <div id="region-alert"></div>
+
+          <div class="row g-3">
+            <div class="col-12 col-xl-5">
+              <div class="card config-card h-100">
+                <div class="card-header config-settings-header">
+                  <span class="fw-semibold">Active Support Group</span>
+                  <button class="btn btn-success btn-sm" type="button" id="activate-region">
+                    <span class="spinner-border spinner-border-sm me-1 d-none" id="activate-region-spinner" aria-hidden="true"></span>
+                    <i class="fa-solid fa-check me-1" id="activate-region-icon"></i>
+                    Set Active
+                  </button>
+                </div>
+                <div class="card-body">
+                  <label class="form-label" for="region-select">Support group profile</label>
+                  <select class="form-select mb-3" id="region-select"></select>
+                  <div class="small text-secondary" id="region-details">Select a support group profile.</div>
+                  <div class="d-flex flex-wrap gap-2 mt-3">
+                    <button class="btn btn-outline-danger btn-sm" type="button" id="delete-region">
+                      <i class="fa-solid fa-trash me-1"></i>
+                      Delete Support Group
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12 col-xl-7">
+              <div class="card config-card h-100">
+                <div class="card-header config-devices-header">
+                  <span class="fw-semibold">Support Group Profiles</span>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Support Group</th>
+                        <th>Region</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="regions-body">
+                      <tr>
+                        <td colspan="3" class="text-center text-secondary py-4">Loading support groups...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -503,11 +617,14 @@
 
             <section class="doc-panel">
               <h3><i class="fa-solid fa-sliders me-2 text-warning"></i>Configuration</h3>
-              <p>The Configuration page edits the same <code>config.json</code> used by the backend.</p>
+              <p>The Configuration page edits the active region JSON used by the backend.</p>
               <ul>
+                <li>Use <strong>Support Groups</strong> to switch between independent JSON profiles such as Support Team A, Support Team B, or Demo.</li>
+                <li>Dashboard and Configuration always use the active support group profile.</li>
                 <li>Devices are grouped by facility and category; both levels are collapsible by default.</li>
                 <li>Filter configured devices by name, address, hostname, facility, or category.</li>
                 <li>Add, copy, or edit name, facility, address, hostname, website URL, category, enabled state, and checks from a modal editor.</li>
+                <li>Use <strong>Bulk Edit</strong> for spreadsheet-style updates to common fields, with one save button per row.</li>
                 <li>Set <strong>Auto refresh</strong> to control how often Auto Refresh runs a full check.</li>
                 <li>Use <strong>Ping this device by hostname</strong> when that device's IP changes but its DNS name stays stable.</li>
                 <li>Use <strong>Themes</strong> to create, rename, activate, delete, and color reusable GUI templates.</li>
@@ -518,11 +635,11 @@
 
             <section class="doc-panel">
               <h3><i class="fa-solid fa-file-code me-2 text-info"></i>JSON File</h3>
-              <p>The portable build keeps <code>config.json</code> beside <code>NetWatch-Lite.exe</code>, so operators can edit it directly if needed.</p>
+              <p>The portable build keeps runtime JSON profiles beside <code>NetWatch-Lite.exe</code>, so operators can manage independent support group inventories.</p>
               <ul>
-                <li>If <code>config.json</code> is missing, NetWatch Lite creates a starter <strong>Localhost</strong> ping device so first-time users can test immediately.</li>
+                <li>If support group profiles are missing, NetWatch Lite creates a <strong>Support Team A</strong> profile and a protected <strong>Demo</strong> profile.</li>
                 <li><strong>Reload JSON</strong> reloads the file without restarting the app.</li>
-                <li><strong>Export JSON</strong> downloads the current configuration; <strong>Import JSON</strong> validates a selected file before replacing the current configuration.</li>
+                <li><strong>Export JSON</strong> downloads the active support group configuration; <strong>Import JSON</strong> validates a selected file before replacing the active support group configuration.</li>
                 <li>Invalid JSON is reported in the UI/API so it can be corrected.</li>
                 <li>TCP checks verify whether a socket connection can be opened.</li>
               </ul>
@@ -585,6 +702,35 @@
         <div class="modal-footer">
           <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
           <button class="btn btn-primary" type="submit" id="submit-theme">Create Theme</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal fade" id="region-form-modal" tabindex="-1" aria-labelledby="region-form-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <form class="modal-content" id="region-form">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="region-form-title">New Support Group</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label" for="region-name">Support Group</label>
+            <input class="form-control" type="text" id="region-name" autocomplete="off" placeholder="Support Team A" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="region-value">Region</label>
+            <input class="form-control" type="text" id="region-value" autocomplete="off" placeholder="Sample Region">
+          </div>
+          <div class="form-check" id="region-copy-wrapper">
+            <input class="form-check-input" type="checkbox" id="region-copy-active" checked>
+            <label class="form-check-label" for="region-copy-active">Copy devices from the active support group</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" type="submit" id="submit-region">Create Support Group</button>
         </div>
       </form>
     </div>
@@ -667,6 +813,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="/app.js?v=theme-delete-reset-20260617"></script>
+  <script src="/app.js?v=regions-20260618"></script>
 </body>
 </html>

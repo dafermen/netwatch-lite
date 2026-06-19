@@ -17,6 +17,11 @@ public sealed class NetworkMonitorOptions
     public string DeviceFilePath { get; init; } = "config.json";
 
     /// <summary>
+    /// Relative or absolute path to the region/profile registry JSON file.
+    /// </summary>
+    public string ProfileFilePath { get; init; } = "regions.json";
+
+    /// <summary>
     /// Relative or absolute path to the editable themes.json UI theme file.
     /// </summary>
     public string ThemeFilePath { get; init; } = "themes.json";

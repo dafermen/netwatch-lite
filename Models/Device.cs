@@ -39,6 +39,18 @@ public sealed class Device
     public string? WebsiteUrl { get; init; }
 
     /// <summary>
+    /// Higher-level operational region, for example Sample Region.
+    /// </summary>
+    [JsonPropertyName("region")]
+    public string Region { get; init; } = "Unassigned";
+
+    /// <summary>
+    /// Support group inside the region, for example Support Team A or Support Team B.
+    /// </summary>
+    [JsonPropertyName("supportGroup")]
+    public string SupportGroup { get; init; } = "Unassigned";
+
+    /// <summary>
     /// Physical site or branch where the device is located, for example Miami Warehouse or Orlando Office.
     /// </summary>
     [JsonPropertyName("facility")]

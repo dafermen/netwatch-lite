@@ -184,7 +184,7 @@
         </div>
         <div class="card">
           <h3>Portable</h3>
-          <p>Se publica como <code>win-x64</code> self-contained. Los archivos runtime <code>config.json</code> y <code>themes.json</code> quedan junto a <code>NetWatch-Lite.exe</code> y no deben versionarse.</p>
+          <p>Se publica como <code>win-x64</code> self-contained. Los archivos runtime <code>config.json</code>, <code>regions.json</code>, perfiles en <code>regions/*.json</code> y <code>themes.json</code> quedan junto a <code>NetWatch-Lite.exe</code> y no deben versionarse.</p>
         </div>
         <div class="card">
           <h3>WebView2</h3>
@@ -212,7 +212,8 @@
       <h2>Flujo De Ejecucion</h2>
       <ol>
         <li>La aplicacion inicia en <code>Program.cs</code>.</li>
-        <li><code>JsonDeviceRepository.ReloadAsync</code> carga y normaliza <code>config.json</code>.</li>
+        <li><code>JsonRegionProfileRepository</code> administra perfiles independientes por support group dentro de una region configurable.</li>
+        <li><code>JsonDeviceRepository.ReloadAsync</code> carga y normaliza el JSON de la region activa.</li>
         <li>La UI llama <code>GET /api/monitor/stream</code> para ejecutar un full check progresivo.</li>
         <li>El modo automatico ejecuta un full check segun <code>settings.intervalSeconds</code>.</li>
         <li><code>NetworkMonitorService.CheckAllDevicesAsync</code> revisa dispositivos habilitados en paralelo.</li>
@@ -224,7 +225,7 @@
 
     <section>
       <h2>Configuracion JSON</h2>
-      <p>En desarrollo <code>Data/config.json</code> es local e ignorado por Git. El ejemplo seguro versionado vive en <code>Data/config.sample.json</code>. Al publicar portable se copia como <code>config.sample.json</code>; si el runtime <code>config.json</code> no existe, la aplicacion crea una configuracion inicial con un dispositivo <code>Localhost</code> para poder probar el monitor inmediatamente.</p>
+      <p>En desarrollo <code>Data/config.json</code>, <code>Data/regions.json</code> y <code>Data/regions/*.json</code> son locales e ignorados por Git. El ejemplo seguro versionado vive en <code>Data/config.sample.json</code>. Si no existen perfiles, la aplicacion crea un perfil <code>Support Team A</code> desde el config local cuando esta disponible y un perfil protegido <code>Demo</code> desde el sample.</p>
       <p>El archivo <code>themes.json</code> tambien es runtime e ignorado por Git. Guarda templates de color para el GUI y se crea automaticamente con el tema <code>NetWatch Default</code> si no existe.</p>
       <pre>{
   "settings": {
@@ -302,9 +303,13 @@
         </thead>
         <tbody>
           <tr><td><span class="tag get">GET</span></td><td><code>/api/devices</code></td><td>Obtiene dispositivos normalizados.</td><td>Lista de <code>Device</code>.</td></tr>
-          <tr><td><span class="tag post">POST</span></td><td><code>/api/reload</code></td><td>Recarga <code>config.json</code> desde disco.</td><td>Conteos y settings.</td></tr>
+          <tr><td><span class="tag get">GET</span></td><td><code>/api/regions</code></td><td>Lista perfiles de region y perfil activo.</td><td><code>RegionProfileConfiguration</code>.</td></tr>
+          <tr><td><span class="tag post">POST</span></td><td><code>/api/regions</code></td><td>Crea un perfil independiente y lo activa.</td><td>Perfiles actualizados.</td></tr>
+          <tr><td><span class="tag post">POST</span></td><td><code>/api/regions/{id}/activate</code></td><td>Cambia la region activa.</td><td>Perfiles y conteos.</td></tr>
+          <tr><td><span class="tag post">POST</span></td><td><code>/api/reload</code></td><td>Recarga el JSON activo desde disco.</td><td>Conteos y settings.</td></tr>
           <tr><td><span class="tag get">GET</span></td><td><code>/api/config</code></td><td>Devuelve la configuracion completa editable.</td><td><code>MonitorConfiguration</code>.</td></tr>
           <tr><td><span class="tag post">POST</span></td><td><code>/api/config</code></td><td>Guarda la configuracion completa, crea <code>config.backup.json</code> y recarga memoria.</td><td>Configuracion guardada.</td></tr>
+          <tr><td><span class="tag post">POST</span></td><td><code>/api/config/devices/{deviceIndex}</code></td><td>Valida y guarda una sola fila desde Bulk Edit.</td><td>Dispositivo y configuracion actualizada.</td></tr>
           <tr><td><span class="tag get">GET</span></td><td><code>/api/config/export</code></td><td>Descarga la configuracion normalizada como JSON.</td><td>Archivo JSON.</td></tr>
           <tr><td><span class="tag post">POST</span></td><td><code>/api/config/import</code></td><td>Importa un archivo <code>.json</code>, valida la configuracion, crea backup y recarga memoria.</td><td>Configuracion importada o error controlado.</td></tr>
           <tr><td><span class="tag get">GET</span></td><td><code>/api/themes</code></td><td>Lee y normaliza <code>themes.json</code>; crea el tema por defecto si falta.</td><td><code>ThemeConfiguration</code>.</td></tr>
@@ -375,7 +380,7 @@
       <h2>Frontend</h2>
       <p><code>wwwroot/index.html</code> define el layout compartido: sidebar hamburguesa, topbar, dashboard, pagina de configuracion, pagina de temas, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto. Cuando hay problemas aparece <code>Run Failed</code> para repetir solo los dispositivos fallidos, y cada fila con problema muestra <code>Run</code> junto al timestamp para repetir solo ese dispositivo.</p>
       <p>El dashboard muestra botones de facility para enfocar una sede y habilitar <code>Run Facility</code>. En vista general, las tablas se agrupan por facility y luego por categoria, por lo que dos equipos con el mismo nombre en sedes distintas se ven como registros diferentes.</p>
-      <p>La pagina <code>/config</code> agrupa los dispositivos por facility y categoria, con grupos colapsados por defecto para facilitar la edicion de inventarios grandes. Las acciones de agregar, copiar, actualizar y eliminar dispositivos guardan inmediatamente en <code>config.json</code>, y el boton <code>Save Settings</code> dentro de Settings guarda ajustes generales como intervalo, timeout, reintentos, pausa entre reintentos y concurrencia maxima. <code>Export JSON</code> descarga la configuracion actual e <code>Import JSON</code> valida un archivo antes de reemplazar la configuracion.</p>
+      <p>La pagina <code>/regions</code> permite crear, copiar, renombrar, activar y eliminar perfiles JSON independientes. La pagina <code>/config</code> trabaja sobre la region activa y agrupa los dispositivos por facility y categoria, con grupos colapsados por defecto para facilitar la edicion de inventarios grandes. El modo <code>Bulk Edit</code> muestra una tabla estilo hoja de calculo para actualizar campos comunes y guardar una fila a la vez. Las acciones de agregar, copiar, actualizar y eliminar dispositivos guardan inmediatamente en el JSON activo, y el boton <code>Save Settings</code> guarda ajustes generales como intervalo, timeout, reintentos, pausa entre reintentos y concurrencia maxima. <code>Export JSON</code> descarga la configuracion activa e <code>Import JSON</code> valida un archivo antes de reemplazar esa configuracion.</p>
       <p>La pagina <code>/themes</code> permite crear, copiar, renombrar, activar, borrar, resetear y guardar templates de color en <code>themes.json</code>. El nombre de un tema nuevo, copiado o renombrado se captura en modal, y los colores editables incluyen el sidebar, superficies, estados, categorias, headers colapsables de Configuration, <code>Auto Refresh ON</code>, <code>Auto Refresh OFF</code> y el boton principal de ejecucion.</p>
       <p>El sidebar tambien incluye <code>/manual</code> con un manual de usuario integrado y <code>/about</code> con informacion del proyecto, su caracter libre y notas operativas.</p>
       <p><code>wwwroot/app.js</code> contiene funciones JSDoc para:</p>
@@ -406,6 +411,7 @@ dotnet run</pre>
           <tr><th>Version</th><th>Resumen</th></tr>
         </thead>
         <tbody>
+          <tr><td><code>v0.6.0</code></td><td>Support Groups independientes, Bulk Edit por fila, defaults publicos neutrales, dashboard mas compacto y portable limpio con solo <code>config.sample.json</code>.</td></tr>
           <tr><td><code>v0.5.1</code></td><td>Facilities compactas y colapsables, Configuration colapsable por facility/categoria, boton unico de ejecucion, temas renombrables, controles de color para headers colapsables y naranja para categorias degradadas.</td></tr>
           <tr><td><code>v0.5.0</code></td><td>Facilities, agrupacion facility/categoria, Run Facility, copia de dispositivos, temas editables en <code>themes.json</code> y colores para botones del dashboard.</td></tr>
           <tr><td><code>v0.4.1</code></td><td>Reintentos configurables, Run Failed, feedback por dispositivo y protecciones para config runtime.</td></tr>
@@ -420,16 +426,17 @@ dotnet run</pre>
     <section>
       <h2>Crear Portable Windows</h2>
       <p>Comando recomendado:</p>
-      <pre>dotnet publish NetWatch.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o publish/win-x64-portable</pre>
+      <pre>dotnet publish NetWatch.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x64-v0.6.0</pre>
       <p>Resultado esperado:</p>
-      <pre>publish/win-x64-portable/
+      <pre>publish/win-x64-v0.6.0/
 ├── NetWatch-Lite.exe
 ├── config.sample.json
 ├── appsettings.json
 ├── wwwroot/
 └── runtime dependencies...</pre>
       <p>Crear ZIP en macOS:</p>
-      <pre>ditto -c -k --sequesterRsrc --keepParent publish/win-x64-portable publish/NetWatch-Lite-win-x64-portable-2026-06-17-v0.5.1-ui-themes.zip</pre>
+      <pre>cd publish/win-x64-v0.6.0
+zip -r ../../releases/NetWatch-Lite-win-x64-portable-2026-06-19-v0.6.0-support-groups-bulk-edit.zip .</pre>
       <p>Uso en Windows:</p>
       <ol>
         <li>Descomprimir el ZIP.</li>

@@ -19,6 +19,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 // Register configuration and singleton services. Singletons keep the loaded JSON in memory.
 builder.Services.Configure<NetworkMonitorOptions>(
     builder.Configuration.GetSection(NetworkMonitorOptions.SectionName));
+builder.Services.AddSingleton<JsonRegionProfileRepository>();
 builder.Services.AddSingleton<JsonDeviceRepository>();
 builder.Services.AddSingleton<JsonThemeRepository>();
 builder.Services.AddSingleton<NetworkMonitorService>();
@@ -116,6 +117,41 @@ app.MapPost("/api/config", async (
     {
         return Results.Problem(
             title: "Unable to save configuration.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
+// Saves one device row in the active support group JSON for bulk-edit workflows.
+app.MapPost("/api/config/devices/{deviceIndex:int}", async (
+    int deviceIndex,
+    Device device,
+    JsonDeviceRepository deviceRepository,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var saved = await deviceRepository.UpdateDeviceAsync(deviceIndex, device, cancellationToken);
+
+        return Results.Ok(new
+        {
+            savedAt = DateTimeOffset.Now,
+            deviceIndex,
+            device = saved.Devices[deviceIndex],
+            configuration = saved
+        });
+    }
+    catch (InvalidDataException ex)
+    {
+        return Results.BadRequest(new
+        {
+            error = ex.Message
+        });
+    }
+    catch (Exception ex) when (IsConfigurationWriteException(ex))
+    {
+        return Results.Problem(
+            title: "Unable to save device.",
             detail: ex.Message,
             statusCode: StatusCodes.Status500InternalServerError);
     }
@@ -293,6 +329,195 @@ app.MapPost("/api/themes/reset", async (
     {
         return Results.Problem(
             title: "Unable to reset themes.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
+// Returns the available region profiles and the active monitor configuration selection.
+app.MapGet("/api/regions", async (
+    JsonRegionProfileRepository profileRepository,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return Results.Ok(await profileRepository.GetConfigurationAsync(cancellationToken));
+    }
+    catch (Exception ex) when (IsConfigurationReadException(ex))
+    {
+        return Results.BadRequest(new
+        {
+            error = ex.Message
+        });
+    }
+});
+
+// Creates a new independent region profile and makes it active.
+app.MapPost("/api/regions", async (
+    CreateRegionProfileRequest request,
+    JsonRegionProfileRepository profileRepository,
+    JsonDeviceRepository deviceRepository,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var configuration = await profileRepository.CreateAsync(request, cancellationToken);
+        await deviceRepository.ReloadAsync(cancellationToken);
+
+        return Results.Ok(new
+        {
+            savedAt = DateTimeOffset.Now,
+            configuration
+        });
+    }
+    catch (InvalidDataException ex)
+    {
+        return Results.BadRequest(new
+        {
+            error = ex.Message
+        });
+    }
+    catch (Exception ex) when (IsConfigurationWriteException(ex))
+    {
+        return Results.Problem(
+            title: "Unable to create region profile.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
+// Activates an existing region profile.
+app.MapPost("/api/regions/{profileId}/activate", async (
+    string profileId,
+    JsonRegionProfileRepository profileRepository,
+    JsonDeviceRepository deviceRepository,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var configuration = await profileRepository.SetActiveAsync(profileId, cancellationToken);
+        var monitorConfiguration = await deviceRepository.ReloadAsync(cancellationToken);
+
+        return Results.Ok(new
+        {
+            savedAt = DateTimeOffset.Now,
+            count = monitorConfiguration.Devices.Count,
+            enabledCount = monitorConfiguration.Devices.Count(device => device.Enabled),
+            configuration
+        });
+    }
+    catch (InvalidDataException ex)
+    {
+        return Results.BadRequest(new
+        {
+            error = ex.Message
+        });
+    }
+    catch (Exception ex) when (IsConfigurationWriteException(ex) || IsConfigurationReadException(ex))
+    {
+        return Results.Problem(
+            title: "Unable to activate region profile.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
+// Duplicates an existing region profile and makes the copy active.
+app.MapPost("/api/regions/{profileId}/duplicate", async (
+    string profileId,
+    JsonRegionProfileRepository profileRepository,
+    JsonDeviceRepository deviceRepository,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var configuration = await profileRepository.DuplicateAsync(profileId, cancellationToken);
+        await deviceRepository.ReloadAsync(cancellationToken);
+
+        return Results.Ok(new
+        {
+            savedAt = DateTimeOffset.Now,
+            configuration
+        });
+    }
+    catch (InvalidDataException ex)
+    {
+        return Results.BadRequest(new
+        {
+            error = ex.Message
+        });
+    }
+    catch (Exception ex) when (IsConfigurationWriteException(ex) || IsConfigurationReadException(ex))
+    {
+        return Results.Problem(
+            title: "Unable to duplicate region profile.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
+// Renames a region profile and updates its display region.
+app.MapPost("/api/regions/{profileId}", async (
+    string profileId,
+    RenameRegionProfileRequest request,
+    JsonRegionProfileRepository profileRepository,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var configuration = await profileRepository.RenameAsync(profileId, request, cancellationToken);
+
+        return Results.Ok(new
+        {
+            savedAt = DateTimeOffset.Now,
+            configuration
+        });
+    }
+    catch (InvalidDataException ex)
+    {
+        return Results.BadRequest(new
+        {
+            error = ex.Message
+        });
+    }
+    catch (Exception ex) when (IsConfigurationWriteException(ex))
+    {
+        return Results.Problem(
+            title: "Unable to rename region profile.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
+// Deletes one region profile and keeps the remaining profiles intact.
+app.MapDelete("/api/regions/{profileId}", async (
+    string profileId,
+    JsonRegionProfileRepository profileRepository,
+    JsonDeviceRepository deviceRepository,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var configuration = await profileRepository.DeleteAsync(profileId, cancellationToken);
+        await deviceRepository.ReloadAsync(cancellationToken);
+
+        return Results.Ok(new
+        {
+            deletedAt = DateTimeOffset.Now,
+            configuration
+        });
+    }
+    catch (InvalidDataException ex)
+    {
+        return Results.BadRequest(new
+        {
+            error = ex.Message
+        });
+    }
+    catch (Exception ex) when (IsConfigurationWriteException(ex) || IsConfigurationReadException(ex))
+    {
+        return Results.Problem(
+            title: "Unable to delete region profile.",
             detail: ex.Message,
             statusCode: StatusCodes.Status500InternalServerError);
     }

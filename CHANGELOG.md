@@ -2,6 +2,15 @@
 
 All notable changes to NetWatch-Lite are documented here.
 
+## v0.6.0 - 2026-06-19
+
+- Added Support Group profiles so teams can use independent JSON configuration files inside a region.
+- Added a Support Groups page to create, copy, rename, activate, and delete one profile at a time.
+- Dashboard and Configuration now use the active support group JSON while preserving compatibility with the existing `Data/config.json`.
+- Added per-device `region` and `supportGroup` normalization so legacy devices inherit the active profile context when fields are missing.
+- Added Configuration Bulk Edit mode with per-row `Save`, `Revert`, and `Advanced` actions for fast updates across large device inventories.
+- Compact dashboard navigation with the active region title, support group badge, facility tabs, Auto Refresh, and Run action grouped together.
+
 ## v0.5.1 - 2026-06-17
 
 - Made dashboard facility sections compact and collapsible, with a per-facility `Run` action visible from the collapsed summary row.

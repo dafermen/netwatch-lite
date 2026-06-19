@@ -15,6 +15,7 @@ publish/
 # IDE folders
 .vs/
 .vscode/
+.private/
 
 # Wallboard is maintained in the sibling netwatch-lite-wallboard repository
 src/
@@ -26,6 +27,8 @@ src/
 Data/config.json
 Data/config.backup.json
 Data/themes.json
+Data/regions.json
+Data/regions/
 config.backup.json
 themes.json
 

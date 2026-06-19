@@ -29,7 +29,7 @@ NetworkMonitorService
 Ping / TCP checks
 ```
 
-Configuration is stored in runtime `config.json`. During development, `Data/config.json` is private and ignored by Git; `Data/config.sample.json` is the safe committed example. During portable publish, the sample is copied beside the executable as `config.sample.json`. When runtime `config.json` is missing, the repository creates a starter configuration with one enabled `Localhost` ping device.
+Configuration is stored in runtime JSON profiles. During development, `Data/config.json`, `Data/regions.json`, and `Data/regions/*.json` are private and ignored by Git; `Data/config.sample.json` is the safe committed example. When profile metadata is missing, the repository creates a `Support Team A` profile in `Sample Region` from the existing local config when available and a protected `Demo` profile from the sample file.
 
 GUI theme templates are stored in runtime `themes.json`. The file is also ignored by Git and is created automatically with the built-in `NetWatch Default` theme when missing.
 
@@ -44,11 +44,12 @@ Important responsibilities:
 - Registers JSON enum serialization so `DeviceStatus` is sent as `Healthy`, `Degraded`, or `Down`.
 - Registers singleton services:
   - `JsonDeviceRepository`
+  - `JsonRegionProfileRepository`
   - `JsonThemeRepository`
   - `NetworkMonitorService`
   - `MonitorExecutionService`
-- Attempts to load `config.json` at startup.
-- Keeps the app alive if `config.json` is invalid so `/config` can be used to repair it.
+- Attempts to load the active support group JSON at startup.
+- Keeps the app alive if the active JSON is invalid so `/config` can be used to repair it.
 - Maps configuration endpoints.
 - Maps monitoring endpoints.
 - Returns controlled error payloads for configuration read/write failures.
@@ -60,11 +61,18 @@ Important endpoints:
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/devices` | Returns normalized devices from the current configuration. |
-| `POST /api/reload` | Reloads `config.json` from disk and returns summary counts. |
-| `GET /api/config` | Returns the full editable configuration. |
-| `POST /api/config` | Validates, backs up, saves, and reloads the configuration. |
-| `GET /api/config/export` | Downloads the current normalized configuration as JSON. |
-| `POST /api/config/import` | Imports an uploaded `.json` file, validates it, backs up the current config, saves it, and reloads memory. |
+| `POST /api/reload` | Reloads the active support group JSON from disk and returns summary counts. |
+| `GET /api/config` | Returns the full editable active support group configuration. |
+| `POST /api/config` | Validates, backs up, saves, and reloads the active support group configuration. |
+| `POST /api/config/devices/{deviceIndex}` | Validates, backs up, saves, and reloads one device row from Configuration Bulk Edit. |
+| `GET /api/config/export` | Downloads the active normalized configuration as JSON. |
+| `POST /api/config/import` | Imports an uploaded `.json` file, validates it, backs up the active config, saves it, and reloads memory. |
+| `GET /api/regions` | Returns support group profiles and the active profile id. |
+| `POST /api/regions` | Creates and activates a new independent support group profile. |
+| `POST /api/regions/{id}/activate` | Activates an existing profile and reloads its JSON. |
+| `POST /api/regions/{id}/duplicate` | Copies an existing profile and activates the copy. |
+| `POST /api/regions/{id}` | Renames a profile and updates its region label. |
+| `DELETE /api/regions/{id}` | Deletes one profile and archives its JSON locally. |
 | `GET /api/themes` | Returns normalized theme templates from `themes.json`, creating the default file when missing. |
 | `POST /api/themes` | Validates, normalizes, and saves theme templates. |
 | `POST /api/themes/reset` | Replaces `themes.json` with the built-in default theme. |
@@ -377,9 +385,11 @@ Important configuration functions:
 - `importConfigFile`: validates selected file name/size, uploads it to `/api/config/import`, and refreshes UI state.
 - `applyConfigPayload`: syncs loaded settings and devices into the configuration UI.
 - `renderConfigDevices`: paints the facility/category grouped device table.
+- `renderBulkEditDevices`: paints the spreadsheet-style Bulk Edit table for common device fields.
 - `filterConfigDevices`: filters configuration devices by name, address, hostname, facility, or category while preserving original indexes.
 - `groupConfigDevicesByFacility`: groups devices by facility and category while preserving their original JSON index.
 - `renderConfigDeviceRow`: renders one editable device row inside a category group.
+- `saveBulkRow`: validates and saves a single Bulk Edit row through `/api/config/devices/{deviceIndex}`.
 - `toggleConfigCategory`: expands or collapses all rows for one configuration category.
 - `toggleConfigFacility`: expands or collapses all category headers and device rows for one configuration facility.
 - `startAddDevice`: opens the add device modal.
