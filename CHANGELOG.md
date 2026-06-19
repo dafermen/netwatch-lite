@@ -2,6 +2,14 @@
 
 All notable changes to NetWatch-Lite are documented here.
 
+## v0.6.1 - 2026-06-19
+
+- Fixed scoped dashboard category runs so `Run Group` executes only the selected category instead of carrying over unrelated dashboard categories.
+- Improved Bulk Edit for large inventories with facility/category filters, facility/category visual separators, and collapsible facility sections.
+- Standardized the Themes layout with the same compact left-side action panel used by Configuration and Support Groups.
+- Expanded public, developer, in-app, and private presentation documentation with the current security model and deployment boundary.
+- Updated source comments and developer documentation to describe active Support Group JSON profiles instead of the legacy single `config.json` flow.
+
 ## v0.6.0 - 2026-06-19
 
 - Added Support Group profiles so teams can use independent JSON configuration files inside a region.

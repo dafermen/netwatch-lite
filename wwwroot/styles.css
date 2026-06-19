@@ -325,9 +325,26 @@ body {
   width: 25rem;
 }
 
+.config-toolbar {
+  background: var(--nw-surface);
+  border: 1px solid var(--nw-border);
+  border-radius: 0.5rem;
+  padding: 0.85rem;
+}
+
+.config-page-toolbar {
+  align-items: flex-start;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(18rem, 1fr);
+}
+
 .config-actions {
+  align-items: center;
+  display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  gap: 0.5rem;
+  justify-content: flex-start;
 }
 
 .config-settings-header,
@@ -355,6 +372,20 @@ body {
 .config-search-box {
   max-width: 26rem;
   min-width: 16rem;
+}
+
+.region-action-grid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.region-action-grid .btn {
+  justify-content: center;
+}
+
+.region-action-danger {
+  grid-column: 1 / -1;
 }
 
 .config-devices-table {
@@ -430,6 +461,21 @@ body {
   min-width: 1180px;
 }
 
+.bulk-edit-controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.bulk-edit-filter-grid {
+  align-items: end;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 1fr) auto;
+}
+
 .bulk-edit-table input {
   min-width: 8rem;
 }
@@ -442,6 +488,36 @@ body {
   display: inline-flex;
   flex-wrap: nowrap;
   gap: 0.35rem;
+}
+
+.bulk-group-row td {
+  background: var(--nw-config-facility-header);
+  color: var(--nw-config-facility-text);
+  padding: 0.5rem 0.75rem;
+}
+
+.bulk-category-row td {
+  background: var(--nw-config-category-header);
+  color: var(--nw-config-category-text);
+  padding: 0.45rem 0.75rem;
+}
+
+.bulk-facility-toggle {
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  color: inherit;
+  display: inline-flex;
+  height: 1.75rem;
+  justify-content: center;
+  margin-right: 0.5rem;
+  padding: 0;
+  width: 1.75rem;
+}
+
+.bulk-facility-toggle:hover,
+.bulk-facility-toggle:focus {
+  border-color: currentColor;
+  color: inherit;
 }
 
 .facility-toggle,
@@ -723,7 +799,7 @@ body {
 .theme-color-grid {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .theme-color-field {
@@ -874,6 +950,15 @@ body {
 
   .group-check-control {
     width: 100%;
+  }
+
+  .bulk-edit-controls,
+  .bulk-edit-filter-grid {
+    width: 100%;
+  }
+
+  .bulk-edit-filter-grid {
+    grid-template-columns: 1fr;
   }
 
   .facility-strip-header {

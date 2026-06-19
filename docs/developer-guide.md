@@ -33,6 +33,28 @@ Configuration is stored in runtime JSON profiles. During development, `Data/conf
 
 GUI theme templates are stored in runtime `themes.json`. The file is also ignored by Git and is created automatically with the built-in `NetWatch Default` theme when missing.
 
+## Security Model
+
+NetWatch Lite is an internal operational monitoring tool. It does not currently implement application-level authentication, authorization, or multi-user roles. Security depends on a narrow deployment boundary plus server-side validation and careful handling of runtime data.
+
+Application-level safeguards:
+
+- Runtime JSON files are ignored by Git: `Data/config.json`, `Data/regions.json`, `Data/regions/*.json`, and `Data/themes.json`.
+- The committed sample inventory is limited to generic `Localhost` data.
+- `NetWatch.csproj` excludes runtime JSON profiles from publish output so portable packages do not accidentally include operational inventory.
+- Import endpoints enforce file extension, size, JSON parsing, and configuration validation before replacing active data.
+- Save endpoints validate configuration server-side before writing.
+- Save operations create local backups beside the active JSON.
+- Monitoring execution uses an execution lock to avoid overlapping full checks.
+- Network exceptions are converted into device results or controlled API/SSE errors instead of process crashes.
+
+Deployment expectations:
+
+- Run the app on a trusted internal workstation/server or place it behind existing enterprise controls such as VPN, firewall rules, reverse proxy authentication, or Windows access controls.
+- Do not expose the app directly to untrusted networks.
+- Treat IP addresses, hostnames, facilities, support groups, and theme/profile files as operational data.
+- Add authentication and role-based authorization before using it as a shared multi-user service outside a controlled internal context.
+
 ## Backend Entry Point
 
 ### Program.cs
@@ -385,7 +407,9 @@ Important configuration functions:
 - `importConfigFile`: validates selected file name/size, uploads it to `/api/config/import`, and refreshes UI state.
 - `applyConfigPayload`: syncs loaded settings and devices into the configuration UI.
 - `renderConfigDevices`: paints the facility/category grouped device table.
-- `renderBulkEditDevices`: paints the spreadsheet-style Bulk Edit table for common device fields.
+- `renderBulkEditDevices`: paints the grouped spreadsheet-style Bulk Edit table for common device fields.
+- `renderBulkEditFilterOptions`: builds the Bulk Edit facility/category filters from the current searchable device set.
+- `filterBulkEditDevices`: applies Bulk Edit facility/category scope before rows are rendered.
 - `filterConfigDevices`: filters configuration devices by name, address, hostname, facility, or category while preserving original indexes.
 - `groupConfigDevicesByFacility`: groups devices by facility and category while preserving their original JSON index.
 - `renderConfigDeviceRow`: renders one editable device row inside a category group.
@@ -510,18 +534,19 @@ JsonDeviceRepository.Validate
 config.backup.json is created
   |
   v
-config.json is written
+active support group JSON is written
   |
   v
 memory configuration is replaced
 ```
 
-Device add, update, and delete actions call the same save path immediately after the local state changes, so the user does not need a second Save click for device CRUD. The `Save Settings` button lives inside the Settings card and persists global settings such as auto refresh interval, timeout, retries, retry delay, and max parallel checks.
+Device add, update, and delete actions call the same save path immediately after the local state changes, so the user does not need a second Save click for device CRUD. Bulk Edit saves one row through `/api/config/devices/{deviceIndex}` so large inventories can be updated without rewriting unrelated rows from the browser. The `Save Settings` button lives inside the Settings card and persists global settings such as auto refresh interval, timeout, retries, retry delay, and max parallel checks.
 
 ## Operational Notes For Developers
 
-- Do not commit user-generated `Data/config.backup.json` unless intentionally adding sample backup data.
-- Treat `Data/config.json` carefully because the user may have local edits from the UI.
+- Do not commit user-generated `Data/config.json`, `Data/config.backup.json`, `Data/regions.json`, `Data/regions/*.json`, or `Data/themes.json`.
+- Treat runtime JSON files carefully because the user may have local edits from the UI.
+- Before publishing a portable package, inspect the ZIP and confirm it contains only `config.sample.json`, not active runtime profiles.
 - Keep user-facing feature changes in `CHANGELOG.md`.
 - Keep `README.md` and `docs/index.html` aligned with endpoints and UI behavior.
 - Use `dotnet build` and `node --check wwwroot/app.js` after frontend/backend changes.

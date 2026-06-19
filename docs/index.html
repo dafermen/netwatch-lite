@@ -380,7 +380,7 @@
       <h2>Frontend</h2>
       <p><code>wwwroot/index.html</code> define el layout compartido: sidebar hamburguesa, topbar, dashboard, pagina de configuracion, pagina de temas, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto. Cuando hay problemas aparece <code>Run Failed</code> para repetir solo los dispositivos fallidos, y cada fila con problema muestra <code>Run</code> junto al timestamp para repetir solo ese dispositivo.</p>
       <p>El dashboard muestra botones de facility para enfocar una sede y habilitar <code>Run Facility</code>. En vista general, las tablas se agrupan por facility y luego por categoria, por lo que dos equipos con el mismo nombre en sedes distintas se ven como registros diferentes.</p>
-      <p>La pagina <code>/regions</code> permite crear, copiar, renombrar, activar y eliminar perfiles JSON independientes. La pagina <code>/config</code> trabaja sobre la region activa y agrupa los dispositivos por facility y categoria, con grupos colapsados por defecto para facilitar la edicion de inventarios grandes. El modo <code>Bulk Edit</code> muestra una tabla estilo hoja de calculo para actualizar campos comunes y guardar una fila a la vez. Las acciones de agregar, copiar, actualizar y eliminar dispositivos guardan inmediatamente en el JSON activo, y el boton <code>Save Settings</code> guarda ajustes generales como intervalo, timeout, reintentos, pausa entre reintentos y concurrencia maxima. <code>Export JSON</code> descarga la configuracion activa e <code>Import JSON</code> valida un archivo antes de reemplazar esa configuracion.</p>
+      <p>La pagina <code>/regions</code> permite crear, copiar, renombrar, activar y eliminar perfiles JSON independientes. La pagina <code>/config</code> trabaja sobre la region activa y agrupa los dispositivos por facility y categoria, con grupos colapsados por defecto para facilitar la edicion de inventarios grandes. El modo <code>Bulk Edit</code> muestra una tabla estilo hoja de calculo para actualizar campos comunes y guardar una fila a la vez; incluye filtros por facility/categoria y separadores visuales para evitar listas masivas dificiles de leer. Las acciones de agregar, copiar, actualizar y eliminar dispositivos guardan inmediatamente en el JSON activo, y el boton <code>Save Settings</code> guarda ajustes generales como intervalo, timeout, reintentos, pausa entre reintentos y concurrencia maxima. <code>Export JSON</code> descarga la configuracion activa e <code>Import JSON</code> valida un archivo antes de reemplazar esa configuracion.</p>
       <p>La pagina <code>/themes</code> permite crear, copiar, renombrar, activar, borrar, resetear y guardar templates de color en <code>themes.json</code>. El nombre de un tema nuevo, copiado o renombrado se captura en modal, y los colores editables incluyen el sidebar, superficies, estados, categorias, headers colapsables de Configuration, <code>Auto Refresh ON</code>, <code>Auto Refresh OFF</code> y el boton principal de ejecucion.</p>
       <p>El sidebar tambien incluye <code>/manual</code> con un manual de usuario integrado y <code>/about</code> con informacion del proyecto, su caracter libre y notas operativas.</p>
       <p><code>wwwroot/app.js</code> contiene funciones JSDoc para:</p>
@@ -411,6 +411,7 @@ dotnet run</pre>
           <tr><th>Version</th><th>Resumen</th></tr>
         </thead>
         <tbody>
+          <tr><td><code>v0.6.1</code></td><td>Run Group corregido por categoria, Bulk Edit con filtros y facilities colapsables, Themes alineado al layout compacto y documentacion de seguridad ampliada.</td></tr>
           <tr><td><code>v0.6.0</code></td><td>Support Groups independientes, Bulk Edit por fila, defaults publicos neutrales, dashboard mas compacto y portable limpio con solo <code>config.sample.json</code>.</td></tr>
           <tr><td><code>v0.5.1</code></td><td>Facilities compactas y colapsables, Configuration colapsable por facility/categoria, boton unico de ejecucion, temas renombrables, controles de color para headers colapsables y naranja para categorias degradadas.</td></tr>
           <tr><td><code>v0.5.0</code></td><td>Facilities, agrupacion facility/categoria, Run Facility, copia de dispositivos, temas editables en <code>themes.json</code> y colores para botones del dashboard.</td></tr>
@@ -468,6 +469,20 @@ zip -r ../../releases/NetWatch-Lite-win-x64-portable-2026-06-19-v0.6.0-support-g
         <li>Para redes grandes, ajustar <code>maxParallelChecks</code> segun capacidad de red y equipo.</li>
         <li>El ping puede requerir permisos o reglas de firewall dependiendo del sistema operativo y la red.</li>
         <li>Los checks TCP tratan timeouts, rechazos, destinos invalidos y fallos de socket como puertos no disponibles; no validan el protocolo de aplicacion.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Modelo De Seguridad</h2>
+      <p>NetWatch Lite esta disenado como una herramienta operacional interna. La version actual no incluye autenticacion, roles de usuario ni autorizacion por permisos dentro de la aplicacion; por eso debe ejecutarse en una estacion o servidor interno confiable, o detras de controles existentes como VPN, firewall, autenticacion de reverse proxy o controles de acceso de Windows.</p>
+      <ul>
+        <li>Los archivos runtime <code>Data/config.json</code>, <code>Data/regions.json</code>, <code>Data/regions/*.json</code> y <code>Data/themes.json</code> estan ignorados por Git.</li>
+        <li>El repositorio solo debe incluir <code>Data/config.sample.json</code> con datos genericos.</li>
+        <li>El publish excluye perfiles runtime para evitar que el portable incluya inventario operacional real.</li>
+        <li><code>Import JSON</code> valida extension, tamano maximo, JSON valido y estructura de configuracion antes de reemplazar datos activos.</li>
+        <li>Los guardados se validan en backend antes de escribir archivos y crean backups locales.</li>
+        <li>Las ejecuciones de monitoreo evitan solapamiento y reportan errores controlados en API/UI.</li>
+        <li>Direcciones IP, hostnames, facilities, support groups y perfiles JSON deben tratarse como informacion operacional interna.</li>
       </ul>
     </section>
   </main>

@@ -14,7 +14,7 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 
 Download the latest Windows x64 portable ZIP:
 
-[Download NetWatch Lite portable ZIP](https://github.com/dafermen/netwatch-lite/raw/refs/heads/main/releases/NetWatch-Lite-win-x64-portable-2026-06-19-v0.6.0-support-groups-bulk-edit.zip)
+[Download NetWatch Lite portable ZIP](https://github.com/dafermen/netwatch-lite/raw/refs/heads/main/releases/NetWatch-Lite-win-x64-portable-2026-06-19-v0.6.1-ui-security-bulk-edit.zip)
 
 Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The ZIP includes a safe `config.sample.json`; NetWatch Lite creates the editable runtime `config.json` and `themes.json` beside the executable on first run if they do not already exist.
 
@@ -62,9 +62,9 @@ Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The ZIP includes a safe 
 - Configuration page at `/config`.
 - CRUD UI for devices and checks stored in the active support group JSON.
 - Editable auto refresh interval, timeout, max parallel check limit, and per-device ping target mode in `/config`.
-- Add, update, and delete device actions save immediately to `config.json`.
+- Add, update, and delete device actions save immediately to the active support group JSON.
 - Copy device action opens a prefilled add form so similar devices can be created quickly.
-- Bulk Edit mode lets operators update common device fields in a spreadsheet-style table, with individual row saves and validation.
+- Bulk Edit mode lets operators filter by facility/category and update common device fields in a grouped spreadsheet-style table, with individual row saves and validation.
 - Theme templates can be created, copied, renamed, activated, deleted one at a time, or fully reset from the Themes page. If `themes.json` is missing, NetWatch Lite creates the default theme automatically.
 - Configuration device table grouped by facility and category for easier editing.
 - Configuration devices can be filtered by name, address, hostname, facility, or category.
@@ -191,9 +191,9 @@ That project renders operational monitoring pages in native WebView2 panels for 
 | Method | Endpoint | Purpose |
 |---|---|---|
 | `GET` | `/api/devices` | Returns normalized devices from the loaded JSON. |
-| `POST` | `/api/reload` | Reloads `config.json` from disk. |
+| `POST` | `/api/reload` | Reloads the active support group JSON from disk. |
 | `GET` | `/api/config` | Returns the full editable configuration. |
-| `POST` | `/api/config` | Saves the full configuration, creates `config.backup.json`, and reloads memory. |
+| `POST` | `/api/config` | Saves the full active support group configuration, creates a sibling backup, and reloads memory. |
 | `POST` | `/api/config/devices/{deviceIndex}` | Validates and saves one device row from Bulk Edit, then reloads the active support group configuration in memory. |
 | `GET` | `/api/config/export` | Downloads the current normalized configuration as JSON. |
 | `POST` | `/api/config/import` | Imports a `.json` config file, validates it, creates `config.backup.json`, saves it, and reloads memory. |
@@ -203,6 +203,27 @@ That project renders operational monitoring pages in native WebView2 panels for 
 | `GET` | `/api/results` | Backwards-compatible endpoint that forces a full check. |
 | `POST` | `/api/monitor/run` | Forces a full check and prevents overlapping executions. |
 | `GET` | `/api/monitor/stream` | Streams a full check progressively with `started`, `result`, `completed`, `busy`, and `error` events. Supports optional `facility`, `category`, `deviceName`, and `deviceIp` query filtering. |
+
+## Security Model
+
+NetWatch Lite is designed as an internal operational tool. Its current security posture is based on keeping sensitive inventory data local, validating all configuration changes on the server, and avoiding unnecessary infrastructure exposure.
+
+Built-in safeguards:
+
+- Runtime inventory files are ignored by Git: `Data/config.json`, `Data/regions.json`, `Data/regions/*.json`, and `Data/themes.json`.
+- The committed sample file is generic and safe: `Data/config.sample.json`.
+- Portable releases are built with only the safe `config.sample.json`, not active operational profiles.
+- JSON import rejects empty files, non-`.json` files, files larger than 5 MB, malformed JSON, and invalid monitor configurations.
+- Configuration saves are validated server-side before writing to disk.
+- Saves create local backup files so accidental changes can be recovered.
+- Monitoring endpoints prevent overlapping executions.
+- Network check failures are handled as device status results instead of crashing the app.
+
+Current scope and deployment expectation:
+
+- The app does not currently include built-in user authentication or role-based access.
+- Deploy it only on a trusted internal workstation/server or behind existing controls such as VPN, firewall rules, reverse proxy authentication, or Windows access controls.
+- Treat device inventories, hostnames, IP addresses, facilities, and support group profiles as internal operational data.
 
 ## Version Notes
 
@@ -291,6 +312,7 @@ Edit `config.json` in the same folder as `NetWatch-Lite.exe`, or use the `/confi
 - If an operating system ping succeeds but NetWatch Lite shows a ping failure, compare the device ping target mode, configured `timeoutMs`, `retryCount`, and `retryDelayMs`. NetWatch Lite uses the per-device `useHostnameForPing` value and the configured timeout, which may be shorter than the operating system ping command's default wait time.
 - Configuration read/write problems return controlled API errors so the Configuration page can show the message to the operator.
 - JSON import rejects empty files, non-`.json` files, files larger than 5 MB, malformed JSON, and invalid monitor configurations before replacing the current file.
+- Runtime support group profiles and themes are local operational data; do not commit them to Git or include them in public releases.
 - Monitoring stream failures are logged by the backend and sent to the dashboard as an `error` event when the client is still connected.
 - If a group check fails while previous dashboard results are visible, the UI keeps those results on screen and reports the failure in the status line.
 - `maxParallelChecks` should be adjusted carefully for large networks.

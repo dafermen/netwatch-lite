@@ -30,7 +30,7 @@ var app = builder.Build();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-// Load config.json at startup so configuration errors are visible immediately.
+// Load the active support group JSON at startup so configuration errors are visible immediately.
 var repository = app.Services.GetRequiredService<JsonDeviceRepository>();
 try
 {
@@ -42,17 +42,17 @@ catch (Exception ex) when (
         or IOException
         or UnauthorizedAccessException)
 {
-    app.Logger.LogError(ex, "Unable to load config.json at startup. The configuration page can still be used to repair it.");
+    app.Logger.LogError(ex, "Unable to load the active support group JSON at startup. The configuration page can still be used to repair it.");
 }
 
-// Returns the normalized devices currently loaded from config.json.
+// Returns the normalized devices currently loaded from the active support group JSON.
 app.MapGet("/api/devices", async (JsonDeviceRepository deviceRepository) =>
 {
     var devices = await deviceRepository.GetDevicesAsync();
     return Results.Ok(devices);
 });
 
-// Reloads config.json from disk without restarting the application.
+// Reloads the active support group JSON from disk without restarting the application.
 app.MapPost("/api/reload", async (JsonDeviceRepository deviceRepository) =>
 {
     try
@@ -91,7 +91,7 @@ app.MapGet("/api/config", async (JsonDeviceRepository deviceRepository) =>
     }
 });
 
-// Saves the full monitor configuration to config.json, creates config.backup.json, and reloads memory.
+// Saves the full monitor configuration to the active support group JSON, creates a sibling backup, and reloads memory.
 app.MapPost("/api/config", async (
     MonitorConfiguration configuration,
     JsonDeviceRepository deviceRepository) =>

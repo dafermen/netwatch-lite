@@ -44,7 +44,7 @@ public sealed class JsonDeviceRepository
     /// <summary>
     /// Returns the normalized device inventory currently loaded in memory.
     /// </summary>
-    /// <returns>A read-only list of devices loaded from config.json.</returns>
+    /// <returns>A read-only list of devices loaded from the active support group JSON.</returns>
     public Task<IReadOnlyList<Device>> GetDevicesAsync()
     {
         return Task.FromResult<IReadOnlyList<Device>>(_configuration.Devices);
@@ -60,7 +60,7 @@ public sealed class JsonDeviceRepository
     }
 
     /// <summary>
-    /// Reloads config.json from disk, validates supported fields, and replaces the in-memory configuration atomically.
+    /// Reloads the active support group JSON from disk, validates supported fields, and replaces the in-memory configuration atomically.
     /// </summary>
     /// <param name="cancellationToken">Token used to cancel the file read or JSON parse operation.</param>
     /// <returns>The normalized configuration loaded from disk.</returns>

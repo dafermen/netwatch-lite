@@ -53,6 +53,9 @@ const configDevicesTableWrapper = document.querySelector("#config-devices-table-
 const bulkEditPanel = document.querySelector("#bulk-edit-panel");
 const bulkDevicesBody = document.querySelector("#bulk-devices-body");
 const bulkEditSummary = document.querySelector("#bulk-edit-summary");
+const bulkFacilityFilter = document.querySelector("#bulk-facility-filter");
+const bulkCategoryFilter = document.querySelector("#bulk-category-filter");
+const bulkClearFiltersButton = document.querySelector("#bulk-clear-filters");
 const reloadConfigButton = document.querySelector("#reload-config");
 const exportConfigButton = document.querySelector("#export-config");
 const importConfigButton = document.querySelector("#import-config");
@@ -157,6 +160,9 @@ let hasLoadedDashboardGroups = false;
 let dashboardConfigStale = false;
 let activeConfigSearch = "";
 let activeConfigView = "normal";
+let activeBulkFacility = "";
+let activeBulkCategory = "";
+const collapsedBulkFacilityNames = new Set();
 const defaultAutoFullCheckIntervalSeconds = 60;
 const maxConfigImportBytes = 5 * 1024 * 1024;
 let configState = createEmptyConfiguration();
@@ -264,7 +270,7 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
       activeRunDeviceName = device?.name || "";
       activeRunDeviceIp = device?.ip || "";
       activeRunFailedIps = new Set(devices.map(scopedDevice => scopedDevice.ip).filter(Boolean));
-      activeRunKeepsDashboardStable = Boolean((facility || category || device || devices.length > 0) && latestResults.length > 0);
+      activeRunKeepsDashboardStable = Boolean((device || devices.length > 0) && latestResults.length > 0);
       activeRunPreservesDashboard = Boolean(!facility && !category && !device && devices.length === 0 && autoRefreshEnabled && latestResults.length > 0);
       resetStreamingDashboard(payload, getExecutionScopeLabel(facility, category, device, devices));
     });
@@ -405,22 +411,7 @@ function renderMonitorPayload(payload) {
 
 function renderScopedMonitorPayload(payload, { facility = "", category = "" } = {}) {
   const scopedResults = payload.results ?? [];
-  const scopedFacility = facility.toLowerCase();
-  const scopedCategory = category.toLowerCase();
-  const remainingResults = latestResults.filter(result => {
-    const matchesFacility = scopedFacility
-      && String(result.facility ?? "Unassigned").toLowerCase() === scopedFacility;
-    const matchesCategory = scopedCategory
-      && String(result.category ?? "Uncategorized").toLowerCase() === scopedCategory;
-
-    if (scopedFacility && scopedCategory) {
-      return !(matchesFacility && matchesCategory);
-    }
-
-    return scopedFacility ? !matchesFacility : !matchesCategory;
-  });
-
-  latestResults = [...remainingResults, ...scopedResults];
+  latestResults = scopedResults;
   latestCategories = groupResultsByCategory(latestResults);
   hasCompletedFullCheck = true;
   activeRunFacility = "";
@@ -490,9 +481,13 @@ function renderScopedDevicePayload(payload, requestedDevice) {
  */
 function resetStreamingDashboard(payload, scopeLabel = "") {
   const scopedRun = Boolean(scopeLabel);
+  const replacesDashboard = scopedRun
+    && (activeRunFacility || activeRunCategory)
+    && !activeRunDeviceName
+    && activeRunFailedIps.size === 0;
   const targetLabel = scopeLabel || "devices";
 
-  if (!scopedRun) {
+  if (!scopedRun || replacesDashboard) {
     if (!activeRunPreservesDashboard) {
       hasCompletedFullCheck = false;
       latestResults = [];
@@ -1838,28 +1833,125 @@ function switchConfigView(view) {
   renderBulkEditDevices();
 }
 
+/**
+ * Renders the Bulk Edit table after applying the global text search plus the
+ * Bulk Edit facility/category filters. Rows are grouped so large inventories
+ * can be edited by operational scope instead of as one flat list.
+ */
 function renderBulkEditDevices() {
-  const devices = filterConfigDevices(configState.devices ?? []);
+  renderBulkEditFilterOptions();
+  const devices = filterBulkEditDevices(filterConfigDevices(configState.devices ?? []));
   const hasSearch = activeConfigSearch.trim().length > 0;
+  const hasBulkFilters = Boolean(activeBulkFacility || activeBulkCategory);
 
   if (!bulkDevicesBody) {
     return;
   }
 
-  bulkEditSummary.textContent = `${formatNumber(devices.length)} devices shown`;
+  bulkEditSummary.textContent = `${formatNumber(devices.length)} of ${formatNumber(configState.devices?.length ?? 0)} devices shown`;
 
   if (devices.length === 0) {
     bulkDevicesBody.innerHTML = `
       <tr>
-        <td colspan="9" class="text-center text-secondary py-4">${hasSearch ? "No devices match the current filter." : "No devices configured."}</td>
+        <td colspan="9" class="text-center text-secondary py-4">${hasSearch || hasBulkFilters ? "No devices match the current filters." : "No devices configured."}</td>
       </tr>`;
     return;
   }
 
-  bulkDevicesBody.innerHTML = devices
-    .sort(compareConfigDevices)
-    .map(({ device, index }) => renderBulkEditRow(device, index))
+  bulkDevicesBody.innerHTML = groupConfigDevicesByFacility(devices)
+    .map(group => renderBulkEditFacilityGroup(group))
     .join("");
+}
+
+/**
+ * Rebuilds Bulk Edit filter dropdowns from the currently searchable devices.
+ * Category options are scoped by the selected facility so operators do not
+ * choose category/facility combinations that have no rows.
+ */
+function renderBulkEditFilterOptions() {
+  if (!bulkFacilityFilter || !bulkCategoryFilter) {
+    return;
+  }
+
+  const devices = filterConfigDevices(configState.devices ?? []);
+  const facilities = getUniqueDeviceValues(devices, "facility", "Unassigned");
+  const facilityScopedDevices = activeBulkFacility
+    ? devices.filter(({ device }) => (device.facility || "Unassigned") === activeBulkFacility)
+    : devices;
+  const categories = getUniqueDeviceValues(facilityScopedDevices, "category", "Uncategorized");
+
+  if (activeBulkFacility && !facilities.includes(activeBulkFacility)) {
+    activeBulkFacility = "";
+  }
+
+  if (activeBulkCategory && !categories.includes(activeBulkCategory)) {
+    activeBulkCategory = "";
+  }
+
+  bulkFacilityFilter.innerHTML = `
+    <option value="">All facilities</option>
+    ${facilities.map(facility => `<option value="${escapeHtml(facility)}" ${facility === activeBulkFacility ? "selected" : ""}>${escapeHtml(facility)}</option>`).join("")}`;
+  bulkCategoryFilter.innerHTML = `
+    <option value="">All categories</option>
+    ${categories.map(category => `<option value="${escapeHtml(category)}" ${category === activeBulkCategory ? "selected" : ""}>${escapeHtml(category)}</option>`).join("")}`;
+}
+
+/**
+ * Returns sorted unique values from indexed device records for select options.
+ * @param {Array<{device: object, index: number}>} indexedDevices Devices with original indexes.
+ * @param {string} fieldName Device field to read.
+ * @param {string} fallback Value used when the device field is blank.
+ * @returns {string[]} Sorted unique values.
+ */
+function getUniqueDeviceValues(indexedDevices, fieldName, fallback) {
+  return Array.from(new Set(
+    indexedDevices.map(({ device }) => device[fieldName] || fallback)))
+    .sort((left, right) => left.localeCompare(right));
+}
+
+/**
+ * Applies Bulk Edit facility/category filters while preserving original indexes.
+ * @param {Array<{device: object, index: number}>} indexedDevices Devices already filtered by text search.
+ * @returns {Array<{device: object, index: number}>} Devices visible in the Bulk Edit table.
+ */
+function filterBulkEditDevices(indexedDevices) {
+  return indexedDevices.filter(({ device }) => {
+    const facility = device.facility || "Unassigned";
+    const category = device.category || "Uncategorized";
+
+    return (!activeBulkFacility || facility === activeBulkFacility)
+      && (!activeBulkCategory || category === activeBulkCategory);
+  });
+}
+
+/**
+ * Renders one facility section and its category subsections for Bulk Edit.
+ * @param {{name: string, devices: Array, categories: Array<{name: string, devices: Array}>}} group Facility group.
+ * @returns {string} Table rows for the facility, categories, and editable devices.
+ */
+function renderBulkEditFacilityGroup(group) {
+  const isCollapsed = collapsedBulkFacilityNames.has(group.name);
+
+  return `
+    <tr class="bulk-group-row">
+      <td colspan="9">
+        <button class="btn btn-sm bulk-facility-toggle" type="button" data-bulk-facility-toggle="${escapeAttribute(group.name)}" aria-expanded="${!isCollapsed}">
+          <i class="fa-solid fa-chevron-${isCollapsed ? "right" : "down"}"></i>
+        </button>
+        <span class="fw-semibold"><i class="fa-solid fa-location-dot me-2"></i>${escapeHtml(group.name)}</span>
+        <span class="badge text-bg-dark ms-2">${group.devices.length} devices</span>
+        <span class="small ms-2">${group.categories.length} categories</span>
+      </td>
+    </tr>
+    ${isCollapsed ? "" : group.categories.map(category => `
+      <tr class="bulk-category-row">
+        <td colspan="9">
+          <span class="fw-semibold">${escapeHtml(category.name)}</span>
+          <span class="badge text-bg-secondary ms-2">${category.devices.length} devices</span>
+        </td>
+      </tr>
+      ${category.devices.map(({ device, index }) => renderBulkEditRow(device, index)).join("")}
+    `).join("")}`;
 }
 
 function renderBulkEditRow(device, index) {
@@ -2525,7 +2617,7 @@ function setConfigBusy(isBusy, { showSaveSpinner = true } = {}) {
   addDeviceButton.disabled = isBusy;
   configNormalViewButton.disabled = isBusy;
   configBulkViewButton.disabled = isBusy;
-  bulkEditPanel.querySelectorAll("input, button").forEach(element => {
+  bulkEditPanel.querySelectorAll("input, select, button").forEach(element => {
     element.disabled = isBusy;
   });
   if (intervalSecondsInput) {
@@ -3472,9 +3564,20 @@ function resetDashboardViewState() {
 function resetConfigViewState() {
   activeConfigSearch = "";
   activeConfigView = "normal";
+  activeBulkFacility = "";
+  activeBulkCategory = "";
+  collapsedBulkFacilityNames.clear();
 
   if (configDeviceSearchInput) {
     configDeviceSearchInput.value = "";
+  }
+
+  if (bulkFacilityFilter) {
+    bulkFacilityFilter.value = "";
+  }
+
+  if (bulkCategoryFilter) {
+    bulkCategoryFilter.value = "";
   }
 
   renderConfigView();
@@ -3766,6 +3869,26 @@ configDeviceSearchInput.addEventListener("input", debounce(event => {
   renderConfigDevices();
   renderBulkEditDevices();
 }, 150));
+bulkFacilityFilter.addEventListener("change", event => {
+  activeBulkFacility = event.target.value;
+  renderBulkEditDevices();
+});
+bulkCategoryFilter.addEventListener("change", event => {
+  activeBulkCategory = event.target.value;
+  renderBulkEditDevices();
+});
+bulkClearFiltersButton.addEventListener("click", () => {
+  activeBulkFacility = "";
+  activeBulkCategory = "";
+  collapsedBulkFacilityNames.clear();
+  if (bulkFacilityFilter) {
+    bulkFacilityFilter.value = "";
+  }
+  if (bulkCategoryFilter) {
+    bulkCategoryFilter.value = "";
+  }
+  renderBulkEditDevices();
+});
 if (intervalSecondsInput) {
   intervalSecondsInput.addEventListener("input", () => {
     showConfigAlert("info", "Auto refresh interval changed locally. Click Save Settings to persist changes.");
@@ -3845,9 +3968,23 @@ bulkDevicesBody.addEventListener("change", event => {
   }
 });
 bulkDevicesBody.addEventListener("click", event => {
+  const facilityToggle = event.target.closest("[data-bulk-facility-toggle]");
   const saveButton = event.target.closest("[data-bulk-save]");
   const revertButton = event.target.closest("[data-bulk-revert]");
   const advancedButton = event.target.closest("[data-bulk-advanced]");
+
+  if (facilityToggle) {
+    const facilityName = facilityToggle.dataset.bulkFacilityToggle;
+
+    if (collapsedBulkFacilityNames.has(facilityName)) {
+      collapsedBulkFacilityNames.delete(facilityName);
+    } else {
+      collapsedBulkFacilityNames.add(facilityName);
+    }
+
+    renderBulkEditDevices();
+    return;
+  }
 
   if (saveButton) {
     saveBulkRow(saveButton.closest("[data-bulk-index]"));
