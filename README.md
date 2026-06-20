@@ -14,7 +14,7 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 
 Download the latest Windows x64 portable ZIP:
 
-[Download NetWatch Lite portable ZIP](https://github.com/dafermen/netwatch-lite/raw/refs/heads/main/releases/NetWatch-Lite-win-x64-portable-2026-06-19-v0.6.1-ui-security-bulk-edit.zip)
+[Download NetWatch Lite portable ZIP](https://github.com/dafermen/netwatch-lite/raw/refs/heads/main/releases/NetWatch-Lite-win-x64-portable-2026-06-20-v0.6.2-ping-only.zip)
 
 Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The ZIP includes a safe `config.sample.json`; NetWatch Lite creates the editable runtime `config.json` and `themes.json` beside the executable on first run if they do not already exist.
 
@@ -73,6 +73,7 @@ Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The ZIP includes a safe 
 - Configuration JSON export and import from `/config`, with server-side validation before imported files replace the active support group config.
 - Manual mode by default.
 - Optional auto refresh toggle that runs a full check using `settings.intervalSeconds`.
+- Execution mode toggle for `Full Check` or `Ping Only` connectivity checks without changing the saved JSON.
 - Forced full check.
 - Category-scoped dashboard checks for running one group, such as IP Cameras, without checking the full inventory.
 - Device-scoped dashboard checks for rerunning one row without checking the full inventory.
@@ -201,8 +202,8 @@ That project renders operational monitoring pages in native WebView2 panels for 
 | `POST` | `/api/themes` | Saves theme templates after validation and normalization. |
 | `POST` | `/api/themes/reset` | Resets theme templates to the built-in default. |
 | `GET` | `/api/results` | Backwards-compatible endpoint that forces a full check. |
-| `POST` | `/api/monitor/run` | Forces a full check and prevents overlapping executions. |
-| `GET` | `/api/monitor/stream` | Streams a full check progressively with `started`, `result`, `completed`, `busy`, and `error` events. Supports optional `facility`, `category`, `deviceName`, and `deviceIp` query filtering. |
+| `POST` | `/api/monitor/run` | Forces a full check and prevents overlapping executions. Supports `checkMode=ping` for connectivity-only runs. |
+| `GET` | `/api/monitor/stream` | Streams a full check progressively with `started`, `result`, `completed`, `busy`, and `error` events. Supports optional `facility`, `category`, `deviceName`, `deviceIp`, and `checkMode=ping` query filtering. |
 
 ## Security Model
 
@@ -297,6 +298,7 @@ Edit `config.json` in the same folder as `NetWatch-Lite.exe`, or use the `/confi
 - `Run All Facilities` executes all configured checks immediately.
 - Facility tabs focus the dashboard on one site. The same primary run button changes to `Run Facility` and executes checks only for the selected facility.
 - `Run Group` executes checks only for the selected category.
+- `Full Check` runs configured ping and TCP checks; `Ping Only` runs connectivity checks only and shows configured ports as skipped for that execution.
 - `Run Failed` appears only when the current dashboard has `Degraded` or `Down` devices and retries only those devices.
 - `Run` appears beside the timestamp only for devices in `Degraded` or `Down` state; it executes only that device and replaces its latest dashboard result.
 - The dashboard starts empty in manual mode; results appear after `Run All Facilities`, `Run Facility`, or after enabling `Auto Refresh`.

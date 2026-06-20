@@ -10,6 +10,16 @@ namespace NetWatch.Services;
 /// </summary>
 public sealed class NetworkMonitorService
 {
+    /// <summary>
+    /// Executes every configured check for each device.
+    /// </summary>
+    public const string FullCheckMode = "Full";
+
+    /// <summary>
+    /// Executes only ICMP ping checks and skips TCP port checks for a connectivity-only run.
+    /// </summary>
+    public const string PingOnlyCheckMode = "PingOnly";
+
     private readonly JsonDeviceRepository _deviceRepository;
     private readonly ILogger<NetworkMonitorService> _logger;
 
@@ -29,9 +39,11 @@ public sealed class NetworkMonitorService
     /// <summary>
     /// Runs all checks for every enabled device using asynchronous parallel execution.
     /// </summary>
+    /// <param name="checkMode">Execution mode: Full or PingOnly.</param>
     /// <param name="cancellationToken">Token used to cancel queued or in-flight check work.</param>
     /// <returns>One aggregated result per enabled device.</returns>
     public async Task<IReadOnlyList<DeviceResult>> CheckAllDevicesAsync(
+        string checkMode = FullCheckMode,
         CancellationToken cancellationToken = default)
     {
         var configuration = await _deviceRepository.GetConfigurationAsync();
@@ -41,7 +53,7 @@ public sealed class NetworkMonitorService
 
         using var checkLimiter = new SemaphoreSlim(maxParallelChecks, maxParallelChecks);
         var checkTasks = enabledDevices.Select(device =>
-            CheckDeviceAsync(device, settings, checkLimiter, cancellationToken));
+            CheckDeviceAsync(device, settings, checkLimiter, checkMode, cancellationToken));
 
         return await Task.WhenAll(checkTasks);
     }
@@ -50,10 +62,12 @@ public sealed class NetworkMonitorService
     /// Runs checks for enabled devices and yields each device result as soon as it completes.
     /// </summary>
     /// <param name="configuration">Configuration snapshot used for this execution.</param>
+    /// <param name="checkMode">Execution mode: Full or PingOnly.</param>
     /// <param name="cancellationToken">Token used to cancel queued or in-flight check work.</param>
     /// <returns>An async stream of completed device results.</returns>
     public async IAsyncEnumerable<DeviceResult> CheckDevicesAsCompletedAsync(
         MonitorConfiguration configuration,
+        string checkMode = FullCheckMode,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var settings = configuration.Settings;
@@ -64,7 +78,7 @@ public sealed class NetworkMonitorService
 
         using var checkLimiter = new SemaphoreSlim(maxParallelChecks, maxParallelChecks);
         var checkTasks = enabledDevices
-            .Select(device => CheckDeviceAsync(device, settings, checkLimiter, cancellationToken))
+            .Select(device => CheckDeviceAsync(device, settings, checkLimiter, checkMode, cancellationToken))
             .ToList();
 
         while (checkTasks.Count > 0)
@@ -84,16 +98,20 @@ public sealed class NetworkMonitorService
     /// <param name="device">Device to check.</param>
     /// <param name="settings">Execution settings such as timeout, retry, and concurrency limit.</param>
     /// <param name="checkLimiter">Shared semaphore limiting total concurrent checks across all devices.</param>
+    /// <param name="checkMode">Execution mode: Full or PingOnly.</param>
     /// <param name="cancellationToken">Token used to cancel check work.</param>
     /// <returns>A complete device result with ping state, latency, port lists, raw checks, and final status.</returns>
     private async Task<DeviceResult> CheckDeviceAsync(
         Device device,
         MonitorSettings settings,
         SemaphoreSlim checkLimiter,
+        string checkMode,
         CancellationToken cancellationToken)
     {
+        var normalizedCheckMode = NormalizeCheckMode(checkMode);
         var pingTarget = ResolvePingTarget(device);
-        var checkTasks = device.Checks.Select(check =>
+        var checksToRun = GetChecksForExecution(device, normalizedCheckMode);
+        var checkTasks = checksToRun.Select(check =>
             RunLimitedCheckAsync(device.Ip, pingTarget, check, settings, checkLimiter, cancellationToken));
         var checkResults = await Task.WhenAll(checkTasks);
 
@@ -129,10 +147,58 @@ public sealed class NetworkMonitorService
             LatencyMs = latencyMs,
             Enabled = device.Enabled,
             RequestedPorts = requestedPorts,
+            CheckMode = normalizedCheckMode,
             OpenPorts = openPorts,
             Checks = checkResults,
             LastCheck = DateTimeOffset.Now
         };
+    }
+
+    /// <summary>
+    /// Chooses which configured checks to execute for this run without changing the saved device JSON.
+    /// </summary>
+    /// <param name="device">Device being checked.</param>
+    /// <param name="checkMode">Normalized check mode.</param>
+    /// <returns>Configured checks for full mode, or only ping checks for connectivity-only mode.</returns>
+    private static IReadOnlyList<DeviceCheck> GetChecksForExecution(Device device, string checkMode)
+    {
+        if (!IsPingOnlyMode(checkMode))
+        {
+            return device.Checks;
+        }
+
+        var pingChecks = device.Checks
+            .Where(check => string.Equals(check.Type, "ping", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        return pingChecks.Count > 0
+            ? pingChecks
+            : [new DeviceCheck { Type = "ping" }];
+    }
+
+    /// <summary>
+    /// Converts external query values into one of the supported execution modes.
+    /// </summary>
+    /// <param name="checkMode">Raw mode from the API layer.</param>
+    /// <returns>Full or PingOnly.</returns>
+    public static string NormalizeCheckMode(string? checkMode)
+    {
+        return IsPingOnlyMode(checkMode)
+            ? PingOnlyCheckMode
+            : FullCheckMode;
+    }
+
+    /// <summary>
+    /// Returns true when the requested mode should skip TCP checks.
+    /// </summary>
+    /// <param name="checkMode">Raw or normalized check mode.</param>
+    /// <returns>True for ping-only aliases.</returns>
+    public static bool IsPingOnlyMode(string? checkMode)
+    {
+        return string.Equals(checkMode, PingOnlyCheckMode, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(checkMode, "ping", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(checkMode, "ping-only", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(checkMode, "pingOnly", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

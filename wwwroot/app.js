@@ -16,6 +16,7 @@ const lastCheck = document.querySelector("#last-check");
 const executionMode = document.querySelector("#execution-mode");
 const autoRefreshToggle = document.querySelector("#auto-refresh-toggle");
 const autoRefreshLabel = document.querySelector("#auto-refresh-label");
+const checkModeInputs = document.querySelectorAll("input[name='check-mode']");
 const facilityTabs = document.querySelector("#facility-tabs");
 const dashboardRegionTitle = document.querySelector("#dashboard-region-title");
 const dashboardSupportGroupLabel = document.querySelector("#dashboard-support-group-label");
@@ -153,6 +154,7 @@ let activeRunCategory = "";
 let activeRunDeviceName = "";
 let activeRunDeviceIp = "";
 let activeRunFailedIps = new Set();
+let activeRunCheckMode = "full";
 let activeRunKeepsDashboardStable = false;
 let activeRunPreservesDashboard = false;
 let currentRoute = normalizeRoute(location.pathname);
@@ -222,10 +224,10 @@ async function loadResults({ showErrors = true, facility = "", category = "", de
  * Opens the Server-Sent Events monitoring stream and routes each event to the
  * dashboard renderer. This keeps large inventories responsive because each
  * device result is shown as soon as the backend finishes it.
- * @param {{ showErrors?: boolean, facility?: string, category?: string, device?: object | null, devices?: Array<object> }} options Controls whether stream errors are displayed and optional execution scope.
+ * @param {{ showErrors?: boolean, facility?: string, category?: string, device?: object | null, devices?: Array<object>, checkMode?: string }} options Controls whether stream errors are displayed and optional execution scope.
  * @returns {Promise<void>} Resolves when the stream completes, reports busy, or fails.
  */
-function streamFullCheck({ showErrors = true, facility = "", category = "", device = null, devices = [] } = {}) {
+function streamFullCheck({ showErrors = true, facility = "", category = "", device = null, devices = [], checkMode = getSelectedCheckMode() } = {}) {
   if (activeMonitorStream) {
     lastCheck.textContent = "A monitoring execution is already running.";
     return Promise.resolve();
@@ -233,7 +235,12 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
 
   return new Promise(resolve => {
     let settled = false;
+    const normalizedCheckMode = normalizeCheckMode(checkMode);
     const streamParams = new URLSearchParams();
+
+    if (isPingOnlyMode(normalizedCheckMode)) {
+      streamParams.set("checkMode", "ping");
+    }
 
     if (facility) {
       streamParams.set("facility", facility);
@@ -262,6 +269,8 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
       : "/api/monitor/stream";
     const source = new EventSource(streamUrl);
     activeMonitorStream = source;
+    activeRunCheckMode = normalizedCheckMode;
+    setCheckModeInputsDisabled(true);
 
     source.addEventListener("started", event => {
       const payload = JSON.parse(event.data);
@@ -272,6 +281,7 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
       activeRunFailedIps = new Set(devices.map(scopedDevice => scopedDevice.ip).filter(Boolean));
       activeRunKeepsDashboardStable = Boolean((device || devices.length > 0) && latestResults.length > 0);
       activeRunPreservesDashboard = Boolean(!facility && !category && !device && devices.length === 0 && autoRefreshEnabled && latestResults.length > 0);
+      activeRunCheckMode = normalizeCheckMode(payload.checkMode || normalizedCheckMode);
       resetStreamingDashboard(payload, getExecutionScopeLabel(facility, category, device, devices));
     });
 
@@ -290,7 +300,8 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
         results: payload.results,
         lastExecutionTime: payload.timestamp,
         lastCheck: payload.timestamp,
-        executionStatus: payload.executionStatus
+        executionStatus: payload.executionStatus,
+        checkMode: payload.checkMode || normalizedCheckMode
       };
 
       if (devices.length > 0) {
@@ -311,6 +322,7 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
       activeRunDeviceName = "";
       activeRunDeviceIp = "";
       activeRunFailedIps = new Set();
+      activeRunCheckMode = getSelectedCheckMode();
       activeRunKeepsDashboardStable = false;
       activeRunPreservesDashboard = false;
       settled = true;
@@ -325,6 +337,7 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
       activeRunDeviceName = "";
       activeRunDeviceIp = "";
       activeRunFailedIps = new Set();
+      activeRunCheckMode = getSelectedCheckMode();
       activeRunKeepsDashboardStable = false;
       activeRunPreservesDashboard = false;
       lastCheck.textContent = payload.message || "A monitoring execution is already running.";
@@ -371,6 +384,7 @@ function handleMonitorStreamFailure(message, scopeLabel, showErrors) {
   activeRunDeviceName = "";
   activeRunDeviceIp = "";
   activeRunFailedIps = new Set();
+  activeRunCheckMode = getSelectedCheckMode();
   activeRunKeepsDashboardStable = false;
   activeRunPreservesDashboard = false;
 
@@ -404,7 +418,7 @@ function renderMonitorPayload(payload) {
   renderFilteredCategories();
   updateRunFailedButton();
   scheduleRefresh();
-  executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
+  executionMode.textContent = getDashboardExecutionText(payload.checkMode);
   lastCheck.textContent = `Last execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
   updateProgressPanel(payload.results?.length ?? 0, payload.results?.length ?? 0, "Completed", false);
 }
@@ -420,7 +434,7 @@ function renderScopedMonitorPayload(payload, { facility = "", category = "" } = 
   renderSummary(createSummaryFromResults(getVisibleResults()));
   renderFilteredCategories();
   updateRunFailedButton();
-  executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
+  executionMode.textContent = getDashboardExecutionText(payload.checkMode);
   lastCheck.textContent = `Last ${facility || category} execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
   updateProgressPanel(scopedResults.length, scopedResults.length, "Completed", false);
   activeRunKeepsDashboardStable = false;
@@ -443,7 +457,7 @@ function renderScopedDevicesPayload(payload, requestedDevices) {
   renderSummary(createSummaryFromResults(getVisibleResults()));
   renderFilteredCategories();
   updateRunFailedButton();
-  executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
+  executionMode.textContent = getDashboardExecutionText(payload.checkMode);
   lastCheck.textContent = `Last failed-device retry: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
   updateProgressPanel(scopedResults.length, requestedDevices.length, "Completed", false);
   activeRunKeepsDashboardStable = false;
@@ -467,7 +481,7 @@ function renderScopedDevicePayload(payload, requestedDevice) {
   activeRunDeviceIp = "";
   renderSummary(createSummaryFromResults(getVisibleResults()));
   renderFilteredCategories();
-  executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
+  executionMode.textContent = getDashboardExecutionText(payload.checkMode);
   lastCheck.textContent = result
     ? `Last ${result.name} execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`
     : lastCheck.textContent;
@@ -514,7 +528,7 @@ function resetStreamingDashboard(payload, scopeLabel = "") {
       </div>`;
   }
 
-  executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
+  executionMode.textContent = getDashboardExecutionText(payload.checkMode || activeRunCheckMode);
   lastCheck.textContent = `Checking ${targetLabel} 0/${Number(payload.totalDevices) || 0}...`;
 }
 
@@ -1181,9 +1195,17 @@ function groupResultsByFacility(results) {
 function renderPorts(result) {
   const requestedPorts = result.requestedPorts ?? [];
   const openPorts = result.openPorts ?? [];
+  const isPingOnlyResult = isPingOnlyMode(result.checkMode);
 
   if (requestedPorts.length === 0) {
     return `<span class="text-secondary">No ports configured</span>`;
+  }
+
+  if (isPingOnlyResult) {
+    return `
+      <span class="badge text-bg-secondary port-pill" title="TCP checks were skipped for this Ping Only execution.">
+        <i class="fa-solid fa-forward me-1"></i>Skipped - Ping Only
+      </span>`;
   }
 
   const openPortSet = new Set(openPorts);
@@ -1484,7 +1506,7 @@ async function toggleAutoRefresh() {
   autoRefreshLabel.textContent = autoRefreshEnabled
     ? "Auto Refresh: ON"
     : "Auto Refresh: OFF";
-  executionMode.textContent = autoRefreshEnabled ? "Auto full check active" : "Manual mode";
+  executionMode.textContent = getDashboardExecutionText();
 
   if (autoRefreshEnabled) {
     if (!hasLoadedDashboardGroups) {
@@ -3709,6 +3731,39 @@ function getExecutionScopeLabel(facility, category, device, devices = []) {
   return category ? `${category} devices` : "";
 }
 
+function getSelectedCheckMode() {
+  const selectedInput = Array.from(checkModeInputs).find(input => input.checked);
+  return normalizeCheckMode(selectedInput?.value || "full");
+}
+
+function normalizeCheckMode(checkMode) {
+  return isPingOnlyMode(checkMode) ? "ping" : "full";
+}
+
+function isPingOnlyMode(checkMode) {
+  const normalizedMode = String(checkMode || "").trim().toLowerCase();
+  return normalizedMode === "ping"
+    || normalizedMode === "pingonly"
+    || normalizedMode === "ping-only";
+}
+
+function getCheckModeLabel(checkMode = getSelectedCheckMode()) {
+  return isPingOnlyMode(checkMode) ? "Ping Only" : "Full Check";
+}
+
+function getDashboardExecutionText(checkMode = getSelectedCheckMode()) {
+  const modeLabel = getCheckModeLabel(checkMode);
+  return autoRefreshEnabled
+    ? `Auto ${modeLabel} active`
+    : `Manual mode - ${modeLabel}`;
+}
+
+function setCheckModeInputsDisabled(isDisabled) {
+  checkModeInputs.forEach(input => {
+    input.disabled = isDisabled;
+  });
+}
+
 function formatDate(value) {
   if (!value) {
     return "";
@@ -3779,6 +3834,12 @@ autoRefreshToggle.addEventListener("click", toggleAutoRefresh);
 runFacilityCheckButton.addEventListener("click", runSelectedFacilityCheck);
 runGroupCheckButton.addEventListener("click", runSelectedGroupCheck);
 runFailedCheckButton.addEventListener("click", runFailedChecks);
+checkModeInputs.forEach(input => {
+  input.addEventListener("change", () => {
+    activeRunCheckMode = getSelectedCheckMode();
+    executionMode.textContent = getDashboardExecutionText();
+  });
+});
 groupCheckSelect.addEventListener("change", () => {
   runGroupCheckButton.disabled = !groupCheckSelect.value;
 });
@@ -4100,4 +4161,6 @@ function closeMonitorStream() {
     activeMonitorStream.close();
     activeMonitorStream = undefined;
   }
+
+  setCheckModeInputsDisabled(false);
 }

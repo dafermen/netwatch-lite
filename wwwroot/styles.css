@@ -203,6 +203,10 @@ body {
   justify-content: flex-end;
 }
 
+.check-mode-toggle {
+  white-space: nowrap;
+}
+
 .facility-tabs {
   display: flex;
   gap: 0.5rem;
@@ -972,6 +976,15 @@ body {
   .facility-actions .btn {
     flex: 1 1 11rem;
     justify-content: center;
+  }
+
+  .check-mode-toggle {
+    display: flex;
+    width: 100%;
+  }
+
+  .check-mode-toggle .btn {
+    flex: 1 1 50%;
   }
 
   .facility-tab {

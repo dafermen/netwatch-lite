@@ -21,6 +21,11 @@ public sealed class MonitorResponse
     public required string ExecutionStatus { get; init; }
 
     /// <summary>
+    /// Check mode used by the execution. Supported values are Full and PingOnly.
+    /// </summary>
+    public string CheckMode { get; init; } = "Full";
+
+    /// <summary>
     /// Settings used by the dashboard to control refresh timing and display execution context.
     /// </summary>
     public required MonitorSettings Settings { get; init; }

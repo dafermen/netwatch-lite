@@ -99,8 +99,8 @@ Important endpoints:
 | `POST /api/themes` | Validates, normalizes, and saves theme templates. |
 | `POST /api/themes/reset` | Replaces `themes.json` with the built-in default theme. |
 | `GET /api/results` | Backwards-compatible full-check endpoint. |
-| `POST /api/monitor/run` | Runs a full check and returns one final payload. |
-| `GET /api/monitor/stream` | Runs a full check, one category when `category` is supplied, one device when `deviceName` and `deviceIp` are supplied, or selected devices when `deviceIp` is supplied multiple times, and streams progressive events. |
+| `POST /api/monitor/run` | Runs a full check and returns one final payload. Supports `checkMode=ping` for connectivity-only runs. |
+| `GET /api/monitor/stream` | Runs a full check, one category when `category` is supplied, one device when `deviceName` and `deviceIp` are supplied, or selected devices when `deviceIp` is supplied multiple times, and streams progressive events. Supports `checkMode=ping` to skip TCP checks temporarily. |
 
 ## Windows WebView2 Wallboard
 
@@ -302,6 +302,7 @@ Key methods:
 - `CheckAllDevicesAsync`: runs all enabled devices and returns a final list.
 - `CheckDevicesAsCompletedAsync`: yields each `DeviceResult` as soon as it finishes.
 - `CheckDeviceAsync`: runs checks for one device and computes status.
+- `GetChecksForExecution`: keeps full runs unchanged and filters a temporary execution list to ping checks for `PingOnly` mode.
 - `RunLimitedCheckAsync`: wraps ping/TCP checks with the global concurrency semaphore.
 - `RunWithRetryAsync`: repeats failed ping/TCP checks using `RetryCount` and `RetryDelayMs`.
 - `PingAsync`: executes ICMP ping and returns success plus latency.
@@ -466,10 +467,10 @@ Defines:
 ### Progressive Dashboard Flow
 
 ```text
-User clicks Run All Facilities, Run Facility, Run Group, or enables Auto Refresh
+User chooses Full Check or Ping Only, then clicks Run All Facilities, Run Facility, Run Group, or enables Auto Refresh
   |
   v
-app.js calls GET /api/monitor/stream
+app.js calls GET /api/monitor/stream, optionally with checkMode=ping
   |
   v
 Program.cs opens text/event-stream response
@@ -488,6 +489,8 @@ If the backend fails after opening the stream, the browser receives:
 
   error
 ```
+
+`PingOnly` is an execution mode, not a JSON configuration change. The backend preserves configured TCP ports in `requestedPorts` for display, skips TCP connection attempts for that run, and returns `checkMode: "PingOnly"` so the frontend can show ports as skipped instead of failed.
 
 The dashboard updates:
 

@@ -145,6 +145,13 @@
                 <span class="small text-secondary" id="active-facility-label">Showing all facilities</span>
               </div>
               <div class="facility-actions">
+                <div class="btn-group btn-group-sm check-mode-toggle" role="group" aria-label="Execution check mode">
+                  <input type="radio" class="btn-check" name="check-mode" id="check-mode-full" value="full" checked>
+                  <label class="btn btn-outline-secondary" for="check-mode-full" title="Run configured ping and TCP checks">Full Check</label>
+
+                  <input type="radio" class="btn-check" name="check-mode" id="check-mode-ping" value="ping">
+                  <label class="btn btn-outline-secondary" for="check-mode-ping" title="Run ping connectivity checks only">Ping Only</label>
+                </div>
                 <button class="btn btn-danger btn-sm" type="button" id="auto-refresh-toggle">
                   <i class="fa-solid fa-arrows-rotate me-1"></i>
                   <span id="auto-refresh-label">Auto Refresh: OFF</span>
@@ -612,6 +619,7 @@
               <ul>
                 <li>Use facility buttons to focus one site, then run only that facility when hundreds of devices are configured.</li>
                 <li>Use <strong>Run All Facilities</strong> to execute all configured ping and TCP checks immediately.</li>
+                <li>Use <strong>Full Check</strong> for configured ping and TCP checks, or <strong>Ping Only</strong> for a fast connectivity-only run.</li>
                 <li>Use <strong>Run Failed</strong> when it appears to retry only devices currently marked as Degraded or Down.</li>
                 <li>Use <strong>Run</strong> beside a problem device's timestamp to repeat only that device when a failure may be temporary.</li>
                 <li>Use <strong>Auto Refresh</strong> to run a full check using the configured interval.</li>
@@ -627,6 +635,7 @@
                 <li><strong>Healthy:</strong> every configured ping and TCP check succeeds.</li>
                 <li><strong>Degraded:</strong> at least one check succeeds, but one or more checks fail.</li>
                 <li><strong>Down:</strong> no configured checks succeed.</li>
+                <li>In <strong>Ping Only</strong> mode, TCP ports are skipped for that execution and shown as skipped instead of failed.</li>
                 <li>Ping badges include diagnostic details on hover, including the ping target, ICMP status, and configured timeout.</li>
               </ul>
             </section>

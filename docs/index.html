@@ -214,7 +214,7 @@
         <li>La aplicacion inicia en <code>Program.cs</code>.</li>
         <li><code>JsonRegionProfileRepository</code> administra perfiles independientes por support group dentro de una region configurable.</li>
         <li><code>JsonDeviceRepository.ReloadAsync</code> carga y normaliza el JSON de la region activa.</li>
-        <li>La UI llama <code>GET /api/monitor/stream</code> para ejecutar un full check progresivo.</li>
+        <li>La UI llama <code>GET /api/monitor/stream</code> para ejecutar un full check progresivo o un <code>checkMode=ping</code> de conectividad solamente.</li>
         <li>El modo automatico ejecuta un full check segun <code>settings.intervalSeconds</code>.</li>
         <li><code>NetworkMonitorService.CheckAllDevicesAsync</code> revisa dispositivos habilitados en paralelo.</li>
         <li>Se calcula <span class="healthy">Healthy</span>, <span class="degraded">Degraded</span> o <span class="down">Down</span>.</li>
@@ -316,8 +316,8 @@
           <tr><td><span class="tag post">POST</span></td><td><code>/api/themes</code></td><td>Guarda templates de tema despues de validar ids, nombres y colores.</td><td>Configuracion guardada.</td></tr>
           <tr><td><span class="tag post">POST</span></td><td><code>/api/themes/reset</code></td><td>Restaura el tema integrado por defecto.</td><td>Configuracion de tema por defecto.</td></tr>
           <tr><td><span class="tag get">GET</span></td><td><code>/api/results</code></td><td>Compatibilidad. Fuerza ejecucion completa.</td><td><code>MonitorResponse</code>.</td></tr>
-          <tr><td><span class="tag post">POST</span></td><td><code>/api/monitor/run</code></td><td>Fuerza full check sin permitir solapamiento.</td><td><code>MonitorResponse</code> o HTTP 409.</td></tr>
-          <tr><td><span class="tag get">GET</span></td><td><code>/api/monitor/stream</code></td><td>Ejecuta full check, una facility con <code>facility</code>, una categoria con <code>category</code>, un dispositivo con <code>deviceName</code> y <code>deviceIp</code>, o varios dispositivos repitiendo <code>deviceIp</code>; envia resultados progresivos por Server-Sent Events.</td><td>Eventos <code>started</code>, <code>result</code>, <code>completed</code>, <code>busy</code> o <code>error</code>.</td></tr>
+          <tr><td><span class="tag post">POST</span></td><td><code>/api/monitor/run</code></td><td>Fuerza full check sin permitir solapamiento. Acepta <code>checkMode=ping</code> para ejecutar solo conectividad.</td><td><code>MonitorResponse</code> o HTTP 409.</td></tr>
+          <tr><td><span class="tag get">GET</span></td><td><code>/api/monitor/stream</code></td><td>Ejecuta full check, una facility con <code>facility</code>, una categoria con <code>category</code>, un dispositivo con <code>deviceName</code> y <code>deviceIp</code>, o varios dispositivos repitiendo <code>deviceIp</code>; acepta <code>checkMode=ping</code> para saltar TCP y envia resultados progresivos por Server-Sent Events.</td><td>Eventos <code>started</code>, <code>result</code>, <code>completed</code>, <code>busy</code> o <code>error</code>.</td></tr>
         </tbody>
       </table>
     </section>
@@ -388,7 +388,7 @@
         <li>Consumir <code>/api/monitor/stream</code> para pintar resultados conforme termina cada dispositivo.</li>
         <li>Renderizar metricas, facilities, categorias, filas, badges de estado, puertos y links opcionales de <code>websiteUrl</code>.</li>
         <li>Contraer y expandir grupos de facility y categoria para navegar inventarios grandes; al completar un full check, los grupos se contraen y quedan en verde, naranja o rojo segun la salud final.</li>
-        <li>Manejar modo manual por defecto, auto refresh ON/OFF y el boton principal <code>Run All Facilities</code>/<code>Run Facility</code>.</li>
+        <li>Manejar modo manual por defecto, auto refresh ON/OFF, selector <code>Full Check</code>/<code>Ping Only</code> y el boton principal <code>Run All Facilities</code>/<code>Run Facility</code>.</li>
         <li>Administrar dispositivos y checks desde la ruta <code>/config</code>.</li>
         <li>Administrar templates de color desde la ruta <code>/themes</code>.</li>
         <li>Filtrar por texto, facility, categoria, online, offline y problemas.</li>
@@ -411,6 +411,7 @@ dotnet run</pre>
           <tr><th>Version</th><th>Resumen</th></tr>
         </thead>
         <tbody>
+          <tr><td><code>v0.6.2</code></td><td>Selector Full Check / Ping Only, soporte <code>checkMode=ping</code> en APIs de monitoreo y puertos TCP mostrados como omitidos en ejecuciones solo ping.</td></tr>
           <tr><td><code>v0.6.1</code></td><td>Run Group corregido por categoria, Bulk Edit con filtros y facilities colapsables, Themes alineado al layout compacto y documentacion de seguridad ampliada.</td></tr>
           <tr><td><code>v0.6.0</code></td><td>Support Groups independientes, Bulk Edit por fila, defaults publicos neutrales, dashboard mas compacto y portable limpio con solo <code>config.sample.json</code>.</td></tr>
           <tr><td><code>v0.5.1</code></td><td>Facilities compactas y colapsables, Configuration colapsable por facility/categoria, boton unico de ejecucion, temas renombrables, controles de color para headers colapsables y naranja para categorias degradadas.</td></tr>

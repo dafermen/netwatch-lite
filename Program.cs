@@ -539,12 +539,15 @@ app.MapGet("/api/results", async (MonitorExecutionService executionService) =>
     }
 });
 
-// Starts a full monitoring execution immediately and rejects overlapping runs with HTTP 409.
-app.MapPost("/api/monitor/run", async (MonitorExecutionService executionService) =>
+// Starts a monitoring execution immediately and rejects overlapping runs with HTTP 409.
+app.MapPost("/api/monitor/run", async (
+    HttpContext context,
+    MonitorExecutionService executionService) =>
 {
     try
     {
-        var response = await executionService.TryRunFullCheckAsync();
+        var checkMode = context.Request.Query["checkMode"].FirstOrDefault();
+        var response = await executionService.TryRunFullCheckAsync(checkMode ?? NetworkMonitorService.FullCheckMode);
 
         if (response is null)
         {
@@ -615,12 +618,15 @@ app.MapGet("/api/monitor/stream", async (
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => value!)
             .ToList();
+        var checkMode = context.Request.Query["checkMode"].FirstOrDefault()
+            ?? NetworkMonitorService.FullCheckMode;
         var started = await executionService.TryStreamFullCheckAsync(
             WriteEventAsync,
             facilityName,
             categoryName,
             deviceName,
             deviceIps,
+            checkMode,
             context.RequestAborted);
 
         if (!started)

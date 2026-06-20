@@ -27,27 +27,29 @@ public sealed class MonitorExecutionService
     /// <summary>
     /// Runs a full monitor execution, waiting for any existing execution to finish first.
     /// </summary>
+    /// <param name="checkMode">Execution mode: Full or PingOnly.</param>
     /// <param name="cancellationToken">Token used to cancel waiting or execution.</param>
     /// <returns>A fresh monitor response.</returns>
-    public async Task<MonitorResponse> RunFullCheckAsync(CancellationToken cancellationToken = default)
+    public async Task<MonitorResponse> RunFullCheckAsync(string checkMode = NetworkMonitorService.FullCheckMode, CancellationToken cancellationToken = default)
     {
         await _executionLock.WaitAsync(cancellationToken);
-        return await ExecuteFullCheckAsync(cancellationToken);
+        return await ExecuteFullCheckAsync(checkMode, cancellationToken);
     }
 
     /// <summary>
     /// Attempts to start a full monitor execution immediately without waiting behind another execution.
     /// </summary>
+    /// <param name="checkMode">Execution mode: Full or PingOnly.</param>
     /// <param name="cancellationToken">Token used to cancel lock acquisition or execution.</param>
     /// <returns>A fresh monitor response, or null when another execution is already running.</returns>
-    public async Task<MonitorResponse?> TryRunFullCheckAsync(CancellationToken cancellationToken = default)
+    public async Task<MonitorResponse?> TryRunFullCheckAsync(string checkMode = NetworkMonitorService.FullCheckMode, CancellationToken cancellationToken = default)
     {
         if (!await _executionLock.WaitAsync(0, cancellationToken))
         {
             return null;
         }
 
-        return await ExecuteFullCheckAsync(cancellationToken);
+        return await ExecuteFullCheckAsync(checkMode, cancellationToken);
     }
 
     /// <summary>
@@ -58,6 +60,7 @@ public sealed class MonitorExecutionService
     /// <param name="categoryName">Optional category name used to limit the execution to one group.</param>
     /// <param name="deviceName">Optional device name used to limit the execution to one device.</param>
     /// <param name="deviceIps">Optional device IP list used to limit the execution to selected devices.</param>
+    /// <param name="checkMode">Execution mode: Full or PingOnly.</param>
     /// <param name="cancellationToken">Token used to cancel waiting, checks, or writes.</param>
     /// <returns>True when streaming started; false when another execution is already running.</returns>
     public async Task<bool> TryStreamFullCheckAsync(
@@ -66,6 +69,7 @@ public sealed class MonitorExecutionService
         string? categoryName = null,
         string? deviceName = null,
         IReadOnlyCollection<string>? deviceIps = null,
+        string checkMode = NetworkMonitorService.FullCheckMode,
         CancellationToken cancellationToken = default)
     {
         if (!await _executionLock.WaitAsync(0, cancellationToken))
@@ -77,6 +81,7 @@ public sealed class MonitorExecutionService
         {
             var loadedConfiguration = await _deviceRepository.GetConfigurationAsync();
             var configuration = FilterConfiguration(loadedConfiguration, facilityName, categoryName, deviceName, deviceIps);
+            var normalizedCheckMode = NetworkMonitorService.NormalizeCheckMode(checkMode);
             var settings = configuration.Settings;
             var totalDevices = configuration.Devices.Count(device => device.Enabled);
             var results = new List<DeviceResult>();
@@ -89,10 +94,11 @@ public sealed class MonitorExecutionService
                 Settings = settings,
                 Summary = CreateDashboardSummary(results, totalDevices),
                 Timestamp = DateTimeOffset.Now,
-                ExecutionStatus = "Running"
+                ExecutionStatus = "Running",
+                CheckMode = normalizedCheckMode
             }, cancellationToken);
 
-            await foreach (var result in _monitorService.CheckDevicesAsCompletedAsync(configuration, cancellationToken))
+            await foreach (var result in _monitorService.CheckDevicesAsCompletedAsync(configuration, normalizedCheckMode, cancellationToken))
             {
                 results.Add(result);
 
@@ -105,7 +111,8 @@ public sealed class MonitorExecutionService
                     Result = result,
                     Summary = CreateDashboardSummary(results, totalDevices),
                     Timestamp = DateTimeOffset.Now,
-                    ExecutionStatus = "Running"
+                    ExecutionStatus = "Running",
+                    CheckMode = normalizedCheckMode
                 }, cancellationToken);
             }
 
@@ -120,7 +127,8 @@ public sealed class MonitorExecutionService
                 Categories = CreateCategoryResults(results),
                 Results = results,
                 Timestamp = completedAt,
-                ExecutionStatus = "Completed"
+                ExecutionStatus = "Completed",
+                CheckMode = normalizedCheckMode
             }, cancellationToken);
 
             return true;
@@ -134,15 +142,17 @@ public sealed class MonitorExecutionService
     /// <summary>
     /// Performs the locked execution flow.
     /// </summary>
+    /// <param name="checkMode">Execution mode: Full or PingOnly.</param>
     /// <param name="cancellationToken">Token used by the network checks.</param>
     /// <returns>A completed monitor response.</returns>
-    private async Task<MonitorResponse> ExecuteFullCheckAsync(CancellationToken cancellationToken)
+    private async Task<MonitorResponse> ExecuteFullCheckAsync(string checkMode, CancellationToken cancellationToken)
     {
         try
         {
             var configuration = await _deviceRepository.GetConfigurationAsync();
-            var results = await _monitorService.CheckAllDevicesAsync(cancellationToken);
-            var response = CreateResponse(configuration.Settings, results, "Completed");
+            var normalizedCheckMode = NetworkMonitorService.NormalizeCheckMode(checkMode);
+            var results = await _monitorService.CheckAllDevicesAsync(normalizedCheckMode, cancellationToken);
+            var response = CreateResponse(configuration.Settings, results, "Completed", normalizedCheckMode);
 
             return response;
         }
@@ -218,11 +228,13 @@ public sealed class MonitorExecutionService
     /// <param name="settings">Settings used by the latest execution.</param>
     /// <param name="results">Flat device results produced by the monitor service.</param>
     /// <param name="executionStatus">Human-readable execution status to include in the response.</param>
+    /// <param name="checkMode">Execution mode: Full or PingOnly.</param>
     /// <returns>A complete monitor response for the dashboard.</returns>
     private static MonitorResponse CreateResponse(
         MonitorSettings settings,
         IReadOnlyList<DeviceResult> results,
-        string executionStatus)
+        string executionStatus,
+        string checkMode = NetworkMonitorService.FullCheckMode)
     {
         var now = DateTimeOffset.Now;
 
@@ -231,6 +243,7 @@ public sealed class MonitorExecutionService
             LastCheck = now,
             LastExecutionTime = now,
             ExecutionStatus = executionStatus,
+            CheckMode = NetworkMonitorService.NormalizeCheckMode(checkMode),
             Settings = settings,
             Summary = CreateDashboardSummary(results),
             Categories = CreateCategoryResults(results),

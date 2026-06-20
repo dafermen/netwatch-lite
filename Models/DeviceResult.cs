@@ -66,6 +66,11 @@ public sealed class DeviceResult
     public required IReadOnlyList<int> RequestedPorts { get; init; }
 
     /// <summary>
+    /// Execution mode used to produce this result. Full runs every configured check; PingOnly skips TCP checks.
+    /// </summary>
+    public string CheckMode { get; init; } = "Full";
+
+    /// <summary>
     /// TCP ports that accepted a connection during this execution.
     /// </summary>
     public required IReadOnlyList<int> OpenPorts { get; init; }

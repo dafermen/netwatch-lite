@@ -2,6 +2,12 @@
 
 All notable changes to NetWatch-Lite are documented here.
 
+## v0.6.2 - 2026-06-20
+
+- Added a Dashboard execution mode toggle for `Full Check` versus `Ping Only` connectivity checks.
+- Added `checkMode=ping` support to monitoring APIs so TCP checks can be skipped temporarily without changing saved JSON.
+- Ping-only results preserve configured ports for display and show them as skipped instead of failed.
+
 ## v0.6.1 - 2026-06-19
 
 - Fixed scoped dashboard category runs so `Run Group` executes only the selected category instead of carrying over unrelated dashboard categories.

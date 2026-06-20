@@ -56,6 +56,11 @@ public sealed class MonitorStreamEvent
     public string? ExecutionStatus { get; init; }
 
     /// <summary>
+    /// Check mode used by this execution. Supported values are Full and PingOnly.
+    /// </summary>
+    public string? CheckMode { get; init; }
+
+    /// <summary>
     /// Optional message for busy or error-like stream events.
     /// </summary>
     public string? Message { get; init; }
