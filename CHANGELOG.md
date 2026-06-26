@@ -91,7 +91,7 @@ All notable changes to NetWatch-Lite are documented here.
 - Replaced public sample device references with neutral names.
 - Added a downloadable Windows x64 portable ZIP under `releases/`.
 
-## v0.3.0 - 2026-05-06
+## v0.3.0 - 2026-06-06
 
 - Default dashboard execution mode changed to manual.
 - Auto refresh now starts only when the operator enables `Auto Refresh: ON`.
@@ -113,13 +113,13 @@ All notable changes to NetWatch-Lite are documented here.
 - Hardened invalid JSON handling, monitoring API errors, and unexpected TCP failure handling.
 - Documentation updated to describe manual-first behavior.
 
-## v0.2.0 - 2026-05-05
+## v0.2.0 - 2026-06-05
 
 - Added collapsible device category groups.
 - Preserved collapsed/expanded category state during refreshes.
 - Updated UI documentation for large inventories.
 
-## v0.1.0 - 2026-05-05
+## v0.1.0 - 2026-06-05
 
 - Initial NetWatch-Lite release.
 - Added JSON-driven device inventory.
