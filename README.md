@@ -14,7 +14,7 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 
 Download the latest Windows x64 portable ZIP:
 
-[Download NetWatch Lite portable ZIP v0.7.0](https://github.com/dafermen/netwatch-lite/raw/refs/heads/main/releases/NetWatch-Lite-win-x64-portable-2026-06-27-v0.7.0-reports-bulk-actions.zip)
+[Download NetWatch Lite portable ZIP v0.7.1](https://github.com/dafermen/netwatch-lite/raw/refs/heads/main/releases/NetWatch-Lite-win-x64-portable-2026-06-27-v0.7.1-reports-integrations-polish.zip)
 
 Extract the ZIP on Windows and run `NetWatch-Lite.exe`. The ZIP includes a safe `config.sample.json`; NetWatch Lite creates the editable runtime `config.json` and `themes.json` beside the executable on first run if they do not already exist.
 
@@ -66,7 +66,7 @@ Previous portable versions remain available in the [`releases/`](releases/) fold
 - Editable auto refresh interval, timeout, max parallel check limit, and per-device ping target mode in `/config`.
 - Add, update, and delete device actions save immediately to the active support group JSON.
 - Copy device action opens a prefilled add form so similar devices can be created quickly.
-- Bulk Edit mode lets operators filter by facility/category and update common device fields in a grouped spreadsheet-style table, with individual row saves and validation.
+- Bulk Edit mode lets operators filter by facility/category and update common device fields in a grouped spreadsheet-style table, with individual row saves, collapse/expand-all facility controls, and validation.
 - Theme templates can be created, copied, renamed, activated, deleted one at a time, or fully reset from the Themes page. If `themes.json` is missing, NetWatch Lite creates the default theme automatically.
 - Configuration device table grouped by facility and category for easier editing.
 - Configuration devices can be filtered by name, address, hostname, facility, or category.
@@ -85,8 +85,9 @@ Previous portable versions remain available in the [`releases/`](releases/) fold
 - Visible monitoring progress with percentage and checked/total count while a run is active.
 - JSON reload without restarting.
 - Local monitor history stored in `monitor-history.json` for future reporting and analysis.
-- Reports page at `/reports` with executive summary tables, summary cards, filters, sortable indexed table, and filtered JSON export from local monitor history.
+- Reports page at `/reports` with summary cards, coherent filters, collapsible paginated/sortable Facility Performance, Category Performance, Recent Runs, indexed Detailed Monitor History, per-execution delete actions, and filtered JSON export from local monitor history.
 - Local application error log stored in `app-errors.json` for troubleshooting where the app fails.
+- Integrations page at `/integrations` for choosing local JSON or a future external inventory endpoint, plus future outbound report endpoint settings.
 - Future-ready reporting model: operator identity, audit fields, and external integrations are planned but not enabled yet.
 
 ## Project Structure
@@ -146,7 +147,8 @@ The device JSON path is configured in `appsettings.json`.
     "ProfileFilePath": "regions.json",
     "ThemeFilePath": "themes.json",
     "HistoryFilePath": "monitor-history.json",
-    "ErrorLogFilePath": "app-errors.json"
+    "ErrorLogFilePath": "app-errors.json",
+    "IntegrationFilePath": "integrations.json"
   }
 }
 ```
@@ -155,7 +157,7 @@ During local development, `Data/config.json`, `Data/regions.json`, and `Data/reg
 
 `themes.json` stores GUI theme templates and the active theme id. It is runtime data and is ignored by Git, just like `config.json`. If it is missing, NetWatch Lite creates the built-in `NetWatch Default` and `Corporate Logistics` themes automatically. Theme color tokens include page/surface/sidebar colors, status colors, dashboard category health colors, Configuration collapsible header colors, and dashboard action colors for `Auto Refresh: ON`, `Auto Refresh: OFF`, and the primary run button.
 
-`monitor-history.json` stores completed monitoring executions locally, including run timing, selected scope, dashboard summary, and device-level results. `app-errors.json` stores local application errors with request context so failures can be reviewed later. Both files are runtime data, ignored by Git, and excluded from portable publish output.
+`monitor-history.json` stores completed monitoring executions locally, including run timing, selected scope, dashboard summary, and device-level results. `app-errors.json` stores local application errors with request context so failures can be reviewed later. `integrations.json` stores local integration settings for inventory source mode and future outbound report delivery. These files are runtime data, ignored by Git, and excluded from portable publish output.
 
 Future history versions should add audit context without breaking existing local files. Planned fields include `executedBy`, `executedByDisplayName`, `authProvider`, `triggerSource`, `correlationId`, and optional external reference ids. These fields are intentionally not active yet because NetWatch Lite does not currently authenticate users.
 
@@ -173,7 +175,7 @@ Future history versions should add audit context without breaking existing local
   "devices": [
     {
       "name": "Web Server",
-      "ip": "192.168.4.10",
+      "ip": "192.0.2.10",
       "hostname": "web-server.local",
       "useHostnameForPing": true,
       "websiteUrl": "https://example.local/status",
@@ -221,8 +223,11 @@ That project renders operational monitoring pages in native WebView2 panels for 
 | `GET` | `/api/monitor/stream` | Streams a full check progressively with `started`, `result`, `completed`, `busy`, and `error` events. Supports optional `facility`, `category`, `deviceName`, `deviceIp`, and `checkMode=ping` query filtering. |
 | `GET` | `/api/history` | Returns local monitoring history from `monitor-history.json`. |
 | `POST` | `/api/history/clear` | Clears local monitoring history for maintenance or demo reset. |
+| `DELETE` | `/api/history/runs/{runId}` | Deletes one stored monitoring execution without clearing the full history file. |
 | `GET` | `/api/errors` | Returns local application errors from `app-errors.json`. |
 | `POST` | `/api/errors/clear` | Clears local application errors for maintenance or demo reset. |
+| `GET` | `/api/integrations` | Returns local integration settings from `integrations.json`. |
+| `POST` | `/api/integrations` | Saves integration settings locally without calling external systems. |
 
 ## Security Model
 
@@ -231,7 +236,7 @@ NetWatch Lite is designed as an internal operational tool. Its current security 
 Built-in safeguards:
 
 - Runtime inventory files are ignored by Git: `Data/config.json`, `Data/regions.json`, `Data/regions/*.json`, and `Data/themes.json`.
-- Runtime history and troubleshooting files are ignored by Git: `Data/monitor-history.json` and `Data/app-errors.json`.
+- Runtime history, troubleshooting, and integration settings files are ignored by Git: `Data/monitor-history.json`, `Data/app-errors.json`, and `Data/integrations.json`.
 - The committed sample file is generic and safe: `Data/config.sample.json`.
 - Portable releases are built with only the safe `config.sample.json`, not active operational profiles.
 - JSON import rejects empty files, non-`.json` files, files larger than 5 MB, malformed JSON, and invalid monitor configurations.
@@ -257,7 +262,100 @@ Future integration direction:
 
 - Inbound integrations may later create check requests, import inventory metadata, or receive external incident context.
 - Outbound integrations may later send availability events, report exports, Teams/email notifications, ticket updates, or webhook payloads.
+- Current `/integrations` settings are configuration only; they do not import inventory or send reports yet.
 - Each integration should use explicit authentication, request logging, correlation ids, and allowlisted destinations before production use.
+
+## Integrations Design
+
+The `/integrations` page is the planning surface for future data exchange. The current implementation only saves local settings in `integrations.json`; it does not call external systems yet.
+
+### Receive Inventory Data
+
+Goal: allow NetWatch Lite to load facilities, devices, categories, and checks from an approved external system instead of relying only on the local JSON profile. Until that connector exists, `Local JSON` remains the active source of truth.
+
+Expected external inventory payload:
+
+```json
+{
+  "schemaVersion": 1,
+  "sourceSystem": "inventory-platform",
+  "generatedAt": "2026-06-27T16:00:00Z",
+  "region": "Sample Region",
+  "supportGroup": "Support Team A",
+  "facilities": [
+    {
+      "name": "Facility A",
+      "devices": [
+        {
+          "name": "Device-001",
+          "ip": "192.0.2.20",
+          "hostname": "device-001.example.local",
+          "facility": "Facility A",
+          "category": "Servers",
+          "enabled": true,
+          "useHostnameForPing": false,
+          "websiteUrl": "https://device-001.example.local",
+          "checks": [
+            { "type": "ping" },
+            { "type": "tcp", "port": 443 }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Send Report Data
+
+Goal: allow NetWatch Lite to send report output from local monitor history to an approved external endpoint. The intended source is the same filtered report model shown in `/reports`: execution metadata, summary values, and optional detailed device rows.
+
+Expected outbound report payload:
+
+```json
+{
+  "schemaVersion": 1,
+  "sourceSystem": "netwatch-lite",
+  "exportedAt": "2026-06-27T16:05:00Z",
+  "runId": "20260627-160500-123-full",
+  "scope": {
+    "region": "Sample Region",
+    "supportGroup": "Support Team A",
+    "facility": null,
+    "category": null
+  },
+  "summary": {
+    "totalDevices": 25,
+    "healthyDevices": 22,
+    "degradedDevices": 2,
+    "offlineDevices": 1,
+    "availabilityPercentage": 88.0
+  },
+  "rows": [
+    {
+      "deviceName": "Device-001",
+      "ip": "192.0.2.20",
+      "hostname": "device-001.example.local",
+      "facility": "Facility A",
+      "category": "Servers",
+      "status": "Healthy",
+      "latencyMs": 4,
+      "checkMode": "Full",
+      "completedAt": "2026-06-27T16:05:00Z"
+    }
+  ]
+}
+```
+
+### Future Security Requirements
+
+- Authentication should use Microsoft Entra ID when NetWatch Lite becomes a shared internal service.
+- Endpoint credentials or tokens must not be stored in Git or committed runtime files.
+- External destinations should be allowlisted before outbound report delivery is enabled.
+- Every inbound or outbound request should include a correlation id and be logged.
+- Failed outbound delivery should retry with a bounded policy and then record failure details in local logs.
+- Imported inventory must be validated with the same server-side rules used by local JSON import.
+- Report delivery should clearly separate human-triggered, auto-refresh, scheduled, API, and integration-triggered runs.
 
 ## Version Notes
 
@@ -300,13 +398,13 @@ Open the URL printed by `dotnet run`, usually `http://localhost:5000`, `https://
 Publish a self-contained Windows x64 package:
 
 ```bash
-dotnet publish NetWatch.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x64-v0.7.0
+dotnet publish NetWatch.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x64-v0.7.1
 ```
 
 Expected output:
 
 ```text
-publish/win-x64-v0.7.0/
+publish/win-x64-v0.7.1/
 ├── NetWatch-Lite.exe
 ├── config.sample.json
 ├── appsettings.json
@@ -320,8 +418,8 @@ It also creates `themes.json` beside the executable if no theme file exists.
 Create a ZIP on macOS:
 
 ```bash
-cd publish/win-x64-v0.7.0
-zip -r ../../releases/NetWatch-Lite-win-x64-portable-2026-06-27-v0.7.0-reports-bulk-actions.zip .
+cd publish/win-x64-v0.7.1
+zip -r ../../releases/NetWatch-Lite-win-x64-portable-2026-06-27-v0.7.1-reports-integrations-polish.zip .
 ```
 
 To run on Windows:

@@ -35,4 +35,9 @@ public sealed class NetworkMonitorOptions
     /// Relative or absolute path to the local application error log JSON file.
     /// </summary>
     public string ErrorLogFilePath { get; init; } = "app-errors.json";
+
+    /// <summary>
+    /// Relative or absolute path to the local integrations settings JSON file.
+    /// </summary>
+    public string IntegrationFilePath { get; init; } = "integrations.json";
 }

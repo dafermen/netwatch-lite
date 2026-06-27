@@ -15,7 +15,7 @@ NetWatch Lite is an ASP.NET Core Minimal API application with a static Bootstrap
 
 The backend owns configuration, validation, file persistence, network checks, execution locking, and API responses. The frontend owns navigation, dashboard rendering, configuration CRUD, filters, and progressive rendering through Server-Sent Events.
 
-The Windows-only project `src/NetWatchLite.Wallboard.WebView2` reads `wallboard.json` and renders each panel with a native WebView2 control. Use that executable when required monitoring pages block iframe embedding.
+The Windows WebView2 wallboard is maintained in the sibling `netwatch-lite-wallboard` repository. Use that executable when required monitoring pages block iframe embedding.
 
 ```text
 Browser
@@ -37,6 +37,8 @@ Ping / TCP checks
 Configuration is stored in runtime JSON profiles. During development, `Data/config.json`, `Data/regions.json`, and `Data/regions/*.json` are private and ignored by Git; `Data/config.sample.json` is the safe committed example. When profile metadata is missing, the repository creates a `Support Team A` profile in `Sample Region` from the existing local config when available and a protected `Demo` profile from the sample file.
 
 GUI theme templates are stored in runtime `themes.json`. The file is also ignored by Git and is created automatically with the built-in `NetWatch Default` theme when missing.
+
+Integration settings are stored in runtime `integrations.json`. The current implementation saves the selected inventory source mode and future report destination settings only; it does not call external systems yet.
 
 ## Security Model
 
@@ -80,6 +82,114 @@ Future integrations should be built behind explicit boundaries:
 - Outbound: NetWatch Lite can publish events, report exports, ticket updates, or notification payloads.
 - Security: every integration needs authentication, authorization, input validation, request logging, correlation ids, and a clear data-retention decision.
 - Operations: failed outbound calls should be logged to `app-errors.json` or a future integration log without blocking the main monitoring run.
+- Current `/integrations` settings are preparatory configuration. Implementing real import/export should be done behind explicit services with tests and controlled retry/error behavior.
+
+## Integrations Design
+
+The Integrations page has two planned data flows. The current code persists settings only through `JsonIntegrationRepository` and `integrations.json`; it intentionally does not import inventory or send reports yet.
+
+### Receive Inventory Data
+
+Purpose: replace or refresh the active local inventory from a trusted external source. The future importer should transform the external payload into `MonitorConfiguration`, reuse existing server-side validation, create a local backup, and only then replace the active support group JSON.
+
+Expected external inventory payload:
+
+```json
+{
+  "schemaVersion": 1,
+  "sourceSystem": "inventory-platform",
+  "generatedAt": "2026-06-27T16:00:00Z",
+  "region": "Sample Region",
+  "supportGroup": "Support Team A",
+  "facilities": [
+    {
+      "name": "Facility A",
+      "devices": [
+        {
+          "name": "Device-001",
+          "ip": "192.0.2.20",
+          "hostname": "device-001.example.local",
+          "facility": "Facility A",
+          "category": "Servers",
+          "enabled": true,
+          "useHostnameForPing": false,
+          "websiteUrl": "https://device-001.example.local",
+          "checks": [
+            { "type": "ping" },
+            { "type": "tcp", "port": 443 }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+Implementation notes:
+
+- Treat `Local JSON` as the default and safest source.
+- Add a dedicated importer service instead of placing external HTTP logic in `Program.cs`.
+- Validate endpoint URL, response size, JSON schema, device fields, TCP ports, and duplicate device identity.
+- Keep imports transactional: backup current JSON, validate new configuration, write once, reload memory.
+- Log source system, generated timestamp, correlation id, counts, and validation failures.
+
+### Send Report Data
+
+Purpose: send monitoring results from local history to an approved external endpoint. The outbound payload should be based on the same filtered model used by `/reports` so operators understand exactly what is being sent.
+
+Expected outbound report payload:
+
+```json
+{
+  "schemaVersion": 1,
+  "sourceSystem": "netwatch-lite",
+  "exportedAt": "2026-06-27T16:05:00Z",
+  "runId": "20260627-160500-123-full",
+  "scope": {
+    "region": "Sample Region",
+    "supportGroup": "Support Team A",
+    "facility": null,
+    "category": null
+  },
+  "summary": {
+    "totalDevices": 25,
+    "healthyDevices": 22,
+    "degradedDevices": 2,
+    "offlineDevices": 1,
+    "availabilityPercentage": 88.0
+  },
+  "rows": [
+    {
+      "deviceName": "Device-001",
+      "ip": "192.0.2.20",
+      "hostname": "device-001.example.local",
+      "facility": "Facility A",
+      "category": "Servers",
+      "status": "Healthy",
+      "latencyMs": 4,
+      "checkMode": "Full",
+      "completedAt": "2026-06-27T16:05:00Z"
+    }
+  ]
+}
+```
+
+Implementation notes:
+
+- Add an outbound report delivery service with timeout, retry limit, and structured failure logging.
+- Never block the monitoring run because a report endpoint is unavailable.
+- Support sending summary-only payloads or summary plus detailed rows, matching the Integrations page options.
+- Include `runId`, `correlationId`, `triggerSource`, and future authenticated user fields when identity exists.
+
+### Future Security Requirements
+
+- Use Microsoft Entra ID for authenticated shared deployments.
+- Do not commit endpoint secrets, bearer tokens, client secrets, or runtime integration files.
+- Keep endpoint destinations allowlisted before outbound delivery is enabled.
+- Prefer short-lived tokens or managed identity over static secrets when the deployment environment supports it.
+- Record request/response metadata without storing sensitive headers or full secrets.
+- Use bounded retries with backoff and record final failures in `app-errors.json` or a future integration log.
+- Keep all integration fields optional and versioned so existing local JSON remains readable.
 
 ## Backend Entry Point
 
@@ -94,6 +204,7 @@ Important responsibilities:
   - `JsonDeviceRepository`
   - `JsonRegionProfileRepository`
   - `JsonThemeRepository`
+  - `JsonIntegrationRepository`
   - `NetworkMonitorService`
   - `MonitorExecutionService`
 - Attempts to load the active support group JSON at startup.
@@ -124,20 +235,17 @@ Important endpoints:
 | `GET /api/themes` | Returns normalized theme templates from `themes.json`, creating the default file when missing. |
 | `POST /api/themes` | Validates, normalizes, and saves theme templates. |
 | `POST /api/themes/reset` | Replaces `themes.json` with the built-in default theme. |
+| `GET /api/integrations` | Returns normalized integration settings from `integrations.json`, creating the default file when missing. |
+| `POST /api/integrations` | Validates, normalizes, and saves integration settings without calling external systems. |
+| `GET /api/history` | Returns local monitoring history from `monitor-history.json`. |
+| `DELETE /api/history/runs/{runId}` | Deletes one stored monitoring execution by id. |
 | `GET /api/results` | Backwards-compatible full-check endpoint. |
 | `POST /api/monitor/run` | Runs a full check and returns one final payload. Supports `checkMode=ping` for connectivity-only runs. |
 | `GET /api/monitor/stream` | Runs a full check, one category when `category` is supplied, one device when `deviceName` and `deviceIp` are supplied, or selected devices when `deviceIp` is supplied multiple times, and streams progressive events. Supports `checkMode=ping` to skip TCP checks temporarily. |
 
 ## Windows WebView2 Wallboard
 
-`src/NetWatchLite.Wallboard.WebView2` is a WinForms executable targeting `net8.0-windows`.
-
-Important files:
-
-- `WallboardConfigReader.cs`: reads and normalizes `wallboard.json`.
-- `WallboardForm.cs`: owns layout buttons, page rotation, fullscreen mode, keyboard shortcuts, and the panel grid.
-- `WebViewPanelControl.cs`: wraps one WebView2 control, panel title bar, independent refresh timer, and navigation error handling.
-- `NetWatchLite.Wallboard.WebView2.csproj`: references `Microsoft.Web.WebView2` and copies `wallboard.json` beside the executable.
+The wallboard source is no longer part of this repository. It lives in the sibling `netwatch-lite-wallboard` repository so this project can stay focused on the web dashboard and API.
 
 It supports:
 
@@ -437,6 +545,7 @@ Important configuration functions:
 - `renderBulkEditDevices`: paints the grouped spreadsheet-style Bulk Edit table for common device fields.
 - `renderBulkEditFilterOptions`: builds the Bulk Edit facility/category filters from the current searchable device set.
 - `filterBulkEditDevices`: applies Bulk Edit facility/category scope before rows are rendered.
+- `collapseAllBulkFacilities` and `expandAllBulkFacilities`: collapse or expand every visible Bulk Edit facility group after current filters are applied.
 - `filterConfigDevices`: filters configuration devices by name, address, hostname, facility, or category while preserving original indexes.
 - `groupConfigDevicesByFacility`: groups devices by facility and category while preserving their original JSON index.
 - `renderConfigDeviceRow`: renders one editable device row inside a category group.
@@ -447,6 +556,20 @@ Important configuration functions:
 - `editDevice`: opens the edit device modal.
 - `submitDevice`: updates device state and immediately persists the full configuration.
 - `readDeviceForm`: builds a device object from form fields.
+
+Important integration functions:
+
+- `loadIntegrations`: reads `/api/integrations`.
+- `saveIntegrations`: posts local integration settings to `/api/integrations`.
+- `renderIntegrations`: syncs inventory source and report destination settings into the Integrations page.
+- `updateIntegrationFormState`: enables or disables endpoint fields based on local JSON vs external endpoint choices.
+
+Important report functions:
+
+- `renderReports`: applies filters, sorting, summary calculations, paginated Facility Performance, Category Performance, Recent Runs, and Detailed Monitor History rendering.
+- `populateReportFilterOptions`: keeps category options coherent with the selected facility.
+- `updateReportsPagination`: updates the visible row range and page buttons for Detailed Monitor History.
+- `deleteReportRun`: deletes one stored execution through `/api/history/runs/{runId}` and reloads the report view.
 - `renderWebsiteLink`: renders optional dashboard links from `websiteUrl`.
 - `readCheckRows`: validates check rows.
 - `requestDeleteDevice`: opens confirmation modal.

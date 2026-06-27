@@ -31,10 +31,11 @@ Expected result:
 - Dashboard: select one facility, run it, return to `All Facilities`.
 - Dashboard: run one category.
 - Dashboard: run one failed device when available.
-- Configuration: add, edit, copy, delete, save settings, export, import, Bulk Edit, and Bulk Actions.
+- Configuration: add, edit, copy, delete, save settings, export, import, Bulk Edit, Bulk Actions, and Bulk Edit collapse/expand all.
 - Support Groups: create, copy, rename, activate, delete a test profile.
 - Themes: activate `NetWatch Default`, activate `Corporate Logistics`, create/copy/rename a custom theme.
-- Reports: load history, filter, sort, export filtered JSON.
+- Reports: load history, filter, confirm category/facility coherence, review collapsed Facility Performance, Category Performance, Recent Runs, paginate, sort, export filtered JSON, and delete only a test execution.
+- Integrations: confirm local JSON mode, endpoint fields, validation, save/reload, runtime-only `integrations.json`, documented payload examples, and future security notes.
 - Errors: load `/api/errors` and clear only test data.
 
 ## 4. Documentation
@@ -56,7 +57,8 @@ Do not commit:
 - `Data/themes.json`
 - `Data/monitor-history.json`
 - `Data/app-errors.json`
-- root-level runtime `config.json`, `themes.json`, `monitor-history.json`, or `app-errors.json`
+- `Data/integrations.json`
+- root-level runtime `config.json`, `themes.json`, `monitor-history.json`, `app-errors.json`, or `integrations.json`
 
 ## 6. Portable Package Review
 
@@ -67,7 +69,7 @@ Before publishing a Windows portable package:
 - Exclude operational runtime profiles, history, and error logs.
 - Start the executable on a clean folder.
 - Confirm first-run files are created locally.
-- Confirm Dashboard, Configuration, Themes, and Reports open from the packaged app.
+- Confirm Dashboard, Configuration, Themes, Reports, and Integrations open from the packaged app.
 
 ## 7. Commit Readiness
 

@@ -7,7 +7,7 @@
   <link rel="icon" type="image/png" href="/netwatch-lite-favicon.png">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
-  <link href="/styles.css?v=regions-20260618" rel="stylesheet">
+  <link href="/styles.css?v=reports-20260627" rel="stylesheet">
 </head>
 <body>
   <div class="app-shell">
@@ -32,6 +32,10 @@
         <a class="nav-link" href="/reports" data-route="/reports">
           <i class="fa-solid fa-chart-column"></i>
           Reports
+        </a>
+        <a class="nav-link" href="/integrations" data-route="/integrations">
+          <i class="fa-solid fa-plug-circle-bolt"></i>
+          Integrations
         </a>
         <a class="nav-link" href="/themes" data-route="/themes">
           <i class="fa-solid fa-palette"></i>
@@ -402,6 +406,14 @@
                         <i class="fa-solid fa-xmark me-1"></i>
                         Clear Selection
                       </button>
+                      <button class="btn btn-outline-secondary btn-sm" type="button" id="bulk-collapse-all">
+                        <i class="fa-solid fa-compress me-1"></i>
+                        Collapse All
+                      </button>
+                      <button class="btn btn-outline-secondary btn-sm" type="button" id="bulk-expand-all">
+                        <i class="fa-solid fa-expand me-1"></i>
+                        Expand All
+                      </button>
                       <span class="small text-secondary" id="bulk-selection-summary">0 selected</span>
                     </div>
                     <div class="bulk-action-tools">
@@ -465,10 +477,6 @@
               <button class="btn btn-outline-primary btn-sm" type="button" id="export-reports">
                 <i class="fa-solid fa-file-export me-1"></i>
                 Export Filtered JSON
-              </button>
-              <button class="btn btn-outline-danger btn-sm" type="button" id="clear-reports">
-                <i class="fa-solid fa-trash-can me-1"></i>
-                Clear History
               </button>
             </div>
           </div>
@@ -535,70 +543,162 @@
 
           <section class="reports-executive-grid mb-3" aria-label="Executive report summary">
             <div class="card config-card reports-executive-card">
-              <div class="card-header config-settings-header">
+              <div class="card-header config-settings-header reports-card-header">
                 <span class="fw-semibold">Facility Performance</span>
+                <div class="reports-table-controls">
+                  <span class="small text-secondary" id="reports-facility-performance-summary">No rows loaded</span>
+                  <label class="small text-secondary" for="reports-facility-page-size">Rows</label>
+                  <select class="form-select form-select-sm reports-page-size" id="reports-facility-page-size">
+                    <option value="5">5</option>
+                    <option value="10" selected>10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                  </select>
+                  <button class="btn btn-outline-secondary btn-sm reports-collapse-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#reports-facility-panel" aria-expanded="false" aria-controls="reports-facility-panel" title="Expand Facility Performance">
+                    <i class="fa-solid fa-chevron-down"></i>
+                  </button>
+                </div>
               </div>
-              <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                  <thead class="table-light">
-                    <tr>
-                      <th>Facility</th>
-                      <th class="text-end">Rows</th>
-                      <th class="text-end">Availability</th>
-                      <th class="text-end">Problems</th>
-                      <th class="text-end">Avg latency</th>
-                    </tr>
-                  </thead>
-                  <tbody id="reports-facility-executive-body">
-                    <tr>
-                      <td colspan="5" class="text-center text-secondary py-3">No report data loaded.</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div class="collapse reports-executive-collapse" id="reports-facility-panel">
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0 reports-summary-table">
+                    <thead class="table-light">
+                      <tr>
+                        <th><button class="table-sort-button" type="button" data-report-facility-sort="facility">Facility</button></th>
+                        <th class="text-end"><button class="table-sort-button" type="button" data-report-facility-sort="rowCount">Rows</button></th>
+                        <th class="text-end"><button class="table-sort-button" type="button" data-report-facility-sort="availability">Availability</button></th>
+                        <th class="text-end"><button class="table-sort-button" type="button" data-report-facility-sort="problemCount">Problems</button></th>
+                        <th class="text-end"><button class="table-sort-button" type="button" data-report-facility-sort="averageLatency">Avg latency</button></th>
+                      </tr>
+                    </thead>
+                    <tbody id="reports-facility-executive-body">
+                      <tr>
+                        <td colspan="5" class="text-center text-secondary py-3">No report data loaded.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="reports-pagination border-top px-3 py-2">
+                  <span class="small text-secondary" id="reports-facility-page-summary">No page loaded</span>
+                  <div class="btn-group btn-group-sm" role="group" aria-label="Facility performance pages">
+                    <button class="btn btn-outline-secondary" type="button" id="reports-facility-prev-page">
+                      <i class="fa-solid fa-chevron-left me-1"></i>
+                      Previous
+                    </button>
+                    <button class="btn btn-outline-secondary" type="button" id="reports-facility-next-page">
+                      Next
+                      <i class="fa-solid fa-chevron-right ms-1"></i>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
             <div class="card config-card reports-executive-card">
-              <div class="card-header config-settings-header">
-                <span class="fw-semibold">Top Problem Devices</span>
+              <div class="card-header config-settings-header reports-card-header">
+                <span class="fw-semibold">Category Performance</span>
+                <div class="reports-table-controls">
+                  <span class="small text-secondary" id="reports-category-performance-summary">No rows loaded</span>
+                  <label class="small text-secondary" for="reports-category-page-size">Rows</label>
+                  <select class="form-select form-select-sm reports-page-size" id="reports-category-page-size">
+                    <option value="5">5</option>
+                    <option value="10" selected>10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                  </select>
+                  <button class="btn btn-outline-secondary btn-sm reports-collapse-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#reports-category-panel" aria-expanded="false" aria-controls="reports-category-panel" title="Expand Category Performance">
+                    <i class="fa-solid fa-chevron-down"></i>
+                  </button>
+                </div>
               </div>
-              <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                  <thead class="table-light">
-                    <tr>
-                      <th>Device</th>
-                      <th class="text-end">Problems</th>
-                      <th>Latest</th>
-                    </tr>
-                  </thead>
-                  <tbody id="reports-problem-devices-body">
-                    <tr>
-                      <td colspan="3" class="text-center text-secondary py-3">No problem devices loaded.</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div class="collapse reports-executive-collapse" id="reports-category-panel">
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0 reports-summary-table">
+                    <thead class="table-light">
+                      <tr>
+                        <th><button class="table-sort-button" type="button" data-report-category-sort="category">Category</button></th>
+                        <th class="text-end"><button class="table-sort-button" type="button" data-report-category-sort="facilityCount">Facilities</button></th>
+                        <th class="text-end"><button class="table-sort-button" type="button" data-report-category-sort="rowCount">Rows</button></th>
+                        <th class="text-end"><button class="table-sort-button" type="button" data-report-category-sort="availability">Availability</button></th>
+                        <th class="text-end"><button class="table-sort-button" type="button" data-report-category-sort="problemCount">Problems</button></th>
+                        <th class="text-end"><button class="table-sort-button" type="button" data-report-category-sort="averageLatency">Avg latency</button></th>
+                      </tr>
+                    </thead>
+                    <tbody id="reports-category-executive-body">
+                      <tr>
+                        <td colspan="6" class="text-center text-secondary py-3">No category data loaded.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="reports-pagination border-top px-3 py-2">
+                  <span class="small text-secondary" id="reports-category-page-summary">No page loaded</span>
+                  <div class="btn-group btn-group-sm" role="group" aria-label="Category performance pages">
+                    <button class="btn btn-outline-secondary" type="button" id="reports-category-prev-page">
+                      <i class="fa-solid fa-chevron-left me-1"></i>
+                      Previous
+                    </button>
+                    <button class="btn btn-outline-secondary" type="button" id="reports-category-next-page">
+                      Next
+                      <i class="fa-solid fa-chevron-right ms-1"></i>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
             <div class="card config-card reports-executive-card">
-              <div class="card-header config-settings-header">
+              <div class="card-header config-settings-header reports-card-header">
                 <span class="fw-semibold">Recent Runs</span>
+                <div class="reports-table-controls">
+                  <span class="small text-secondary" id="reports-runs-summary">No rows loaded</span>
+                  <label class="small text-secondary" for="reports-runs-page-size">Rows</label>
+                  <select class="form-select form-select-sm reports-page-size" id="reports-runs-page-size">
+                    <option value="5">5</option>
+                    <option value="10" selected>10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                  </select>
+                  <button class="btn btn-outline-secondary btn-sm reports-collapse-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#reports-runs-panel" aria-expanded="false" aria-controls="reports-runs-panel" title="Expand Recent Runs">
+                    <i class="fa-solid fa-chevron-down"></i>
+                  </button>
+                </div>
               </div>
-              <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                  <thead class="table-light">
-                    <tr>
-                      <th>Completed</th>
-                      <th class="text-end">Availability</th>
-                      <th class="text-end">Problems</th>
-                    </tr>
-                  </thead>
-                  <tbody id="reports-recent-runs-body">
-                    <tr>
-                      <td colspan="3" class="text-center text-secondary py-3">No recent runs loaded.</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div class="collapse reports-executive-collapse" id="reports-runs-panel">
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0 reports-summary-table">
+                    <thead class="table-light">
+                      <tr>
+                        <th><button class="table-sort-button" type="button" data-report-run-sort="completedAt">Completed</button></th>
+                        <th><button class="table-sort-button" type="button" data-report-run-sort="checkMode">Mode</button></th>
+                        <th><button class="table-sort-button" type="button" data-report-run-sort="scopeLabel">Scope</button></th>
+                        <th class="text-end"><button class="table-sort-button" type="button" data-report-run-sort="rowCount">Rows</button></th>
+                        <th class="text-end"><button class="table-sort-button" type="button" data-report-run-sort="availability">Availability</button></th>
+                        <th class="text-end"><button class="table-sort-button" type="button" data-report-run-sort="problemCount">Problems</button></th>
+                        <th class="text-end"><button class="table-sort-button" type="button" data-report-run-sort="durationMs">Run time</button></th>
+                        <th class="text-end">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="reports-recent-runs-body">
+                      <tr>
+                        <td colspan="8" class="text-center text-secondary py-3">No recent runs loaded.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="reports-pagination border-top px-3 py-2">
+                  <span class="small text-secondary" id="reports-runs-page-summary">No page loaded</span>
+                  <div class="btn-group btn-group-sm" role="group" aria-label="Recent run pages">
+                    <button class="btn btn-outline-secondary" type="button" id="reports-runs-prev-page">
+                      <i class="fa-solid fa-chevron-left me-1"></i>
+                      Previous
+                    </button>
+                    <button class="btn btn-outline-secondary" type="button" id="reports-runs-next-page">
+                      Next
+                      <i class="fa-solid fa-chevron-right ms-1"></i>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
@@ -663,7 +763,16 @@
           <div class="card config-card">
             <div class="card-header config-devices-header reports-table-header">
               <span class="fw-semibold">Detailed Monitor History</span>
-              <span class="small text-secondary" id="reports-table-summary">No rows loaded</span>
+              <div class="reports-table-controls">
+                <span class="small text-secondary" id="reports-table-summary">No rows loaded</span>
+                <label class="small text-secondary" for="reports-page-size">Rows</label>
+                <select class="form-select form-select-sm reports-page-size" id="reports-page-size">
+                  <option value="10" selected>10</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="250">250</option>
+                </select>
+              </div>
             </div>
             <div class="table-responsive">
               <table class="table table-hover align-middle mb-0 reports-table">
@@ -687,6 +796,114 @@
                   </tr>
                 </tbody>
               </table>
+            </div>
+            <div class="reports-pagination border-top px-3 py-2">
+              <span class="small text-secondary" id="reports-page-summary">No page loaded</span>
+              <div class="btn-group btn-group-sm" role="group" aria-label="Report table pages">
+                <button class="btn btn-outline-secondary" type="button" id="reports-prev-page">
+                  <i class="fa-solid fa-chevron-left me-1"></i>
+                  Previous
+                </button>
+                <button class="btn btn-outline-secondary" type="button" id="reports-next-page">
+                  Next
+                  <i class="fa-solid fa-chevron-right ms-1"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="integrations-page" data-page="/integrations" hidden>
+          <div class="config-toolbar config-page-toolbar mb-3">
+            <div>
+              <h2 class="h4 mb-1">Integrations</h2>
+              <p class="text-secondary mb-0">Prepare local or external data exchange settings for inventory and reporting.</p>
+            </div>
+            <div class="config-actions">
+              <button class="btn btn-outline-secondary btn-sm" type="button" id="reload-integrations">
+                <i class="fa-solid fa-rotate-right me-1"></i>
+                Reload
+              </button>
+              <button class="btn btn-success btn-sm" type="button" id="save-integrations">
+                <span class="spinner-border spinner-border-sm me-1 d-none" id="save-integrations-spinner" aria-hidden="true"></span>
+                <i class="fa-solid fa-floppy-disk me-1" id="save-integrations-icon"></i>
+                Save Integrations
+              </button>
+            </div>
+          </div>
+
+          <div id="integrations-alert"></div>
+
+          <div class="integrations-grid">
+            <div class="card config-card">
+              <div class="card-header config-settings-header">
+                <span class="fw-semibold">Receive Inventory Data</span>
+              </div>
+              <div class="card-body">
+                <div class="row g-3">
+                  <div class="col-12 col-md-6">
+                    <label class="form-label" for="inventory-source-mode">Inventory source</label>
+                    <select class="form-select" id="inventory-source-mode">
+                      <option value="localJson">Local JSON</option>
+                      <option value="externalEndpoint">External endpoint</option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <label class="form-label" for="inventory-local-json-path">Local JSON path</label>
+                    <input class="form-control font-monospace" type="text" id="inventory-local-json-path" autocomplete="off" placeholder="config.json">
+                  </div>
+                  <div class="col-12 col-md-8">
+                    <label class="form-label" for="inventory-endpoint-url">Endpoint URL</label>
+                    <input class="form-control" type="url" id="inventory-endpoint-url" autocomplete="off" placeholder="https://example.internal/api/netwatch/inventory">
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <label class="form-label" for="inventory-endpoint-method">Method</label>
+                    <select class="form-select" id="inventory-endpoint-method">
+                      <option value="GET">GET</option>
+                      <option value="POST">POST</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="integration-state mt-3" id="inventory-source-status">Using local JSON inventory.</div>
+              </div>
+            </div>
+
+            <div class="card config-card">
+              <div class="card-header config-settings-header">
+                <span class="fw-semibold">Send Report Data</span>
+              </div>
+              <div class="card-body">
+                <div class="form-check form-switch mb-3">
+                  <input class="form-check-input" type="checkbox" role="switch" id="report-destination-enabled">
+                  <label class="form-check-label" for="report-destination-enabled">Enable outbound report endpoint</label>
+                </div>
+                <div class="row g-3">
+                  <div class="col-12 col-md-8">
+                    <label class="form-label" for="report-destination-url">Endpoint URL</label>
+                    <input class="form-control" type="url" id="report-destination-url" autocomplete="off" placeholder="https://example.internal/api/netwatch/reports">
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <label class="form-label" for="report-destination-method">Method</label>
+                    <select class="form-select" id="report-destination-method">
+                      <option value="POST">POST</option>
+                      <option value="PUT">PUT</option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="report-include-summary" checked>
+                      <label class="form-check-label" for="report-include-summary">Include executive summary</label>
+                    </div>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="report-include-rows" checked>
+                      <label class="form-check-label" for="report-include-rows">Include detailed report rows</label>
+                    </div>
+                  </div>
+                </div>
+                <div class="integration-state mt-3" id="report-destination-status">Outbound reports are disabled.</div>
+              </div>
             </div>
           </div>
         </section>
@@ -945,6 +1162,16 @@
             </section>
 
             <section class="doc-panel">
+              <h3><i class="fa-solid fa-plug-circle-bolt me-2 text-primary"></i>Integrations</h3>
+              <p>The Integrations page stores future inbound inventory and outbound report endpoint settings in local runtime JSON.</p>
+              <ul>
+                <li>Use <strong>Local JSON</strong> while the app is running without external systems.</li>
+                <li>Use <strong>External endpoint</strong> as the planned source mode for importing facilities, devices, and settings later.</li>
+                <li>Use <strong>Send Report Data</strong> to prepare the endpoint that will receive report summaries and detailed rows when outbound delivery is implemented.</li>
+              </ul>
+            </section>
+
+            <section class="doc-panel">
               <h3><i class="fa-solid fa-shield-halved me-2 text-success"></i>Security Model</h3>
               <p>NetWatch Lite is intended for trusted internal use. It does not currently include built-in authentication, user roles, or permission-based authorization.</p>
               <ul>
@@ -1124,6 +1351,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="/app.js?v=regions-20260618"></script>
+  <script src="/app.js?v=reports-20260627"></script>
 </body>
 </html>

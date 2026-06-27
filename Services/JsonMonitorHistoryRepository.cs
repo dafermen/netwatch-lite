@@ -128,6 +128,43 @@ public sealed class JsonMonitorHistoryRepository
         }
     }
 
+    /// <summary>
+    /// Deletes one stored monitoring execution by run id.
+    /// </summary>
+    /// <param name="runId">Identifier of the run to remove.</param>
+    /// <param name="cancellationToken">Token used to cancel file operations.</param>
+    /// <returns>The updated monitor history store.</returns>
+    public async Task<MonitorHistoryStore> DeleteRunAsync(
+        string runId,
+        CancellationToken cancellationToken = default)
+    {
+        await _historyLock.WaitAsync(cancellationToken);
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(runId))
+            {
+                throw new InvalidDataException("Run id is required.");
+            }
+
+            var store = await LoadAsync(cancellationToken);
+            var removedCount = store.Runs.RemoveAll(run =>
+                string.Equals(run.RunId, runId, StringComparison.OrdinalIgnoreCase));
+
+            if (removedCount == 0)
+            {
+                throw new KeyNotFoundException($"Monitor history run '{runId}' was not found.");
+            }
+
+            await SaveAsync(store, cancellationToken);
+            return store;
+        }
+        finally
+        {
+            _historyLock.Release();
+        }
+    }
+
     private async Task<MonitorHistoryStore> LoadAsync(CancellationToken cancellationToken)
     {
         var filePath = ResolveHistoryFilePath();

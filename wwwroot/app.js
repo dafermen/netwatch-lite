@@ -8,6 +8,7 @@ const currentPageLabel = document.querySelector("#current-page-label");
 const dashboardPage = document.querySelector("#dashboard-page");
 const configPage = document.querySelector("#config-page");
 const reportsPage = document.querySelector("#reports-page");
+const integrationsPage = document.querySelector("#integrations-page");
 const regionsPage = document.querySelector("#regions-page");
 const themesPage = document.querySelector("#themes-page");
 const manualPage = document.querySelector("#manual-page");
@@ -62,12 +63,46 @@ const reportsToDateInput = document.querySelector("#reports-to-date");
 const resetReportFiltersButton = document.querySelector("#reset-report-filters");
 const refreshReportsButton = document.querySelector("#refresh-reports");
 const exportReportsButton = document.querySelector("#export-reports");
-const clearReportsButton = document.querySelector("#clear-reports");
+const reportsPageSizeSelect = document.querySelector("#reports-page-size");
+const reportsPrevPageButton = document.querySelector("#reports-prev-page");
+const reportsNextPageButton = document.querySelector("#reports-next-page");
+const reportsPageSummary = document.querySelector("#reports-page-summary");
 const reportsTableBody = document.querySelector("#reports-table-body");
 const reportsTableSummary = document.querySelector("#reports-table-summary");
 const reportsFacilityExecutiveBody = document.querySelector("#reports-facility-executive-body");
-const reportsProblemDevicesBody = document.querySelector("#reports-problem-devices-body");
+const reportsFacilityPerformanceSummary = document.querySelector("#reports-facility-performance-summary");
+const reportsFacilityPageSizeSelect = document.querySelector("#reports-facility-page-size");
+const reportsFacilityPrevPageButton = document.querySelector("#reports-facility-prev-page");
+const reportsFacilityNextPageButton = document.querySelector("#reports-facility-next-page");
+const reportsFacilityPageSummary = document.querySelector("#reports-facility-page-summary");
+const reportsCategoryExecutiveBody = document.querySelector("#reports-category-executive-body");
+const reportsCategoryPerformanceSummary = document.querySelector("#reports-category-performance-summary");
+const reportsCategoryPageSizeSelect = document.querySelector("#reports-category-page-size");
+const reportsCategoryPrevPageButton = document.querySelector("#reports-category-prev-page");
+const reportsCategoryNextPageButton = document.querySelector("#reports-category-next-page");
+const reportsCategoryPageSummary = document.querySelector("#reports-category-page-summary");
 const reportsRecentRunsBody = document.querySelector("#reports-recent-runs-body");
+const reportsRunsSummary = document.querySelector("#reports-runs-summary");
+const reportsRunsPageSizeSelect = document.querySelector("#reports-runs-page-size");
+const reportsRunsPrevPageButton = document.querySelector("#reports-runs-prev-page");
+const reportsRunsNextPageButton = document.querySelector("#reports-runs-next-page");
+const reportsRunsPageSummary = document.querySelector("#reports-runs-page-summary");
+const integrationsAlert = document.querySelector("#integrations-alert");
+const reloadIntegrationsButton = document.querySelector("#reload-integrations");
+const saveIntegrationsButton = document.querySelector("#save-integrations");
+const saveIntegrationsSpinner = document.querySelector("#save-integrations-spinner");
+const saveIntegrationsIcon = document.querySelector("#save-integrations-icon");
+const inventorySourceModeSelect = document.querySelector("#inventory-source-mode");
+const inventoryLocalJsonPathInput = document.querySelector("#inventory-local-json-path");
+const inventoryEndpointUrlInput = document.querySelector("#inventory-endpoint-url");
+const inventoryEndpointMethodSelect = document.querySelector("#inventory-endpoint-method");
+const inventorySourceStatus = document.querySelector("#inventory-source-status");
+const reportDestinationEnabledInput = document.querySelector("#report-destination-enabled");
+const reportDestinationUrlInput = document.querySelector("#report-destination-url");
+const reportDestinationMethodSelect = document.querySelector("#report-destination-method");
+const reportIncludeSummaryInput = document.querySelector("#report-include-summary");
+const reportIncludeRowsInput = document.querySelector("#report-include-rows");
+const reportDestinationStatus = document.querySelector("#report-destination-status");
 
 const configAlert = document.querySelector("#config-alert");
 const configDevicesBody = document.querySelector("#config-devices-body");
@@ -82,6 +117,8 @@ const bulkCategoryFilter = document.querySelector("#bulk-category-filter");
 const bulkClearFiltersButton = document.querySelector("#bulk-clear-filters");
 const bulkSelectVisibleButton = document.querySelector("#bulk-select-visible");
 const bulkClearSelectionButton = document.querySelector("#bulk-clear-selection");
+const bulkCollapseAllButton = document.querySelector("#bulk-collapse-all");
+const bulkExpandAllButton = document.querySelector("#bulk-expand-all");
 const bulkSelectionSummary = document.querySelector("#bulk-selection-summary");
 const bulkActionSelect = document.querySelector("#bulk-action-select");
 const bulkActionValueInput = document.querySelector("#bulk-action-value");
@@ -197,8 +234,22 @@ let reportsState = { schemaVersion: 1, runs: [] };
 let reportsRows = [];
 let reportsFilters = createDefaultReportsFilters();
 let reportsSort = { key: "completedAt", direction: "desc" };
+let reportsCurrentPage = 1;
+let reportsPageSize = 10;
+let reportsFacilitySort = { key: "problemCount", direction: "desc" };
+let reportsFacilityPage = 1;
+let reportsFacilityPageSize = 10;
+let reportsCategorySort = { key: "problemCount", direction: "desc" };
+let reportsCategoryPage = 1;
+let reportsCategoryPageSize = 10;
+let reportsRunSort = { key: "completedAt", direction: "desc" };
+let reportsRunPage = 1;
+let reportsRunPageSize = 10;
+let integrationsState = createDefaultIntegrationsState();
 let selectedBulkIndexes = new Set();
 const collapsedBulkFacilityNames = new Set();
+const alertAutoDismissMs = 10000;
+const alertDismissTimers = new Map();
 const defaultAutoFullCheckIntervalSeconds = 60;
 const maxConfigImportBytes = 5 * 1024 * 1024;
 let configState = createEmptyConfiguration();
@@ -753,6 +804,25 @@ function createDefaultReportsFilters() {
   };
 }
 
+function createDefaultIntegrationsState() {
+  return {
+    schemaVersion: 1,
+    inventorySource: {
+      mode: "localJson",
+      localJsonPath: "config.json",
+      endpointUrl: "",
+      method: "GET"
+    },
+    reportDestination: {
+      enabled: false,
+      endpointUrl: "",
+      method: "POST",
+      includeSummary: true,
+      includeRows: true
+    }
+  };
+}
+
 async function loadReports({ showBusy = true, showErrors = true } = {}) {
   if (showBusy) {
     reportsTableBody.innerHTML = `<tr><td colspan="10" class="text-center text-secondary py-4">Loading report history...</td></tr>`;
@@ -806,7 +876,10 @@ function flattenHistoryRows(runs) {
 
 function populateReportFilterOptions() {
   syncSelectOptions(reportsFacilityFilter, reportsRows.map(row => row.facility), "All facilities", reportsFilters.facility);
-  syncSelectOptions(reportsCategoryFilter, reportsRows.map(row => row.category), "All categories", reportsFilters.category);
+  const categoryRows = reportsFilters.facility
+    ? reportsRows.filter(row => row.facility === reportsFilters.facility)
+    : reportsRows;
+  syncSelectOptions(reportsCategoryFilter, categoryRows.map(row => row.category), "All categories", reportsFilters.category);
 }
 
 function syncSelectOptions(select, values, defaultLabel, selectedValue) {
@@ -826,6 +899,16 @@ function syncSelectOptions(select, values, defaultLabel, selectedValue) {
 function renderReports() {
   const filteredRows = getFilteredReportRows();
   const sortedRows = sortReportRows(filteredRows);
+  const totalPages = getReportsTotalPages(sortedRows.length);
+
+  if (reportsCurrentPage > totalPages) {
+    reportsCurrentPage = totalPages;
+  }
+
+  if (reportsCurrentPage < 1) {
+    reportsCurrentPage = 1;
+  }
+
   renderReportsSummary(filteredRows);
   renderReportsExecutive(filteredRows);
   renderReportsTable(sortedRows);
@@ -889,10 +972,7 @@ function renderReportsSummary(rows) {
   const runIds = new Set(rows.map(row => row.runId));
   const healthyCount = rows.filter(row => row.status === "Healthy").length;
   const problemCount = rows.filter(row => row.status === "Degraded" || row.status === "Down").length;
-  const visibleRuns = (reportsState.runs ?? []).filter(run => runIds.has(run.runId));
-  const averageAvailability = visibleRuns.length === 0
-    ? 0
-    : visibleRuns.reduce((sum, run) => sum + (Number(run.summary?.availabilityPercentage) || 0), 0) / visibleRuns.length;
+  const averageAvailability = averageAvailabilityFromRows(rows);
 
   reportsRunCount.textContent = formatNumber(runIds.size);
   reportsRowCount.textContent = formatNumber(rows.length);
@@ -903,37 +983,32 @@ function renderReportsSummary(rows) {
 }
 
 function renderReportsExecutive(rows) {
-  renderFacilityExecutive(rows);
-  renderProblemDeviceExecutive(rows);
+  renderFacilityPerformance(rows);
+  renderCategoryPerformance(rows);
   renderRecentRunsExecutive(rows);
 }
 
-function renderFacilityExecutive(rows) {
-  const facilities = Array.from(groupRowsBy(rows, row => row.facility).entries())
-    .map(([facility, facilityRows]) => {
-      const healthyCount = facilityRows.filter(row => row.status === "Healthy").length;
-      const problemCount = facilityRows.filter(isProblemReportRow).length;
-      const averageLatency = average(facilityRows.map(row => row.latencyMs));
-
-      return {
-        facility,
-        rowCount: facilityRows.length,
-        availability: facilityRows.length === 0 ? 0 : healthyCount / facilityRows.length * 100,
-        problemCount,
-        averageLatency
-      };
-    })
-    .sort((left, right) => right.problemCount - left.problemCount
-      || left.availability - right.availability
-      || left.facility.localeCompare(right.facility))
-    .slice(0, 5);
+function renderFacilityPerformance(rows) {
+  const facilities = sortReportSummaryRows(createFacilityPerformanceRows(rows), reportsFacilitySort);
+  reportsFacilityPage = clampReportsPage(reportsFacilityPage, facilities.length, reportsFacilityPageSize);
+  updateReportSortButtons("[data-report-facility-sort]", reportsFacilitySort, "reportFacilitySort");
+  updateSummaryPagination(
+    reportsFacilityPageSummary,
+    reportsFacilityPrevPageButton,
+    reportsFacilityNextPageButton,
+    reportsFacilityPage,
+    reportsFacilityPageSize,
+    facilities.length,
+    "facilities"
+  );
+  reportsFacilityPerformanceSummary.textContent = `${formatNumber(facilities.length)} facilit${facilities.length === 1 ? "y" : "ies"}`;
 
   if (facilities.length === 0) {
     reportsFacilityExecutiveBody.innerHTML = `<tr><td colspan="5" class="text-center text-secondary py-3">No facility data matches the current filters.</td></tr>`;
     return;
   }
 
-  reportsFacilityExecutiveBody.innerHTML = facilities.map(facility => `
+  reportsFacilityExecutiveBody.innerHTML = getPageRows(facilities, reportsFacilityPage, reportsFacilityPageSize).map(facility => `
     <tr>
       <td>${escapeHtml(facility.facility)}</td>
       <td class="text-end">${formatNumber(facility.rowCount)}</td>
@@ -943,67 +1018,205 @@ function renderFacilityExecutive(rows) {
     </tr>`).join("");
 }
 
-function renderProblemDeviceExecutive(rows) {
-  const problemDevices = Array.from(groupRowsBy(rows.filter(isProblemReportRow), row => `${row.deviceName}\u001f${row.ip}`).values())
-    .map(deviceRows => {
-      const sortedRows = sortReportRowsByCompletedAt(deviceRows);
-      const latestRow = sortedRows[0];
+function renderCategoryPerformance(rows) {
+  const categories = sortReportSummaryRows(createCategoryPerformanceRows(rows), reportsCategorySort);
+  reportsCategoryPage = clampReportsPage(reportsCategoryPage, categories.length, reportsCategoryPageSize);
+  updateReportSortButtons("[data-report-category-sort]", reportsCategorySort, "reportCategorySort");
+  updateSummaryPagination(
+    reportsCategoryPageSummary,
+    reportsCategoryPrevPageButton,
+    reportsCategoryNextPageButton,
+    reportsCategoryPage,
+    reportsCategoryPageSize,
+    categories.length,
+    "categories"
+  );
+  reportsCategoryPerformanceSummary.textContent = `${formatNumber(categories.length)} categor${categories.length === 1 ? "y" : "ies"}`;
 
-      return {
-        latestRow,
-        problemCount: deviceRows.length
-      };
-    })
-    .sort((left, right) => right.problemCount - left.problemCount
-      || new Date(right.latestRow.completedAt).getTime() - new Date(left.latestRow.completedAt).getTime())
-    .slice(0, 5);
-
-  if (problemDevices.length === 0) {
-    reportsProblemDevicesBody.innerHTML = `<tr><td colspan="3" class="text-center text-secondary py-3">No problem devices match the current filters.</td></tr>`;
+  if (categories.length === 0) {
+    reportsCategoryExecutiveBody.innerHTML = `<tr><td colspan="6" class="text-center text-secondary py-3">No category data matches the current filters.</td></tr>`;
     return;
   }
 
-  reportsProblemDevicesBody.innerHTML = problemDevices.map(device => `
+  reportsCategoryExecutiveBody.innerHTML = getPageRows(categories, reportsCategoryPage, reportsCategoryPageSize).map(category => `
     <tr>
-      <td>
-        <div class="fw-semibold">${escapeHtml(device.latestRow.deviceName)}</div>
-        <div class="small text-secondary">${escapeHtml(device.latestRow.facility)} / ${escapeHtml(device.latestRow.category)}</div>
-      </td>
-      <td class="text-end">${formatNumber(device.problemCount)}</td>
-      <td>
-        ${renderReportStatusBadge(device.latestRow.status)}
-        <div class="small text-secondary">${escapeHtml(formatDate(device.latestRow.completedAt))}</div>
-      </td>
+      <td>${escapeHtml(category.category)}</td>
+      <td class="text-end">${formatNumber(category.facilityCount)}</td>
+      <td class="text-end">${formatNumber(category.rowCount)}</td>
+      <td class="text-end">${formatPercent(category.availability)}%</td>
+      <td class="text-end">${formatNumber(category.problemCount)}</td>
+      <td class="text-end">${formatNumber(Math.round(category.averageLatency))} ms</td>
     </tr>`).join("");
 }
 
 function renderRecentRunsExecutive(rows) {
-  const runIds = new Set(rows.map(row => row.runId));
-  const recentRuns = (reportsState.runs ?? [])
-    .filter(run => runIds.has(run.runId))
-    .sort((left, right) => new Date(right.completedAt).getTime() - new Date(left.completedAt).getTime())
-    .slice(0, 5);
+  const runs = sortReportSummaryRows(createRecentRunRows(rows), reportsRunSort);
+  reportsRunPage = clampReportsPage(reportsRunPage, runs.length, reportsRunPageSize);
+  updateReportSortButtons("[data-report-run-sort]", reportsRunSort, "reportRunSort");
+  updateSummaryPagination(
+    reportsRunsPageSummary,
+    reportsRunsPrevPageButton,
+    reportsRunsNextPageButton,
+    reportsRunPage,
+    reportsRunPageSize,
+    runs.length,
+    "runs"
+  );
+  reportsRunsSummary.textContent = `${formatNumber(runs.length)} run${runs.length === 1 ? "" : "s"}`;
 
-  if (recentRuns.length === 0) {
-    reportsRecentRunsBody.innerHTML = `<tr><td colspan="3" class="text-center text-secondary py-3">No runs match the current filters.</td></tr>`;
+  if (runs.length === 0) {
+    reportsRecentRunsBody.innerHTML = `<tr><td colspan="8" class="text-center text-secondary py-3">No runs match the current filters.</td></tr>`;
     return;
   }
 
-  reportsRecentRunsBody.innerHTML = recentRuns.map(run => {
-    const runRows = rows.filter(row => row.runId === run.runId);
-    const problemCount = runRows.filter(isProblemReportRow).length;
-    const availability = Number(run.summary?.availabilityPercentage) || averageAvailabilityFromRows(runRows);
-
-    return `
+  reportsRecentRunsBody.innerHTML = getPageRows(runs, reportsRunPage, reportsRunPageSize).map(run => `
       <tr>
         <td>
           <div>${escapeHtml(formatDate(run.completedAt))}</div>
-          <div class="small text-secondary">${escapeHtml(getCheckModeLabel(run.checkMode || "Full"))}</div>
+          <div class="small text-secondary">${escapeHtml(run.executionStatus)}</div>
         </td>
-        <td class="text-end">${formatPercent(availability)}%</td>
-        <td class="text-end">${formatNumber(problemCount)}</td>
-      </tr>`;
-  }).join("");
+        <td>${escapeHtml(getCheckModeLabel(run.checkMode || "Full"))}</td>
+        <td>${escapeHtml(run.scopeLabel)}</td>
+        <td class="text-end">${formatNumber(run.rowCount)}</td>
+        <td class="text-end">${formatPercent(run.availability)}%</td>
+        <td class="text-end">${formatNumber(run.problemCount)}</td>
+        <td class="text-end">${formatNumber(run.durationMs)} ms</td>
+        <td class="text-end">
+          <button class="btn btn-outline-danger btn-sm" type="button" data-delete-report-run="${escapeAttribute(run.runId)}" title="Delete this execution">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </td>
+      </tr>`).join("");
+}
+
+function createFacilityPerformanceRows(rows) {
+  return Array.from(groupRowsBy(rows, row => row.facility).entries()).map(([facility, facilityRows]) => {
+    const healthyCount = facilityRows.filter(row => row.status === "Healthy").length;
+    const problemCount = facilityRows.filter(isProblemReportRow).length;
+    const averageLatency = average(facilityRows.map(row => row.latencyMs));
+
+    return {
+      facility,
+      rowCount: facilityRows.length,
+      availability: facilityRows.length === 0 ? 0 : healthyCount / facilityRows.length * 100,
+      problemCount,
+      averageLatency
+    };
+  });
+}
+
+function createCategoryPerformanceRows(rows) {
+  return Array.from(groupRowsBy(rows, row => row.category).entries()).map(([category, categoryRows]) => {
+    const healthyCount = categoryRows.filter(row => row.status === "Healthy").length;
+    const problemCount = categoryRows.filter(isProblemReportRow).length;
+    const averageLatency = average(categoryRows.map(row => row.latencyMs));
+    const facilityCount = new Set(categoryRows.map(row => row.facility)).size;
+
+    return {
+      category,
+      facilityCount,
+      rowCount: categoryRows.length,
+      availability: categoryRows.length === 0 ? 0 : healthyCount / categoryRows.length * 100,
+      problemCount,
+      averageLatency
+    };
+  });
+}
+
+function createRecentRunRows(rows) {
+  const rowsByRunId = groupRowsBy(rows, row => row.runId);
+
+  return (reportsState.runs ?? [])
+    .filter(run => rowsByRunId.has(run.runId))
+    .map(run => {
+      const runRows = rowsByRunId.get(run.runId) ?? [];
+
+      return {
+        runId: run.runId,
+        completedAt: run.completedAt,
+        checkMode: run.checkMode || "Full",
+        executionStatus: run.executionStatus || "Completed",
+        scopeLabel: getRunScopeLabel(run.scope),
+        rowCount: runRows.length,
+        availability: averageAvailabilityFromRows(runRows),
+        problemCount: runRows.filter(isProblemReportRow).length,
+        durationMs: Number(run.durationMs) || 0
+      };
+    });
+}
+
+function getRunScopeLabel(scope) {
+  if (!scope) {
+    return "All facilities";
+  }
+
+  if (scope.deviceName || scope.deviceIp) {
+    return `Device: ${scope.deviceName || scope.deviceIp}`;
+  }
+
+  if (scope.category) {
+    return scope.facility ? `${scope.facility} / ${scope.category}` : `Category: ${scope.category}`;
+  }
+
+  if (scope.facility) {
+    return `Facility: ${scope.facility}`;
+  }
+
+  if (scope.region) {
+    return `Region: ${scope.region}`;
+  }
+
+  return "All facilities";
+}
+
+function sortReportSummaryRows(rows, sortState) {
+  const direction = sortState.direction === "asc" ? 1 : -1;
+  const key = sortState.key;
+
+  return [...rows].sort((left, right) => {
+    const leftValue = getReportSummarySortValue(left, key);
+    const rightValue = getReportSummarySortValue(right, key);
+
+    if (typeof leftValue === "number" && typeof rightValue === "number") {
+      return (leftValue - rightValue) * direction;
+    }
+
+    return String(leftValue).localeCompare(String(rightValue)) * direction;
+  });
+}
+
+function getReportSummarySortValue(row, key) {
+  if (key === "completedAt") {
+    return new Date(row.completedAt).getTime();
+  }
+
+  if (["rowCount", "availability", "problemCount", "averageLatency", "facilityCount", "durationMs"].includes(key)) {
+    return Number(row[key]) || 0;
+  }
+
+  return row[key] ?? "";
+}
+
+function getPageRows(rows, page, pageSize) {
+  const startIndex = (page - 1) * pageSize;
+  return rows.slice(startIndex, startIndex + pageSize);
+}
+
+function clampReportsPage(page, rowCount, pageSize) {
+  const totalPages = Math.max(1, Math.ceil(rowCount / pageSize));
+  return Math.min(Math.max(1, page), totalPages);
+}
+
+function updateSummaryPagination(summaryElement, previousButton, nextButton, page, pageSize, rowCount, label) {
+  const totalPages = Math.max(1, Math.ceil(rowCount / pageSize));
+  const startRow = rowCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const endRow = Math.min(rowCount, page * pageSize);
+
+  summaryElement.textContent = rowCount === 0
+    ? `No ${label} to display`
+    : `Showing ${formatNumber(startRow)}-${formatNumber(endRow)} of ${formatNumber(rowCount)} ${label} · Page ${formatNumber(page)} of ${formatNumber(totalPages)}`;
+  previousButton.disabled = page <= 1;
+  nextButton.disabled = page >= totalPages || rowCount === 0;
 }
 
 function groupRowsBy(rows, keySelector) {
@@ -1043,22 +1256,21 @@ function averageAvailabilityFromRows(rows) {
   return healthyCount / rows.length * 100;
 }
 
-function sortReportRowsByCompletedAt(rows) {
-  return [...rows].sort((left, right) =>
-    new Date(right.completedAt).getTime() - new Date(left.completedAt).getTime());
-}
-
 function renderReportsTable(rows) {
-  updateReportSortButtons();
+  updateReportSortButtons("[data-report-sort]", reportsSort, "reportSort");
 
   if (rows.length === 0) {
     reportsTableBody.innerHTML = `<tr><td colspan="10" class="text-center text-secondary py-4">No history rows match the current filters.</td></tr>`;
+    updateReportsPagination(0);
     return;
   }
 
-  reportsTableBody.innerHTML = rows.map((row, index) => `
+  const pageRows = getReportsPageRows(rows);
+  const pageStartIndex = (reportsCurrentPage - 1) * reportsPageSize;
+
+  reportsTableBody.innerHTML = pageRows.map((row, index) => `
     <tr>
-      <td class="text-end text-secondary">${index + 1}</td>
+      <td class="text-end text-secondary">${pageStartIndex + index + 1}</td>
       <td>${escapeHtml(formatDate(row.completedAt))}</td>
       <td>
         <div class="fw-semibold">${escapeHtml(row.deviceName)}</div>
@@ -1072,6 +1284,28 @@ function renderReportsTable(rows) {
       <td>${escapeHtml(getCheckModeLabel(row.checkMode))}</td>
       <td>${formatNumber(row.durationMs)} ms</td>
     </tr>`).join("");
+  updateReportsPagination(rows.length);
+}
+
+function getReportsPageRows(rows) {
+  const startIndex = (reportsCurrentPage - 1) * reportsPageSize;
+  return rows.slice(startIndex, startIndex + reportsPageSize);
+}
+
+function getReportsTotalPages(rowCount) {
+  return Math.max(1, Math.ceil(rowCount / reportsPageSize));
+}
+
+function updateReportsPagination(rowCount) {
+  const totalPages = getReportsTotalPages(rowCount);
+  const startRow = rowCount === 0 ? 0 : (reportsCurrentPage - 1) * reportsPageSize + 1;
+  const endRow = Math.min(rowCount, reportsCurrentPage * reportsPageSize);
+
+  reportsPageSummary.textContent = rowCount === 0
+    ? "No rows to display"
+    : `Showing ${formatNumber(startRow)}-${formatNumber(endRow)} of ${formatNumber(rowCount)} rows · Page ${formatNumber(reportsCurrentPage)} of ${formatNumber(totalPages)}`;
+  reportsPrevPageButton.disabled = reportsCurrentPage <= 1;
+  reportsNextPageButton.disabled = reportsCurrentPage >= totalPages || rowCount === 0;
 }
 
 function renderReportStatusBadge(status) {
@@ -1082,10 +1316,10 @@ function renderReportStatusBadge(status) {
   return `<span class="badge ${badgeClass}">${escapeHtml(status)}</span>`;
 }
 
-function updateReportSortButtons() {
-  document.querySelectorAll("[data-report-sort]").forEach(button => {
-    const isActive = button.dataset.reportSort === reportsSort.key;
-    const indicator = isActive ? (reportsSort.direction === "asc" ? " ↑" : " ↓") : "";
+function updateReportSortButtons(selector, sortState, datasetKey) {
+  document.querySelectorAll(selector).forEach(button => {
+    const isActive = button.dataset[datasetKey] === sortState.key;
+    const indicator = isActive ? (sortState.direction === "asc" ? " ↑" : " ↓") : "";
     button.textContent = `${button.textContent.replace(/[ ↑↓]+$/u, "")}${indicator}`;
     button.classList.toggle("active", isActive);
   });
@@ -1094,6 +1328,13 @@ function updateReportSortButtons() {
 function resetReportsViewState() {
   reportsFilters = createDefaultReportsFilters();
   reportsSort = { key: "completedAt", direction: "desc" };
+  reportsCurrentPage = 1;
+  reportsFacilitySort = { key: "problemCount", direction: "desc" };
+  reportsFacilityPage = 1;
+  reportsCategorySort = { key: "problemCount", direction: "desc" };
+  reportsCategoryPage = 1;
+  reportsRunSort = { key: "completedAt", direction: "desc" };
+  reportsRunPage = 1;
 
   if (reportsSearchInput) reportsSearchInput.value = "";
   if (reportsStatusFilter) reportsStatusFilter.value = "";
@@ -1102,6 +1343,10 @@ function resetReportsViewState() {
   if (reportsCategoryFilter) reportsCategoryFilter.value = "";
   if (reportsFromDateInput) reportsFromDateInput.value = "";
   if (reportsToDateInput) reportsToDateInput.value = "";
+  if (reportsPageSizeSelect) reportsPageSizeSelect.value = String(reportsPageSize);
+  if (reportsFacilityPageSizeSelect) reportsFacilityPageSizeSelect.value = String(reportsFacilityPageSize);
+  if (reportsCategoryPageSizeSelect) reportsCategoryPageSizeSelect.value = String(reportsCategoryPageSize);
+  if (reportsRunsPageSizeSelect) reportsRunsPageSizeSelect.value = String(reportsRunPageSize);
 
   clearReportsAlert();
 }
@@ -1114,40 +1359,230 @@ function exportFilteredReports() {
   showReportsAlert("success", "Filtered report exported as JSON.");
 }
 
-async function clearReportsHistory() {
-  if (!confirm("Clear all local monitor history? This cannot be undone.")) {
+function renderReportsFromFirstPage() {
+  reportsCurrentPage = 1;
+  reportsFacilityPage = 1;
+  reportsCategoryPage = 1;
+  reportsRunPage = 1;
+  renderReports();
+}
+
+function getDefaultReportSummarySortDirection(key) {
+  return ["facility", "category", "checkMode", "scopeLabel"].includes(key) ? "asc" : "desc";
+}
+
+function getNextReportSortState(currentSort, key) {
+  return currentSort.key === key
+    ? { key, direction: currentSort.direction === "asc" ? "desc" : "asc" }
+    : { key, direction: getDefaultReportSummarySortDirection(key) };
+}
+
+async function deleteReportRun(runId) {
+  if (!runId) {
+    return;
+  }
+
+  if (!confirm("Delete this monitoring execution from local history? This cannot be undone.")) {
     return;
   }
 
   try {
-    const response = await fetch("/api/history/clear", { method: "POST" });
+    const response = await fetch(`/api/history/runs/${encodeURIComponent(runId)}`, { method: "DELETE" });
     const payload = await readJsonResponse(response);
 
     if (!response.ok) {
-      throw new Error(payload.error || payload.detail || `Unable to clear history (${response.status}).`);
+      throw new Error(payload.error || payload.detail || `Unable to delete execution (${response.status}).`);
     }
 
     reportsState = payload;
-    reportsRows = [];
+    reportsRows = flattenHistoryRows(payload.runs ?? []);
     populateReportFilterOptions();
     renderReports();
-    showReportsAlert("success", "Monitor history cleared.");
+    showReportsAlert("success", "Monitoring execution deleted.");
   } catch (error) {
-    showReportsAlert("danger", error.message || "Unable to clear monitor history.");
+    showReportsAlert("danger", error.message || "Unable to delete monitoring execution.");
     console.error(error);
   }
 }
 
 function showReportsAlert(type, message) {
-  reportsAlert.innerHTML = `
-    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-      ${escapeHtml(message)}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>`;
+  showPageAlert(reportsAlert, type, message);
 }
 
 function clearReportsAlert() {
-  reportsAlert.innerHTML = "";
+  clearPageAlert(reportsAlert);
+}
+
+async function loadIntegrations({ showBusy = true, showErrors = true } = {}) {
+  if (showBusy) {
+    setIntegrationsBusy(true);
+  }
+
+  try {
+    const response = await fetch("/api/integrations");
+    const payload = await readJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(payload.error || payload.detail || `Unable to load integrations (${response.status}).`);
+    }
+
+    integrationsState = normalizeIntegrationsState(payload);
+    renderIntegrations();
+    clearIntegrationsAlert();
+  } catch (error) {
+    if (showErrors) {
+      showIntegrationsAlert("danger", error.message || "Unable to load integrations.");
+    }
+    console.error(error);
+  } finally {
+    if (showBusy) {
+      setIntegrationsBusy(false);
+    }
+  }
+}
+
+async function saveIntegrations() {
+  const configuration = readIntegrationsForm();
+
+  if (!configuration) {
+    return;
+  }
+
+  setIntegrationsBusy(true);
+
+  try {
+    const response = await fetch("/api/integrations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(configuration)
+    });
+    const payload = await readJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(payload.error || payload.detail || `Unable to save integrations (${response.status}).`);
+    }
+
+    integrationsState = normalizeIntegrationsState(payload.configuration ?? configuration);
+    renderIntegrations();
+    showIntegrationsAlert("success", "Integration settings saved locally.");
+  } catch (error) {
+    showIntegrationsAlert("danger", error.message || "Unable to save integrations.");
+    console.error(error);
+  } finally {
+    setIntegrationsBusy(false);
+  }
+}
+
+function normalizeIntegrationsState(configuration) {
+  const defaults = createDefaultIntegrationsState();
+  const inventorySource = configuration?.inventorySource ?? {};
+  const reportDestination = configuration?.reportDestination ?? {};
+
+  return {
+    schemaVersion: Math.max(1, Number(configuration?.schemaVersion) || defaults.schemaVersion),
+    inventorySource: {
+      mode: inventorySource.mode || defaults.inventorySource.mode,
+      localJsonPath: inventorySource.localJsonPath || defaults.inventorySource.localJsonPath,
+      endpointUrl: inventorySource.endpointUrl || "",
+      method: inventorySource.method || defaults.inventorySource.method
+    },
+    reportDestination: {
+      enabled: Boolean(reportDestination.enabled),
+      endpointUrl: reportDestination.endpointUrl || "",
+      method: reportDestination.method || defaults.reportDestination.method,
+      includeSummary: reportDestination.includeSummary !== false,
+      includeRows: reportDestination.includeRows !== false
+    },
+    updatedAt: configuration?.updatedAt ?? null
+  };
+}
+
+function renderIntegrations() {
+  const inventorySource = integrationsState.inventorySource ?? createDefaultIntegrationsState().inventorySource;
+  const reportDestination = integrationsState.reportDestination ?? createDefaultIntegrationsState().reportDestination;
+
+  inventorySourceModeSelect.value = inventorySource.mode;
+  inventoryLocalJsonPathInput.value = inventorySource.localJsonPath;
+  inventoryEndpointUrlInput.value = inventorySource.endpointUrl;
+  inventoryEndpointMethodSelect.value = inventorySource.method;
+  reportDestinationEnabledInput.checked = Boolean(reportDestination.enabled);
+  reportDestinationUrlInput.value = reportDestination.endpointUrl;
+  reportDestinationMethodSelect.value = reportDestination.method;
+  reportIncludeSummaryInput.checked = reportDestination.includeSummary !== false;
+  reportIncludeRowsInput.checked = reportDestination.includeRows !== false;
+
+  updateIntegrationFormState();
+}
+
+function readIntegrationsForm() {
+  const inventoryMode = inventorySourceModeSelect.value || "localJson";
+  const inventoryEndpointUrl = inventoryEndpointUrlInput.value.trim();
+  const reportEnabled = reportDestinationEnabledInput.checked;
+  const reportEndpointUrl = reportDestinationUrlInput.value.trim();
+
+  if (inventoryMode === "externalEndpoint" && !inventoryEndpointUrl) {
+    showIntegrationsAlert("warning", "External inventory source requires an endpoint URL.");
+    inventoryEndpointUrlInput.focus();
+    return null;
+  }
+
+  if (reportEnabled && !reportEndpointUrl) {
+    showIntegrationsAlert("warning", "Enabled report destination requires an endpoint URL.");
+    reportDestinationUrlInput.focus();
+    return null;
+  }
+
+  return {
+    schemaVersion: integrationsState.schemaVersion || 1,
+    inventorySource: {
+      mode: inventoryMode,
+      localJsonPath: inventoryLocalJsonPathInput.value.trim() || "config.json",
+      endpointUrl: inventoryEndpointUrl,
+      method: inventoryEndpointMethodSelect.value || "GET"
+    },
+    reportDestination: {
+      enabled: reportEnabled,
+      endpointUrl: reportEndpointUrl,
+      method: reportDestinationMethodSelect.value || "POST",
+      includeSummary: reportIncludeSummaryInput.checked,
+      includeRows: reportIncludeRowsInput.checked
+    }
+  };
+}
+
+function updateIntegrationFormState() {
+  const isExternalInventory = inventorySourceModeSelect.value === "externalEndpoint";
+  const isReportEnabled = reportDestinationEnabledInput.checked;
+
+  inventoryLocalJsonPathInput.disabled = isExternalInventory;
+  inventoryEndpointUrlInput.disabled = !isExternalInventory;
+  inventoryEndpointMethodSelect.disabled = !isExternalInventory;
+  reportDestinationUrlInput.disabled = !isReportEnabled;
+  reportDestinationMethodSelect.disabled = !isReportEnabled;
+  reportIncludeSummaryInput.disabled = !isReportEnabled;
+  reportIncludeRowsInput.disabled = !isReportEnabled;
+
+  inventorySourceStatus.textContent = isExternalInventory
+    ? "External inventory endpoint is configured for a future import workflow."
+    : "Using local JSON inventory.";
+  reportDestinationStatus.textContent = isReportEnabled
+    ? "Report endpoint is configured for a future outbound delivery workflow."
+    : "Outbound reports are disabled.";
+}
+
+function setIntegrationsBusy(isBusy) {
+  saveIntegrationsButton.disabled = isBusy;
+  reloadIntegrationsButton.disabled = isBusy;
+  saveIntegrationsSpinner.classList.toggle("d-none", !isBusy);
+  saveIntegrationsIcon.classList.toggle("d-none", isBusy);
+}
+
+function showIntegrationsAlert(type, message) {
+  showPageAlert(integrationsAlert, type, message);
+}
+
+function clearIntegrationsAlert() {
+  clearPageAlert(integrationsAlert);
 }
 
 function getVisibleResults() {
@@ -2537,6 +2972,27 @@ function clearBulkSelection() {
   renderBulkEditDevices();
 }
 
+function getVisibleBulkFacilityNames() {
+  return groupConfigDevicesByFacility(filterBulkEditDevices(filterConfigDevices(configState.devices ?? [])))
+    .map(group => group.name);
+}
+
+function collapseAllBulkFacilities() {
+  for (const facilityName of getVisibleBulkFacilityNames()) {
+    collapsedBulkFacilityNames.add(facilityName);
+  }
+
+  renderBulkEditDevices();
+}
+
+function expandAllBulkFacilities() {
+  for (const facilityName of getVisibleBulkFacilityNames()) {
+    collapsedBulkFacilityNames.delete(facilityName);
+  }
+
+  renderBulkEditDevices();
+}
+
 function toggleBulkRowSelection(index, isSelected) {
   if (isSelected) {
     selectedBulkIndexes.add(index);
@@ -3258,15 +3714,11 @@ function setConfigBusy(isBusy, { showSaveSpinner = true } = {}) {
 }
 
 function showConfigAlert(type, message) {
-  configAlert.innerHTML = `
-    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-      ${escapeHtml(message)}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>`;
+  showPageAlert(configAlert, type, message);
 }
 
 function clearConfigAlert() {
-  configAlert.innerHTML = "";
+  clearPageAlert(configAlert);
 }
 
 function createDefaultRegionState() {
@@ -3661,15 +4113,11 @@ function hideRegionForm() {
 }
 
 function showRegionAlert(type, message) {
-  regionAlert.innerHTML = `
-    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-      ${escapeHtml(message)}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>`;
+  showPageAlert(regionAlert, type, message);
 }
 
 function clearRegionAlert() {
-  regionAlert.innerHTML = "";
+  clearPageAlert(regionAlert);
 }
 
 function createEmptyConfiguration() {
@@ -4117,15 +4565,11 @@ function setThemeBusy(isBusy) {
 }
 
 function showThemeAlert(type, message) {
-  themeAlert.innerHTML = `
-    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-      ${escapeHtml(message)}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>`;
+  showPageAlert(themeAlert, type, message);
 }
 
 function clearThemeAlert() {
-  themeAlert.innerHTML = "";
+  clearPageAlert(themeAlert);
 }
 
 function navigateTo(route, replace = false) {
@@ -4136,6 +4580,7 @@ function navigateTo(route, replace = false) {
   dashboardPage.hidden = normalizedRoute !== "/";
   configPage.hidden = normalizedRoute !== "/config";
   reportsPage.hidden = normalizedRoute !== "/reports";
+  integrationsPage.hidden = normalizedRoute !== "/integrations";
   regionsPage.hidden = normalizedRoute !== "/regions";
   themesPage.hidden = normalizedRoute !== "/themes";
   manualPage.hidden = normalizedRoute !== "/manual";
@@ -4185,6 +4630,11 @@ function resetRouteViewState(route) {
 
   if (route === "/reports") {
     resetReportsViewState();
+    return;
+  }
+
+  if (route === "/integrations") {
+    clearIntegrationsAlert();
     return;
   }
 
@@ -4276,6 +4726,11 @@ function refreshRouteData(route) {
     return;
   }
 
+  if (route === "/integrations") {
+    void loadIntegrations({ showBusy: true, showErrors: true });
+    return;
+  }
+
   if (route === "/themes") {
     void loadThemes({ showBusy: true, showErrors: true });
   }
@@ -4287,7 +4742,7 @@ async function refreshConfigFromActiveRegion() {
 }
 
 function normalizeRoute(pathname) {
-  const knownRoutes = new Set(["/", "/config", "/regions", "/reports", "/themes", "/manual", "/about"]);
+  const knownRoutes = new Set(["/", "/config", "/regions", "/reports", "/integrations", "/themes", "/manual", "/about"]);
   return knownRoutes.has(pathname) ? pathname : "/";
 }
 
@@ -4297,6 +4752,7 @@ function getPageLabel(route) {
     "/config": "Configuration",
     "/regions": "Support Groups",
     "/reports": "Reports",
+    "/integrations": "Integrations",
     "/themes": "Themes",
     "/manual": "User Manual",
     "/about": "About"
@@ -4426,6 +4882,46 @@ function formatPercent(value) {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1
   }).format(Number(value) || 0);
+}
+
+function showPageAlert(container, type, message) {
+  if (!container) {
+    return;
+  }
+
+  clearPageAlert(container);
+  container.innerHTML = `
+    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+      ${escapeHtml(message)}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>`;
+
+  const closeButton = container.querySelector(".btn-close");
+  closeButton?.addEventListener("click", () => clearPageAlert(container), { once: true });
+
+  if (shouldAutoDismissAlert(type)) {
+    const timerId = setTimeout(() => clearPageAlert(container), alertAutoDismissMs);
+    alertDismissTimers.set(container, timerId);
+  }
+}
+
+function clearPageAlert(container) {
+  if (!container) {
+    return;
+  }
+
+  const timerId = alertDismissTimers.get(container);
+
+  if (timerId) {
+    clearTimeout(timerId);
+    alertDismissTimers.delete(container);
+  }
+
+  container.innerHTML = "";
+}
+
+function shouldAutoDismissAlert(type) {
+  return type === "success" || type === "info";
 }
 
 function debounce(callback, delayMs) {
@@ -4594,12 +5090,64 @@ bulkClearFiltersButton.addEventListener("click", () => {
 });
 bulkSelectVisibleButton.addEventListener("click", selectVisibleBulkRows);
 bulkClearSelectionButton.addEventListener("click", clearBulkSelection);
+bulkCollapseAllButton.addEventListener("click", collapseAllBulkFacilities);
+bulkExpandAllButton.addEventListener("click", expandAllBulkFacilities);
 bulkActionSelect.addEventListener("change", updateBulkSelectionControls);
 bulkActionValueInput.addEventListener("input", updateBulkSelectionControls);
 bulkApplyActionButton.addEventListener("click", applyBulkAction);
 refreshReportsButton.addEventListener("click", () => loadReports({ showBusy: true, showErrors: true }));
 exportReportsButton.addEventListener("click", exportFilteredReports);
-clearReportsButton.addEventListener("click", clearReportsHistory);
+reportsPageSizeSelect.addEventListener("change", event => {
+  reportsPageSize = Number(event.target.value) || 10;
+  renderReportsFromFirstPage();
+});
+reportsFacilityPageSizeSelect.addEventListener("change", event => {
+  reportsFacilityPageSize = Number(event.target.value) || 10;
+  reportsFacilityPage = 1;
+  renderReports();
+});
+reportsCategoryPageSizeSelect.addEventListener("change", event => {
+  reportsCategoryPageSize = Number(event.target.value) || 10;
+  reportsCategoryPage = 1;
+  renderReports();
+});
+reportsRunsPageSizeSelect.addEventListener("change", event => {
+  reportsRunPageSize = Number(event.target.value) || 10;
+  reportsRunPage = 1;
+  renderReports();
+});
+reportsPrevPageButton.addEventListener("click", () => {
+  reportsCurrentPage = Math.max(1, reportsCurrentPage - 1);
+  renderReports();
+});
+reportsNextPageButton.addEventListener("click", () => {
+  reportsCurrentPage += 1;
+  renderReports();
+});
+reportsFacilityPrevPageButton.addEventListener("click", () => {
+  reportsFacilityPage = Math.max(1, reportsFacilityPage - 1);
+  renderReports();
+});
+reportsFacilityNextPageButton.addEventListener("click", () => {
+  reportsFacilityPage += 1;
+  renderReports();
+});
+reportsCategoryPrevPageButton.addEventListener("click", () => {
+  reportsCategoryPage = Math.max(1, reportsCategoryPage - 1);
+  renderReports();
+});
+reportsCategoryNextPageButton.addEventListener("click", () => {
+  reportsCategoryPage += 1;
+  renderReports();
+});
+reportsRunsPrevPageButton.addEventListener("click", () => {
+  reportsRunPage = Math.max(1, reportsRunPage - 1);
+  renderReports();
+});
+reportsRunsNextPageButton.addEventListener("click", () => {
+  reportsRunPage += 1;
+  renderReports();
+});
 resetReportFiltersButton.addEventListener("click", () => {
   resetReportsViewState();
   populateReportFilterOptions();
@@ -4607,34 +5155,65 @@ resetReportFiltersButton.addEventListener("click", () => {
 });
 reportsSearchInput.addEventListener("input", debounce(event => {
   reportsFilters.search = event.target.value;
-  renderReports();
+  renderReportsFromFirstPage();
 }, 150));
 reportsStatusFilter.addEventListener("change", event => {
   reportsFilters.status = event.target.value;
-  renderReports();
+  renderReportsFromFirstPage();
 });
 reportsModeFilter.addEventListener("change", event => {
   reportsFilters.mode = event.target.value;
-  renderReports();
+  renderReportsFromFirstPage();
 });
 reportsFacilityFilter.addEventListener("change", event => {
   reportsFilters.facility = event.target.value;
-  renderReports();
+  populateReportFilterOptions();
+  renderReportsFromFirstPage();
 });
 reportsCategoryFilter.addEventListener("change", event => {
   reportsFilters.category = event.target.value;
-  renderReports();
+  renderReportsFromFirstPage();
 });
 reportsFromDateInput.addEventListener("change", event => {
   reportsFilters.fromDate = event.target.value;
-  renderReports();
+  renderReportsFromFirstPage();
 });
 reportsToDateInput.addEventListener("change", event => {
   reportsFilters.toDate = event.target.value;
-  renderReports();
+  renderReportsFromFirstPage();
 });
 document.querySelector("#reports-page").addEventListener("click", event => {
+  const deleteRunButton = event.target.closest("[data-delete-report-run]");
   const sortButton = event.target.closest("[data-report-sort]");
+  const facilitySortButton = event.target.closest("[data-report-facility-sort]");
+  const categorySortButton = event.target.closest("[data-report-category-sort]");
+  const runSortButton = event.target.closest("[data-report-run-sort]");
+
+  if (deleteRunButton) {
+    deleteReportRun(deleteRunButton.dataset.deleteReportRun);
+    return;
+  }
+
+  if (facilitySortButton) {
+    reportsFacilitySort = getNextReportSortState(reportsFacilitySort, facilitySortButton.dataset.reportFacilitySort);
+    reportsFacilityPage = 1;
+    renderReports();
+    return;
+  }
+
+  if (categorySortButton) {
+    reportsCategorySort = getNextReportSortState(reportsCategorySort, categorySortButton.dataset.reportCategorySort);
+    reportsCategoryPage = 1;
+    renderReports();
+    return;
+  }
+
+  if (runSortButton) {
+    reportsRunSort = getNextReportSortState(reportsRunSort, runSortButton.dataset.reportRunSort);
+    reportsRunPage = 1;
+    renderReports();
+    return;
+  }
 
   if (!sortButton) {
     return;
@@ -4644,7 +5223,24 @@ document.querySelector("#reports-page").addEventListener("click", event => {
   reportsSort = reportsSort.key === key
     ? { key, direction: reportsSort.direction === "asc" ? "desc" : "asc" }
     : { key, direction: key === "completedAt" ? "desc" : "asc" };
+  reportsCurrentPage = 1;
   renderReports();
+});
+reloadIntegrationsButton.addEventListener("click", () => loadIntegrations({ showBusy: true, showErrors: true }));
+saveIntegrationsButton.addEventListener("click", saveIntegrations);
+[
+  inventorySourceModeSelect,
+  inventoryLocalJsonPathInput,
+  inventoryEndpointUrlInput,
+  inventoryEndpointMethodSelect,
+  reportDestinationEnabledInput,
+  reportDestinationUrlInput,
+  reportDestinationMethodSelect,
+  reportIncludeSummaryInput,
+  reportIncludeRowsInput
+].forEach(input => {
+  input.addEventListener("input", updateIntegrationFormState);
+  input.addEventListener("change", updateIntegrationFormState);
 });
 if (intervalSecondsInput) {
   intervalSecondsInput.addEventListener("input", () => {

@@ -178,11 +178,60 @@ body {
 .reports-executive-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 34rem), 1fr));
 }
 
 .reports-executive-card .table {
-  min-width: 28rem;
+  min-width: 46rem;
+}
+
+.reports-card-header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.reports-collapse-toggle {
+  align-items: center;
+  display: inline-flex;
+  height: 2rem;
+  justify-content: center;
+  padding: 0;
+  width: 2rem;
+}
+
+.reports-collapse-toggle i {
+  transition: transform 0.15s ease-in-out;
+}
+
+.reports-collapse-toggle[aria-expanded="true"] i {
+  transform: rotate(180deg);
+}
+
+.reports-executive-collapse {
+  border-top: 1px solid var(--nw-border);
+}
+
+.reports-summary-table th.text-end .table-sort-button {
+  text-align: right;
+  width: 100%;
+}
+
+.integrations-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+}
+
+.integration-state {
+  background: #f8fafc;
+  border: 1px solid var(--nw-border);
+  border-radius: 0.5rem;
+  color: var(--nw-muted-text);
+  font-size: 0.875rem;
+  padding: 0.75rem;
 }
 
 .reports-table-header {
@@ -192,8 +241,25 @@ body {
   justify-content: space-between;
 }
 
+.reports-table-controls,
+.reports-pagination {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.reports-page-size {
+  width: 5.5rem;
+}
+
+.reports-pagination {
+  justify-content: space-between;
+}
+
 .reports-table {
-  min-width: 74rem;
+  min-width: 80rem;
 }
 
 .table-sort-button {

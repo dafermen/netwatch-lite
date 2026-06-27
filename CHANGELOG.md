@@ -2,13 +2,29 @@
 
 All notable changes to NetWatch-Lite are documented here.
 
+## v0.7.1 - 2026-06-27
+
+- Refined Reports for large history files with collapsible executive panels, paginated Facility Performance, Category Performance, Recent Runs, and a 10-row default for Detailed Monitor History.
+- Removed Top Problem Devices from Reports so operators can focus on complete facility, category, execution, and detailed history views.
+- Removed per-device delete actions from Detailed Monitor History; execution deletion is handled from Recent Runs.
+- Standardized page alerts so success and informational messages auto-dismiss after 10 seconds.
+- Added explicit publish exclusion for `Data/integrations.json` so local integration settings cannot be included in portable packages.
+- Updated public/private documentation and release checklist for Reports and Integrations behavior.
+- Added a Windows x64 portable ZIP for v0.7.1 while keeping previous portable versions in `releases/`.
+
 ## v0.7.0 - 2026-06-27
 
 - Added local monitor history stored in `monitor-history.json` for completed runs, selected scope, summaries, and device-level results.
 - Added local application error logging stored in `app-errors.json` for troubleshooting unhandled failures and API/runtime issues.
-- Added a Reports page with summary cards, filters, sortable indexed history table, filtered JSON export, and clear-history maintenance action.
+- Added a Reports page with summary cards, filters, sortable indexed history table, filtered JSON export, and targeted execution maintenance actions.
 - Added an executive Reports summary with facility performance, top problem devices, and recent run snapshots.
+- Added Reports pagination with selectable page size so large history files stay readable.
+- Added per-execution delete actions in Reports and `DELETE /api/history/runs/{runId}` for removing one run without clearing all history.
+- Updated Reports filter behavior so category options follow the selected facility and statistics are calculated from the same filtered rows shown in the report.
 - Added Bulk Edit multi-select actions for changing facility/category, enabling/disabling devices, and switching ping target mode across selected devices in one save.
+- Added Bulk Edit controls to collapse or expand all visible facility groups at once.
+- Added an Integrations page for local JSON vs future external inventory source settings and future outbound report endpoint settings.
+- Added `integrations.json` runtime storage plus `GET /api/integrations` and `POST /api/integrations` for saving integration settings locally.
 - Added `GET /api/history`, `POST /api/history/clear`, `GET /api/errors`, and `POST /api/errors/clear`.
 - Added the built-in `Corporate Logistics` theme without using protected brand text.
 - Added a Windows x64 portable ZIP for v0.7.0 while keeping previous portable versions in `releases/`.

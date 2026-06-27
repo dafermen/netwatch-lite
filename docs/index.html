@@ -188,7 +188,7 @@
         </div>
         <div class="card">
           <h3>WebView2</h3>
-          <p>Proyecto Windows en <code>src/NetWatchLite.Wallboard.WebView2</code>. Usa controles WebView2 nativos para paginas que bloquean iframes.</p>
+          <p>Proyecto Windows mantenido en el repositorio hermano <code>netwatch-lite-wallboard</code>. Usa controles WebView2 nativos para paginas que bloquean iframes.</p>
         </div>
       </div>
     </section>
@@ -238,7 +238,7 @@
   "devices": [
     {
       "name": "Web Server",
-      "ip": "192.168.4.10",
+      "ip": "192.0.2.10",
       "hostname": "web-server.local",
       "useHostnameForPing": true,
       "websiteUrl": "https://example.local/status",
@@ -315,6 +315,10 @@
           <tr><td><span class="tag get">GET</span></td><td><code>/api/themes</code></td><td>Lee y normaliza <code>themes.json</code>; crea el tema por defecto si falta.</td><td><code>ThemeConfiguration</code>.</td></tr>
           <tr><td><span class="tag post">POST</span></td><td><code>/api/themes</code></td><td>Guarda templates de tema despues de validar ids, nombres y colores.</td><td>Configuracion guardada.</td></tr>
           <tr><td><span class="tag post">POST</span></td><td><code>/api/themes/reset</code></td><td>Restaura el tema integrado por defecto.</td><td>Configuracion de tema por defecto.</td></tr>
+          <tr><td><span class="tag get">GET</span></td><td><code>/api/integrations</code></td><td>Lee y normaliza <code>integrations.json</code>; crea defaults si falta.</td><td><code>IntegrationConfiguration</code>.</td></tr>
+          <tr><td><span class="tag post">POST</span></td><td><code>/api/integrations</code></td><td>Guarda configuracion local de integraciones sin llamar sistemas externos.</td><td>Configuracion guardada.</td></tr>
+          <tr><td><span class="tag get">GET</span></td><td><code>/api/history</code></td><td>Lee el historial local de ejecuciones.</td><td><code>MonitorHistoryStore</code>.</td></tr>
+          <tr><td><span class="tag post">DELETE</span></td><td><code>/api/history/runs/{runId}</code></td><td>Elimina una ejecucion especifica del historial local.</td><td>Historial actualizado.</td></tr>
           <tr><td><span class="tag get">GET</span></td><td><code>/api/results</code></td><td>Compatibilidad. Fuerza ejecucion completa.</td><td><code>MonitorResponse</code>.</td></tr>
           <tr><td><span class="tag post">POST</span></td><td><code>/api/monitor/run</code></td><td>Fuerza full check sin permitir solapamiento. Acepta <code>checkMode=ping</code> para ejecutar solo conectividad.</td><td><code>MonitorResponse</code> o HTTP 409.</td></tr>
           <tr><td><span class="tag get">GET</span></td><td><code>/api/monitor/stream</code></td><td>Ejecuta full check, una facility con <code>facility</code>, una categoria con <code>category</code>, un dispositivo con <code>deviceName</code> y <code>deviceIp</code>, o varios dispositivos repitiendo <code>deviceIp</code>; acepta <code>checkMode=ping</code> para saltar TCP y envia resultados progresivos por Server-Sent Events.</td><td>Eventos <code>started</code>, <code>result</code>, <code>completed</code>, <code>busy</code> o <code>error</code>.</td></tr>
@@ -380,8 +384,14 @@
       <h2>Frontend</h2>
       <p><code>wwwroot/index.html</code> define el layout compartido: sidebar hamburguesa, topbar, dashboard, pagina de configuracion, pagina de temas, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto. Cuando hay problemas aparece <code>Run Failed</code> para repetir solo los dispositivos fallidos, y cada fila con problema muestra <code>Run</code> junto al timestamp para repetir solo ese dispositivo.</p>
       <p>El dashboard muestra botones de facility para enfocar una sede y habilitar <code>Run Facility</code>. En vista general, las tablas se agrupan por facility y luego por categoria, por lo que dos equipos con el mismo nombre en sedes distintas se ven como registros diferentes.</p>
-      <p>La pagina <code>/regions</code> permite crear, copiar, renombrar, activar y eliminar perfiles JSON independientes. La pagina <code>/config</code> trabaja sobre la region activa y agrupa los dispositivos por facility y categoria, con grupos colapsados por defecto para facilitar la edicion de inventarios grandes. El modo <code>Bulk Edit</code> muestra una tabla estilo hoja de calculo para actualizar campos comunes y guardar una fila a la vez; incluye filtros por facility/categoria y separadores visuales para evitar listas masivas dificiles de leer. Las acciones de agregar, copiar, actualizar y eliminar dispositivos guardan inmediatamente en el JSON activo, y el boton <code>Save Settings</code> guarda ajustes generales como intervalo, timeout, reintentos, pausa entre reintentos y concurrencia maxima. <code>Export JSON</code> descarga la configuracion activa e <code>Import JSON</code> valida un archivo antes de reemplazar esa configuracion.</p>
+      <p>La pagina <code>/regions</code> permite crear, copiar, renombrar, activar y eliminar perfiles JSON independientes. La pagina <code>/config</code> trabaja sobre la region activa y agrupa los dispositivos por facility y categoria, con grupos colapsados por defecto para facilitar la edicion de inventarios grandes. El modo <code>Bulk Edit</code> muestra una tabla estilo hoja de calculo para actualizar campos comunes y guardar una fila a la vez; incluye filtros por facility/categoria, botones para colapsar o expandir todas las facilities visibles, y separadores visuales para evitar listas masivas dificiles de leer. Las acciones de agregar, copiar, actualizar y eliminar dispositivos guardan inmediatamente en el JSON activo, y el boton <code>Save Settings</code> guarda ajustes generales como intervalo, timeout, reintentos, pausa entre reintentos y concurrencia maxima. <code>Export JSON</code> descarga la configuracion activa e <code>Import JSON</code> valida un archivo antes de reemplazar esa configuracion.</p>
       <p>La pagina <code>/themes</code> permite crear, copiar, renombrar, activar, borrar, resetear y guardar templates de color en <code>themes.json</code>. El nombre de un tema nuevo, copiado o renombrado se captura en modal, y los colores editables incluyen el sidebar, superficies, estados, categorias, headers colapsables de Configuration, <code>Auto Refresh ON</code>, <code>Auto Refresh OFF</code> y el boton principal de ejecucion.</p>
+      <p>La pagina <code>/reports</code> usa filtros coherentes con la vista operacional: al elegir una facility, las categorias disponibles se limitan a esa facility. Las tablas <code>Facility Performance</code>, <code>Category Performance</code> y <code>Recent Runs</code> son colapsables y cargan cerradas por defecto para priorizar <code>Detailed Monitor History</code>. Todas se calculan desde las mismas filas filtradas, son paginadas y permiten ordenar columnas. La eliminacion se maneja por ejecucion desde <code>Recent Runs</code>, sin limpiar todo el historial.</p>
+      <p>La pagina <code>/integrations</code> guarda configuracion local en <code>integrations.json</code> para escoger entre inventario JSON local o endpoint externo futuro, y para preparar un endpoint futuro de envio de reportes. Esta version solo guarda configuracion; no importa inventario ni envia reportes a sistemas externos.</p>
+      <h3>Integrations Design</h3>
+      <p><strong>Receive Inventory Data</strong> tiene como objetivo traer facilities, devices, categorias y checks desde un sistema externo aprobado. El payload esperado debe incluir version de esquema, sistema origen, fecha de generacion, region, support group, facilities y devices con campos compatibles con <code>MonitorConfiguration</code>. La importacion futura debe validar tamano, esquema, puertos, URLs, duplicados y reglas de configuracion antes de reemplazar el JSON activo.</p>
+      <p><strong>Send Report Data</strong> tiene como objetivo enviar a un endpoint externo el resultado de reportes: metadata de ejecucion, scope, resumen ejecutivo y filas detalladas opcionales. El payload futuro debe incluir <code>runId</code>, <code>sourceSystem</code>, <code>exportedAt</code>, summary, rows y, cuando exista identidad, usuario autenticado y <code>triggerSource</code>.</p>
+      <p>La seguridad futura debe incluir Microsoft Entra ID para despliegues compartidos, tokens fuera de Git, destinos allowlisted, correlation ids, logs estructurados, reintentos con limite, timeouts y registro de fallas sin bloquear la ejecucion de monitoreo.</p>
       <p>El sidebar tambien incluye <code>/manual</code> con un manual de usuario integrado y <code>/about</code> con informacion del proyecto, su caracter libre y notas operativas.</p>
       <p><code>wwwroot/app.js</code> contiene funciones JSDoc para:</p>
       <ul>
@@ -411,6 +421,8 @@ dotnet run</pre>
           <tr><th>Version</th><th>Resumen</th></tr>
         </thead>
         <tbody>
+          <tr><td><code>v0.7.1</code></td><td>Reports refinado para historiales grandes con paneles ejecutivos colapsables, vista por facility/categoria/runs, tabla detallada a 10 filas por defecto, Integrations protegido del publish y portable actualizado.</td></tr>
+          <tr><td><code>v0.7.0</code></td><td>Historial local, Reports ejecutivo paginado con eliminacion por ejecucion, error log, Bulk Edit con acciones masivas y colapso/expansion global, pagina Integrations para configuracion futura de endpoints, tema Corporate Logistics y portable actualizado.</td></tr>
           <tr><td><code>v0.6.2</code></td><td>Selector Full Check / Ping Only, soporte <code>checkMode=ping</code> en APIs de monitoreo y puertos TCP mostrados como omitidos en ejecuciones solo ping.</td></tr>
           <tr><td><code>v0.6.1</code></td><td>Run Group corregido por categoria, Bulk Edit con filtros y facilities colapsables, Themes alineado al layout compacto y documentacion de seguridad ampliada.</td></tr>
           <tr><td><code>v0.6.0</code></td><td>Support Groups independientes, Bulk Edit por fila, defaults publicos neutrales, dashboard mas compacto y portable limpio con solo <code>config.sample.json</code>.</td></tr>
@@ -428,17 +440,17 @@ dotnet run</pre>
     <section>
       <h2>Crear Portable Windows</h2>
       <p>Comando recomendado:</p>
-      <pre>dotnet publish NetWatch.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x64-v0.6.0</pre>
+      <pre>dotnet publish NetWatch.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x64-v0.7.1</pre>
       <p>Resultado esperado:</p>
-      <pre>publish/win-x64-v0.6.0/
+      <pre>publish/win-x64-v0.7.1/
 ├── NetWatch-Lite.exe
 ├── config.sample.json
 ├── appsettings.json
 ├── wwwroot/
 └── runtime dependencies...</pre>
       <p>Crear ZIP en macOS:</p>
-      <pre>cd publish/win-x64-v0.6.0
-zip -r ../../releases/NetWatch-Lite-win-x64-portable-2026-06-19-v0.6.0-support-groups-bulk-edit.zip .</pre>
+      <pre>cd publish/win-x64-v0.7.1
+zip -r ../../releases/NetWatch-Lite-win-x64-portable-2026-06-27-v0.7.1-reports-integrations-polish.zip .</pre>
       <p>Uso en Windows:</p>
       <ol>
         <li>Descomprimir el ZIP.</li>

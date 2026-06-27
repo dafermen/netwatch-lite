@@ -24,6 +24,7 @@ builder.Services.AddSingleton<JsonDeviceRepository>();
 builder.Services.AddSingleton<JsonThemeRepository>();
 builder.Services.AddSingleton<JsonMonitorHistoryRepository>();
 builder.Services.AddSingleton<JsonAppErrorLogRepository>();
+builder.Services.AddSingleton<JsonIntegrationRepository>();
 builder.Services.AddSingleton<NetworkMonitorService>();
 builder.Services.AddSingleton<MonitorExecutionService>();
 
@@ -396,6 +397,39 @@ app.MapPost("/api/history/clear", async (
     }
 });
 
+// Deletes one locally stored monitoring execution by run id.
+app.MapDelete("/api/history/runs/{runId}", async (
+    string runId,
+    JsonMonitorHistoryRepository historyRepository,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return Results.Ok(await historyRepository.DeleteRunAsync(runId, cancellationToken));
+    }
+    catch (InvalidDataException ex)
+    {
+        return Results.BadRequest(new
+        {
+            error = ex.Message
+        });
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(new
+        {
+            error = ex.Message
+        });
+    }
+    catch (Exception ex) when (IsConfigurationWriteException(ex))
+    {
+        return Results.Problem(
+            title: "Unable to delete monitor history run.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
 // Returns locally stored application errors for troubleshooting.
 app.MapGet("/api/errors", async (
     JsonAppErrorLogRepository errorRepository,
@@ -427,6 +461,56 @@ app.MapPost("/api/errors/clear", async (
     {
         return Results.Problem(
             title: "Unable to clear application errors.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
+// Returns external integration settings for future inventory imports and report exports.
+app.MapGet("/api/integrations", async (
+    JsonIntegrationRepository integrationRepository,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return Results.Ok(await integrationRepository.GetAsync(cancellationToken));
+    }
+    catch (Exception ex) when (IsConfigurationReadException(ex))
+    {
+        return Results.BadRequest(new
+        {
+            error = ex.Message
+        });
+    }
+});
+
+// Saves integration settings locally. External calls are intentionally not executed by this endpoint.
+app.MapPost("/api/integrations", async (
+    IntegrationConfiguration configuration,
+    JsonIntegrationRepository integrationRepository,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var saved = await integrationRepository.SaveAsync(configuration, cancellationToken);
+
+        return Results.Ok(new
+        {
+            savedAt = DateTimeOffset.Now,
+            configuration = saved
+        });
+    }
+    catch (InvalidDataException ex)
+    {
+        return Results.BadRequest(new
+        {
+            error = ex.Message
+        });
+    }
+    catch (Exception ex) when (IsConfigurationWriteException(ex))
+    {
+        return Results.Problem(
+            title: "Unable to save integrations.",
             detail: ex.Message,
             statusCode: StatusCodes.Status500InternalServerError);
     }

@@ -4,7 +4,7 @@ Use this document before an internal release or before asking another developer 
 
 ## Current Review Scope
 
-Review the current MVP without assuming future Nexus Intelligence capabilities are already implemented. NetWatch Lite currently covers local monitoring, configuration, support groups, themes, reports, local history, and local error logging.
+Review the current MVP without assuming future Nexus Intelligence capabilities are already implemented. NetWatch Lite currently covers local monitoring, configuration, support groups, themes, reports, local history, local error logging, and local integration settings.
 
 ## Dashboard Flow
 
@@ -23,6 +23,7 @@ Review the current MVP without assuming future Nexus Intelligence capabilities a
 - Add a test device, edit it, copy it, and delete it.
 - Save settings and confirm validation errors are clear when values are invalid.
 - Use Bulk Edit filters by facility and category.
+- Use Bulk Edit `Collapse All` and `Expand All` after filtering a large facility list.
 - Use Bulk Edit `Select Visible`, apply a safe bulk action, and confirm the selection clears after save.
 - Export configuration JSON.
 - Import a valid JSON file.
@@ -49,11 +50,26 @@ Review the current MVP without assuming future Nexus Intelligence capabilities a
 
 - Run at least one full check so `monitor-history.json` has data.
 - Open Reports and confirm summary cards load.
-- Confirm executive tables show facility performance, top problem devices, and recent runs.
+- Confirm Facility Performance, Category Performance, and Recent Runs load collapsed by default and expand on demand.
+- Confirm Facility Performance, Category Performance, Recent Runs, and Detailed Monitor History load from the same filtered rows.
 - Filter by search, status, mode, facility, category, and date range.
-- Sort each table column in Detailed Monitor History.
+- Confirm category filter options narrow when a facility is selected.
+- Confirm summary cards and all report tables match the filtered report rows.
+- Sort each table column in Facility Performance, Category Performance, Recent Runs, and Detailed Monitor History.
+- Change page size and verify Previous/Next pagination in each report table.
 - Export filtered JSON.
-- Clear history only when demo/test data can be removed.
+- Delete one test execution only when demo/test data can be removed.
+
+## Integrations Flow
+
+- Open Integrations and confirm the default inventory source is `Local JSON`.
+- Switch inventory source to `External endpoint` and confirm endpoint URL/method fields are enabled.
+- Try saving without an external endpoint URL and confirm validation appears.
+- Return inventory source to `Local JSON` before release unless a real integration has been approved.
+- Enable outbound report endpoint, confirm URL/method/include options are enabled, then save only test placeholder values.
+- Confirm `integrations.json` is created only as runtime data and is not committed.
+- Review the documented inbound inventory and outbound report payload examples before implementing external calls.
+- Confirm future security notes mention authentication, tokens outside Git, allowlisted destinations, logging, retries, and Microsoft Entra ID.
 
 ## Error Logging Flow
 
@@ -64,10 +80,10 @@ Review the current MVP without assuming future Nexus Intelligence capabilities a
 
 ## Security And Data Boundaries
 
-- Confirm runtime files are ignored by Git: local config, support group profiles, themes, history, and error logs.
+- Confirm runtime files are ignored by Git: local config, support group profiles, themes, history, error logs, and integration settings.
 - Confirm sample data is generic and safe.
 - Confirm the app is not exposed directly to untrusted networks.
-- Do not claim Microsoft Entra ID, SSO, user identity, or external integrations as current capabilities.
+- Do not claim Microsoft Entra ID, SSO, user identity, external inventory import, or outbound report delivery as current capabilities.
 
 ## Acceptance Criteria
 
@@ -75,6 +91,6 @@ The MVP is ready for an internal checkpoint when:
 
 - `dotnet build` succeeds with no errors.
 - `git diff --check` reports no whitespace errors.
-- Dashboard, Configuration, Support Groups, Themes, Reports, and docs have been reviewed.
+- Dashboard, Configuration, Support Groups, Themes, Reports, Integrations, and docs have been reviewed.
 - Runtime data is excluded from Git and portable release output.
 - `CHANGELOG.md` describes the user-facing changes.
