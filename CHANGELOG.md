@@ -2,6 +2,20 @@
 
 All notable changes to NetWatch-Lite are documented here.
 
+## v0.7.0 - 2026-06-27
+
+- Added local monitor history stored in `monitor-history.json` for completed runs, selected scope, summaries, and device-level results.
+- Added local application error logging stored in `app-errors.json` for troubleshooting unhandled failures and API/runtime issues.
+- Added a Reports page with summary cards, filters, sortable indexed history table, filtered JSON export, and clear-history maintenance action.
+- Added an executive Reports summary with facility performance, top problem devices, and recent run snapshots.
+- Added Bulk Edit multi-select actions for changing facility/category, enabling/disabling devices, and switching ping target mode across selected devices in one save.
+- Added `GET /api/history`, `POST /api/history/clear`, `GET /api/errors`, and `POST /api/errors/clear`.
+- Added the built-in `Corporate Logistics` theme without using protected brand text.
+- Added a Windows x64 portable ZIP for v0.7.0 while keeping previous portable versions in `releases/`.
+- Fixed scoped facility checks so returning to `All Facilities` restores the full dashboard without requiring a page refresh.
+- Expanded public and private documentation for future operator audit fields, Microsoft Entra ID authentication, and inbound/outbound integration planning.
+- Added internal QA and release-readiness documentation for validating the MVP before commit or release.
+
 ## v0.6.2 - 2026-06-20
 
 - Added a Dashboard execution mode toggle for `Full Check` versus `Ping Only` connectivity checks.

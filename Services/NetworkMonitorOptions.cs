@@ -25,4 +25,14 @@ public sealed class NetworkMonitorOptions
     /// Relative or absolute path to the editable themes.json UI theme file.
     /// </summary>
     public string ThemeFilePath { get; init; } = "themes.json";
+
+    /// <summary>
+    /// Relative or absolute path to the local monitor history JSON file.
+    /// </summary>
+    public string HistoryFilePath { get; init; } = "monitor-history.json";
+
+    /// <summary>
+    /// Relative or absolute path to the local application error log JSON file.
+    /// </summary>
+    public string ErrorLogFilePath { get; init; } = "app-errors.json";
 }

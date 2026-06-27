@@ -9,6 +9,7 @@ public sealed class MonitorExecutionService
 {
     private readonly JsonDeviceRepository _deviceRepository;
     private readonly NetworkMonitorService _monitorService;
+    private readonly JsonMonitorHistoryRepository _historyRepository;
     private readonly SemaphoreSlim _executionLock = new(1, 1);
 
     /// <summary>
@@ -16,12 +17,15 @@ public sealed class MonitorExecutionService
     /// </summary>
     /// <param name="deviceRepository">Repository that provides settings used in the response.</param>
     /// <param name="monitorService">Service that performs the actual ping and TCP checks.</param>
+    /// <param name="historyRepository">Repository that stores completed monitoring executions.</param>
     public MonitorExecutionService(
         JsonDeviceRepository deviceRepository,
-        NetworkMonitorService monitorService)
+        NetworkMonitorService monitorService,
+        JsonMonitorHistoryRepository historyRepository)
     {
         _deviceRepository = deviceRepository;
         _monitorService = monitorService;
+        _historyRepository = historyRepository;
     }
 
     /// <summary>
@@ -82,6 +86,7 @@ public sealed class MonitorExecutionService
             var loadedConfiguration = await _deviceRepository.GetConfigurationAsync();
             var configuration = FilterConfiguration(loadedConfiguration, facilityName, categoryName, deviceName, deviceIps);
             var normalizedCheckMode = NetworkMonitorService.NormalizeCheckMode(checkMode);
+            var startedAt = DateTimeOffset.Now;
             var settings = configuration.Settings;
             var totalDevices = configuration.Devices.Count(device => device.Enabled);
             var results = new List<DeviceResult>();
@@ -117,15 +122,23 @@ public sealed class MonitorExecutionService
             }
 
             var completedAt = DateTimeOffset.Now;
+            var response = CreateResponse(settings, results, "Completed", normalizedCheckMode, completedAt);
+            await _historyRepository.AppendAsync(
+                response,
+                CreateHistoryScope(configuration, facilityName, categoryName, deviceName, deviceIps),
+                startedAt,
+                completedAt,
+                cancellationToken);
+
             await writeEventAsync(new MonitorStreamEvent
             {
                 Type = "completed",
                 TotalDevices = totalDevices,
                 CompletedDevices = results.Count,
                 Settings = settings,
-                Summary = CreateDashboardSummary(results),
-                Categories = CreateCategoryResults(results),
-                Results = results,
+                Summary = response.Summary,
+                Categories = response.Categories,
+                Results = response.Results,
                 Timestamp = completedAt,
                 ExecutionStatus = "Completed",
                 CheckMode = normalizedCheckMode
@@ -149,10 +162,19 @@ public sealed class MonitorExecutionService
     {
         try
         {
+            var startedAt = DateTimeOffset.Now;
             var configuration = await _deviceRepository.GetConfigurationAsync();
             var normalizedCheckMode = NetworkMonitorService.NormalizeCheckMode(checkMode);
             var results = await _monitorService.CheckAllDevicesAsync(normalizedCheckMode, cancellationToken);
-            var response = CreateResponse(configuration.Settings, results, "Completed", normalizedCheckMode);
+            var completedAt = DateTimeOffset.Now;
+            var response = CreateResponse(configuration.Settings, results, "Completed", normalizedCheckMode, completedAt);
+
+            await _historyRepository.AppendAsync(
+                response,
+                CreateHistoryScope(configuration),
+                startedAt,
+                completedAt,
+                cancellationToken);
 
             return response;
         }
@@ -229,14 +251,16 @@ public sealed class MonitorExecutionService
     /// <param name="results">Flat device results produced by the monitor service.</param>
     /// <param name="executionStatus">Human-readable execution status to include in the response.</param>
     /// <param name="checkMode">Execution mode: Full or PingOnly.</param>
+    /// <param name="completedAt">Optional timestamp to use as the response completion time.</param>
     /// <returns>A complete monitor response for the dashboard.</returns>
     private static MonitorResponse CreateResponse(
         MonitorSettings settings,
         IReadOnlyList<DeviceResult> results,
         string executionStatus,
-        string checkMode = NetworkMonitorService.FullCheckMode)
+        string checkMode = NetworkMonitorService.FullCheckMode,
+        DateTimeOffset? completedAt = null)
     {
-        var now = DateTimeOffset.Now;
+        var now = completedAt ?? DateTimeOffset.Now;
 
         return new MonitorResponse
         {
@@ -248,6 +272,28 @@ public sealed class MonitorExecutionService
             Summary = CreateDashboardSummary(results),
             Categories = CreateCategoryResults(results),
             Results = results
+        };
+    }
+
+    private static MonitorHistoryScope CreateHistoryScope(
+        MonitorConfiguration configuration,
+        string? facilityName = null,
+        string? categoryName = null,
+        string? deviceName = null,
+        IReadOnlyCollection<string>? deviceIps = null)
+    {
+        var firstDevice = configuration.Devices.FirstOrDefault();
+
+        return new MonitorHistoryScope
+        {
+            Region = firstDevice?.Region,
+            SupportGroup = firstDevice?.SupportGroup,
+            Facility = string.IsNullOrWhiteSpace(facilityName) ? null : facilityName,
+            Category = string.IsNullOrWhiteSpace(categoryName) ? null : categoryName,
+            DeviceName = string.IsNullOrWhiteSpace(deviceName) ? null : deviceName,
+            DeviceIps = deviceIps?
+                .Where(ip => !string.IsNullOrWhiteSpace(ip))
+                .ToList() ?? []
         };
     }
 

@@ -140,6 +140,8 @@ public sealed class NetworkMonitorService
             Hostname = device.Hostname,
             WebsiteUrl = device.WebsiteUrl,
             PingTarget = pingTarget,
+            Region = device.Region,
+            SupportGroup = device.SupportGroup,
             Facility = device.Facility,
             Category = device.Category,
             IsOnline = hasAvailableCheck,

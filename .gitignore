@@ -27,10 +27,14 @@ src/
 Data/config.json
 Data/config.backup.json
 Data/themes.json
+Data/monitor-history.json
+Data/app-errors.json
 Data/regions.json
 Data/regions/
 config.backup.json
 themes.json
+monitor-history.json
+app-errors.json
 
 # Safe sample configs may be committed.
 !Data/config.sample.json

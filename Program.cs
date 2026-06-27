@@ -22,6 +22,8 @@ builder.Services.Configure<NetworkMonitorOptions>(
 builder.Services.AddSingleton<JsonRegionProfileRepository>();
 builder.Services.AddSingleton<JsonDeviceRepository>();
 builder.Services.AddSingleton<JsonThemeRepository>();
+builder.Services.AddSingleton<JsonMonitorHistoryRepository>();
+builder.Services.AddSingleton<JsonAppErrorLogRepository>();
 builder.Services.AddSingleton<NetworkMonitorService>();
 builder.Services.AddSingleton<MonitorExecutionService>();
 
@@ -29,6 +31,30 @@ var app = builder.Build();
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
+
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Unhandled application error.");
+
+        try
+        {
+            var errorRepository = context.RequestServices.GetRequiredService<JsonAppErrorLogRepository>();
+            await errorRepository.AppendAsync(ex, "UnhandledExceptionMiddleware", context, StatusCodes.Status500InternalServerError, context.RequestAborted);
+        }
+        catch (Exception logException)
+        {
+            app.Logger.LogError(logException, "Unable to write app-errors.json.");
+        }
+
+        throw;
+    }
+});
 
 // Load the active support group JSON at startup so configuration errors are visible immediately.
 var repository = app.Services.GetRequiredService<JsonDeviceRepository>();
@@ -334,6 +360,78 @@ app.MapPost("/api/themes/reset", async (
     }
 });
 
+// Returns locally stored monitoring history for reporting and analysis.
+app.MapGet("/api/history", async (
+    JsonMonitorHistoryRepository historyRepository,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return Results.Ok(await historyRepository.GetAsync(cancellationToken));
+    }
+    catch (Exception ex) when (IsConfigurationReadException(ex))
+    {
+        return Results.BadRequest(new
+        {
+            error = ex.Message
+        });
+    }
+});
+
+// Clears local monitoring history. Intended for local maintenance and demo resets.
+app.MapPost("/api/history/clear", async (
+    JsonMonitorHistoryRepository historyRepository,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return Results.Ok(await historyRepository.ClearAsync(cancellationToken));
+    }
+    catch (Exception ex) when (IsConfigurationWriteException(ex))
+    {
+        return Results.Problem(
+            title: "Unable to clear monitor history.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
+// Returns locally stored application errors for troubleshooting.
+app.MapGet("/api/errors", async (
+    JsonAppErrorLogRepository errorRepository,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return Results.Ok(await errorRepository.GetAsync(cancellationToken));
+    }
+    catch (Exception ex) when (IsConfigurationReadException(ex))
+    {
+        return Results.BadRequest(new
+        {
+            error = ex.Message
+        });
+    }
+});
+
+// Clears local application errors. Intended for local maintenance and demo resets.
+app.MapPost("/api/errors/clear", async (
+    JsonAppErrorLogRepository errorRepository,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return Results.Ok(await errorRepository.ClearAsync(cancellationToken));
+    }
+    catch (Exception ex) when (IsConfigurationWriteException(ex))
+    {
+        return Results.Problem(
+            title: "Unable to clear application errors.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
 // Returns the available region profiles and the active monitor configuration selection.
 app.MapGet("/api/regions", async (
     JsonRegionProfileRepository profileRepository,
@@ -524,7 +622,10 @@ app.MapDelete("/api/regions/{profileId}", async (
 });
 
 // Backwards-compatible endpoint that forces a fresh full check and returns the monitor payload.
-app.MapGet("/api/results", async (MonitorExecutionService executionService) =>
+app.MapGet("/api/results", async (
+    HttpContext context,
+    MonitorExecutionService executionService,
+    JsonAppErrorLogRepository errorRepository) =>
 {
     try
     {
@@ -532,6 +633,8 @@ app.MapGet("/api/results", async (MonitorExecutionService executionService) =>
     }
     catch (Exception ex)
     {
+        await errorRepository.AppendAsync(ex, "GET /api/results", context, StatusCodes.Status500InternalServerError, context.RequestAborted);
+
         return Results.Problem(
             title: "Monitoring execution failed.",
             detail: ex.Message,
@@ -542,7 +645,8 @@ app.MapGet("/api/results", async (MonitorExecutionService executionService) =>
 // Starts a monitoring execution immediately and rejects overlapping runs with HTTP 409.
 app.MapPost("/api/monitor/run", async (
     HttpContext context,
-    MonitorExecutionService executionService) =>
+    MonitorExecutionService executionService,
+    JsonAppErrorLogRepository errorRepository) =>
 {
     try
     {
@@ -562,6 +666,8 @@ app.MapPost("/api/monitor/run", async (
     }
     catch (Exception ex)
     {
+        await errorRepository.AppendAsync(ex, "POST /api/monitor/run", context, StatusCodes.Status500InternalServerError, context.RequestAborted);
+
         return Results.Problem(
             title: "Monitoring execution failed.",
             detail: ex.Message,
@@ -649,6 +755,8 @@ app.MapGet("/api/monitor/stream", async (
     catch (Exception ex)
     {
         app.Logger.LogError(ex, "Monitoring stream failed.");
+        var errorRepository = context.RequestServices.GetRequiredService<JsonAppErrorLogRepository>();
+        await errorRepository.AppendAsync(ex, "GET /api/monitor/stream", context, StatusCodes.Status500InternalServerError, context.RequestAborted);
         await WriteErrorEventAsync(ex);
     }
 });

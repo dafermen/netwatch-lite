@@ -165,6 +165,53 @@ body {
   justify-content: flex-end;
 }
 
+.reports-filter-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.reports-filter-actions {
+  align-self: end;
+}
+
+.reports-executive-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+
+.reports-executive-card .table {
+  min-width: 28rem;
+}
+
+.reports-table-header {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.reports-table {
+  min-width: 74rem;
+}
+
+.table-sort-button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  padding: 0;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table-sort-button.active,
+.table-sort-button:hover {
+  color: var(--nw-primary);
+}
+
 .facility-strip {
   background: var(--nw-surface);
   border: 1px solid var(--nw-border);

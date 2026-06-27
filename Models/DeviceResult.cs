@@ -41,6 +41,16 @@ public sealed class DeviceResult
     public required string Category { get; init; }
 
     /// <summary>
+    /// Region copied from configuration and useful for historical reporting.
+    /// </summary>
+    public string? Region { get; init; }
+
+    /// <summary>
+    /// Support group copied from configuration and useful for historical reporting.
+    /// </summary>
+    public string? SupportGroup { get; init; }
+
+    /// <summary>
     /// True when at least one configured check succeeds.
     /// </summary>
     public required bool IsOnline { get; init; }

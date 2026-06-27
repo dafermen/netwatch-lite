@@ -7,6 +7,7 @@ const currentPageLabel = document.querySelector("#current-page-label");
 
 const dashboardPage = document.querySelector("#dashboard-page");
 const configPage = document.querySelector("#config-page");
+const reportsPage = document.querySelector("#reports-page");
 const regionsPage = document.querySelector("#regions-page");
 const themesPage = document.querySelector("#themes-page");
 const manualPage = document.querySelector("#manual-page");
@@ -45,6 +46,28 @@ const metricOnline = document.querySelector("#metric-online");
 const metricOffline = document.querySelector("#metric-offline");
 const metricDegraded = document.querySelector("#metric-degraded");
 const metricAvailability = document.querySelector("#metric-availability");
+const reportsAlert = document.querySelector("#reports-alert");
+const reportsRunCount = document.querySelector("#reports-run-count");
+const reportsRowCount = document.querySelector("#reports-row-count");
+const reportsHealthyCount = document.querySelector("#reports-healthy-count");
+const reportsProblemCount = document.querySelector("#reports-problem-count");
+const reportsAvgAvailability = document.querySelector("#reports-avg-availability");
+const reportsSearchInput = document.querySelector("#reports-search");
+const reportsStatusFilter = document.querySelector("#reports-status-filter");
+const reportsModeFilter = document.querySelector("#reports-mode-filter");
+const reportsFacilityFilter = document.querySelector("#reports-facility-filter");
+const reportsCategoryFilter = document.querySelector("#reports-category-filter");
+const reportsFromDateInput = document.querySelector("#reports-from-date");
+const reportsToDateInput = document.querySelector("#reports-to-date");
+const resetReportFiltersButton = document.querySelector("#reset-report-filters");
+const refreshReportsButton = document.querySelector("#refresh-reports");
+const exportReportsButton = document.querySelector("#export-reports");
+const clearReportsButton = document.querySelector("#clear-reports");
+const reportsTableBody = document.querySelector("#reports-table-body");
+const reportsTableSummary = document.querySelector("#reports-table-summary");
+const reportsFacilityExecutiveBody = document.querySelector("#reports-facility-executive-body");
+const reportsProblemDevicesBody = document.querySelector("#reports-problem-devices-body");
+const reportsRecentRunsBody = document.querySelector("#reports-recent-runs-body");
 
 const configAlert = document.querySelector("#config-alert");
 const configDevicesBody = document.querySelector("#config-devices-body");
@@ -57,6 +80,12 @@ const bulkEditSummary = document.querySelector("#bulk-edit-summary");
 const bulkFacilityFilter = document.querySelector("#bulk-facility-filter");
 const bulkCategoryFilter = document.querySelector("#bulk-category-filter");
 const bulkClearFiltersButton = document.querySelector("#bulk-clear-filters");
+const bulkSelectVisibleButton = document.querySelector("#bulk-select-visible");
+const bulkClearSelectionButton = document.querySelector("#bulk-clear-selection");
+const bulkSelectionSummary = document.querySelector("#bulk-selection-summary");
+const bulkActionSelect = document.querySelector("#bulk-action-select");
+const bulkActionValueInput = document.querySelector("#bulk-action-value");
+const bulkApplyActionButton = document.querySelector("#bulk-apply-action");
 const reloadConfigButton = document.querySelector("#reload-config");
 const exportConfigButton = document.querySelector("#export-config");
 const importConfigButton = document.querySelector("#import-config");
@@ -164,6 +193,11 @@ let activeConfigSearch = "";
 let activeConfigView = "normal";
 let activeBulkFacility = "";
 let activeBulkCategory = "";
+let reportsState = { schemaVersion: 1, runs: [] };
+let reportsRows = [];
+let reportsFilters = createDefaultReportsFilters();
+let reportsSort = { key: "completedAt", direction: "desc" };
+let selectedBulkIndexes = new Set();
 const collapsedBulkFacilityNames = new Set();
 const defaultAutoFullCheckIntervalSeconds = 60;
 const maxConfigImportBytes = 5 * 1024 * 1024;
@@ -280,7 +314,8 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
       activeRunDeviceIp = device?.ip || "";
       activeRunFailedIps = new Set(devices.map(scopedDevice => scopedDevice.ip).filter(Boolean));
       activeRunKeepsDashboardStable = Boolean((device || devices.length > 0) && latestResults.length > 0);
-      activeRunPreservesDashboard = Boolean(!facility && !category && !device && devices.length === 0 && autoRefreshEnabled && latestResults.length > 0);
+      activeRunPreservesDashboard = Boolean(latestResults.length > 0
+        && ((facility || category) || (!device && devices.length === 0 && autoRefreshEnabled)));
       activeRunCheckMode = normalizeCheckMode(payload.checkMode || normalizedCheckMode);
       resetStreamingDashboard(payload, getExecutionScopeLabel(facility, category, device, devices));
     });
@@ -425,7 +460,7 @@ function renderMonitorPayload(payload) {
 
 function renderScopedMonitorPayload(payload, { facility = "", category = "" } = {}) {
   const scopedResults = payload.results ?? [];
-  latestResults = scopedResults;
+  latestResults = mergeScopedResults(latestResults, scopedResults);
   latestCategories = groupResultsByCategory(latestResults);
   hasCompletedFullCheck = true;
   activeRunFacility = "";
@@ -438,6 +473,27 @@ function renderScopedMonitorPayload(payload, { facility = "", category = "" } = 
   lastCheck.textContent = `Last ${facility || category} execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
   updateProgressPanel(scopedResults.length, scopedResults.length, "Completed", false);
   activeRunKeepsDashboardStable = false;
+}
+
+function mergeScopedResults(currentResults, scopedResults) {
+  if (!currentResults.length) {
+    return scopedResults;
+  }
+
+  const mergedResults = [...currentResults];
+
+  for (const result of scopedResults) {
+    const resultKey = createDeviceKey(result);
+    const resultIndex = mergedResults.findIndex(device => createDeviceKey(device) === resultKey);
+
+    if (resultIndex >= 0) {
+      mergedResults[resultIndex] = result;
+    } else {
+      mergedResults.push(result);
+    }
+  }
+
+  return mergedResults;
 }
 
 function renderScopedDevicesPayload(payload, requestedDevices) {
@@ -683,6 +739,415 @@ function renderFilteredCategories() {
   }
 
   renderFacilities(groupResultsByFacility(visibleResults));
+}
+
+function createDefaultReportsFilters() {
+  return {
+    search: "",
+    status: "",
+    mode: "",
+    facility: "",
+    category: "",
+    fromDate: "",
+    toDate: ""
+  };
+}
+
+async function loadReports({ showBusy = true, showErrors = true } = {}) {
+  if (showBusy) {
+    reportsTableBody.innerHTML = `<tr><td colspan="10" class="text-center text-secondary py-4">Loading report history...</td></tr>`;
+  }
+
+  try {
+    const response = await fetch("/api/history");
+    const payload = await readJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(payload.error || payload.detail || `Unable to load report history (${response.status}).`);
+    }
+
+    reportsState = payload;
+    reportsRows = flattenHistoryRows(payload.runs ?? []);
+    populateReportFilterOptions();
+    renderReports();
+    clearReportsAlert();
+  } catch (error) {
+    if (showErrors) {
+      showReportsAlert("danger", error.message || "Unable to load report history.");
+      reportsTableBody.innerHTML = `<tr><td colspan="10" class="text-center text-danger py-4">Unable to load report history.</td></tr>`;
+    }
+    console.error(error);
+  }
+}
+
+function flattenHistoryRows(runs) {
+  return runs.flatMap((run, runIndex) => (run.results ?? []).map((result, resultIndex) => ({
+    rowId: `${run.runId}-${resultIndex}`,
+    runIndex,
+    runId: run.runId,
+    completedAt: run.completedAt,
+    startedAt: run.startedAt,
+    durationMs: Number(run.durationMs) || 0,
+    checkMode: run.checkMode || "Full",
+    executionStatus: run.executionStatus || "Completed",
+    deviceName: result.name || "Unnamed",
+    ip: result.ip || "",
+    hostname: result.hostname || "",
+    facility: result.facility || "Unassigned",
+    category: result.category || "Unassigned",
+    region: result.region || run.scope?.region || "",
+    supportGroup: result.supportGroup || run.scope?.supportGroup || "",
+    status: result.status || "Unknown",
+    latencyMs: Number(result.latencyMs) || 0,
+    isOnline: Boolean(result.isOnline),
+    checks: result.checks ?? []
+  })));
+}
+
+function populateReportFilterOptions() {
+  syncSelectOptions(reportsFacilityFilter, reportsRows.map(row => row.facility), "All facilities", reportsFilters.facility);
+  syncSelectOptions(reportsCategoryFilter, reportsRows.map(row => row.category), "All categories", reportsFilters.category);
+}
+
+function syncSelectOptions(select, values, defaultLabel, selectedValue) {
+  if (!select) {
+    return;
+  }
+
+  const uniqueValues = [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  select.innerHTML = [
+    `<option value="">${escapeHtml(defaultLabel)}</option>`,
+    ...uniqueValues.map(value => `<option value="${escapeAttribute(value)}">${escapeHtml(value)}</option>`)
+  ].join("");
+  select.value = uniqueValues.includes(selectedValue) ? selectedValue : "";
+  reportsFilters[select === reportsFacilityFilter ? "facility" : "category"] = select.value;
+}
+
+function renderReports() {
+  const filteredRows = getFilteredReportRows();
+  const sortedRows = sortReportRows(filteredRows);
+  renderReportsSummary(filteredRows);
+  renderReportsExecutive(filteredRows);
+  renderReportsTable(sortedRows);
+}
+
+function getFilteredReportRows() {
+  const search = reportsFilters.search.trim().toLowerCase();
+  const fromTime = reportsFilters.fromDate ? new Date(`${reportsFilters.fromDate}T00:00:00`).getTime() : null;
+  const toTime = reportsFilters.toDate ? new Date(`${reportsFilters.toDate}T23:59:59.999`).getTime() : null;
+
+  return reportsRows.filter(row => {
+    const completedTime = new Date(row.completedAt).getTime();
+    const matchesSearchValue = !search
+      || row.deviceName.toLowerCase().includes(search)
+      || row.ip.toLowerCase().includes(search)
+      || row.hostname.toLowerCase().includes(search)
+      || row.facility.toLowerCase().includes(search)
+      || row.category.toLowerCase().includes(search)
+      || row.region.toLowerCase().includes(search)
+      || row.supportGroup.toLowerCase().includes(search);
+
+    return matchesSearchValue
+      && (!reportsFilters.status || row.status === reportsFilters.status)
+      && (!reportsFilters.mode || row.checkMode === reportsFilters.mode)
+      && (!reportsFilters.facility || row.facility === reportsFilters.facility)
+      && (!reportsFilters.category || row.category === reportsFilters.category)
+      && (fromTime === null || completedTime >= fromTime)
+      && (toTime === null || completedTime <= toTime);
+  });
+}
+
+function sortReportRows(rows) {
+  const direction = reportsSort.direction === "asc" ? 1 : -1;
+  const key = reportsSort.key;
+
+  return [...rows].sort((left, right) => {
+    const leftValue = getReportSortValue(left, key);
+    const rightValue = getReportSortValue(right, key);
+
+    if (typeof leftValue === "number" && typeof rightValue === "number") {
+      return (leftValue - rightValue) * direction;
+    }
+
+    return String(leftValue).localeCompare(String(rightValue)) * direction;
+  });
+}
+
+function getReportSortValue(row, key) {
+  if (key === "completedAt") {
+    return new Date(row.completedAt).getTime();
+  }
+
+  if (key === "latencyMs" || key === "durationMs") {
+    return Number(row[key]) || 0;
+  }
+
+  return row[key] ?? "";
+}
+
+function renderReportsSummary(rows) {
+  const runIds = new Set(rows.map(row => row.runId));
+  const healthyCount = rows.filter(row => row.status === "Healthy").length;
+  const problemCount = rows.filter(row => row.status === "Degraded" || row.status === "Down").length;
+  const visibleRuns = (reportsState.runs ?? []).filter(run => runIds.has(run.runId));
+  const averageAvailability = visibleRuns.length === 0
+    ? 0
+    : visibleRuns.reduce((sum, run) => sum + (Number(run.summary?.availabilityPercentage) || 0), 0) / visibleRuns.length;
+
+  reportsRunCount.textContent = formatNumber(runIds.size);
+  reportsRowCount.textContent = formatNumber(rows.length);
+  reportsHealthyCount.textContent = formatNumber(healthyCount);
+  reportsProblemCount.textContent = formatNumber(problemCount);
+  reportsAvgAvailability.textContent = `${formatPercent(averageAvailability)}%`;
+  reportsTableSummary.textContent = `${formatNumber(rows.length)} row${rows.length === 1 ? "" : "s"} from ${formatNumber(runIds.size)} run${runIds.size === 1 ? "" : "s"}`;
+}
+
+function renderReportsExecutive(rows) {
+  renderFacilityExecutive(rows);
+  renderProblemDeviceExecutive(rows);
+  renderRecentRunsExecutive(rows);
+}
+
+function renderFacilityExecutive(rows) {
+  const facilities = Array.from(groupRowsBy(rows, row => row.facility).entries())
+    .map(([facility, facilityRows]) => {
+      const healthyCount = facilityRows.filter(row => row.status === "Healthy").length;
+      const problemCount = facilityRows.filter(isProblemReportRow).length;
+      const averageLatency = average(facilityRows.map(row => row.latencyMs));
+
+      return {
+        facility,
+        rowCount: facilityRows.length,
+        availability: facilityRows.length === 0 ? 0 : healthyCount / facilityRows.length * 100,
+        problemCount,
+        averageLatency
+      };
+    })
+    .sort((left, right) => right.problemCount - left.problemCount
+      || left.availability - right.availability
+      || left.facility.localeCompare(right.facility))
+    .slice(0, 5);
+
+  if (facilities.length === 0) {
+    reportsFacilityExecutiveBody.innerHTML = `<tr><td colspan="5" class="text-center text-secondary py-3">No facility data matches the current filters.</td></tr>`;
+    return;
+  }
+
+  reportsFacilityExecutiveBody.innerHTML = facilities.map(facility => `
+    <tr>
+      <td>${escapeHtml(facility.facility)}</td>
+      <td class="text-end">${formatNumber(facility.rowCount)}</td>
+      <td class="text-end">${formatPercent(facility.availability)}%</td>
+      <td class="text-end">${formatNumber(facility.problemCount)}</td>
+      <td class="text-end">${formatNumber(Math.round(facility.averageLatency))} ms</td>
+    </tr>`).join("");
+}
+
+function renderProblemDeviceExecutive(rows) {
+  const problemDevices = Array.from(groupRowsBy(rows.filter(isProblemReportRow), row => `${row.deviceName}\u001f${row.ip}`).values())
+    .map(deviceRows => {
+      const sortedRows = sortReportRowsByCompletedAt(deviceRows);
+      const latestRow = sortedRows[0];
+
+      return {
+        latestRow,
+        problemCount: deviceRows.length
+      };
+    })
+    .sort((left, right) => right.problemCount - left.problemCount
+      || new Date(right.latestRow.completedAt).getTime() - new Date(left.latestRow.completedAt).getTime())
+    .slice(0, 5);
+
+  if (problemDevices.length === 0) {
+    reportsProblemDevicesBody.innerHTML = `<tr><td colspan="3" class="text-center text-secondary py-3">No problem devices match the current filters.</td></tr>`;
+    return;
+  }
+
+  reportsProblemDevicesBody.innerHTML = problemDevices.map(device => `
+    <tr>
+      <td>
+        <div class="fw-semibold">${escapeHtml(device.latestRow.deviceName)}</div>
+        <div class="small text-secondary">${escapeHtml(device.latestRow.facility)} / ${escapeHtml(device.latestRow.category)}</div>
+      </td>
+      <td class="text-end">${formatNumber(device.problemCount)}</td>
+      <td>
+        ${renderReportStatusBadge(device.latestRow.status)}
+        <div class="small text-secondary">${escapeHtml(formatDate(device.latestRow.completedAt))}</div>
+      </td>
+    </tr>`).join("");
+}
+
+function renderRecentRunsExecutive(rows) {
+  const runIds = new Set(rows.map(row => row.runId));
+  const recentRuns = (reportsState.runs ?? [])
+    .filter(run => runIds.has(run.runId))
+    .sort((left, right) => new Date(right.completedAt).getTime() - new Date(left.completedAt).getTime())
+    .slice(0, 5);
+
+  if (recentRuns.length === 0) {
+    reportsRecentRunsBody.innerHTML = `<tr><td colspan="3" class="text-center text-secondary py-3">No runs match the current filters.</td></tr>`;
+    return;
+  }
+
+  reportsRecentRunsBody.innerHTML = recentRuns.map(run => {
+    const runRows = rows.filter(row => row.runId === run.runId);
+    const problemCount = runRows.filter(isProblemReportRow).length;
+    const availability = Number(run.summary?.availabilityPercentage) || averageAvailabilityFromRows(runRows);
+
+    return `
+      <tr>
+        <td>
+          <div>${escapeHtml(formatDate(run.completedAt))}</div>
+          <div class="small text-secondary">${escapeHtml(getCheckModeLabel(run.checkMode || "Full"))}</div>
+        </td>
+        <td class="text-end">${formatPercent(availability)}%</td>
+        <td class="text-end">${formatNumber(problemCount)}</td>
+      </tr>`;
+  }).join("");
+}
+
+function groupRowsBy(rows, keySelector) {
+  const groups = new Map();
+
+  for (const row of rows) {
+    const key = keySelector(row) || "Unassigned";
+
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+
+    groups.get(key).push(row);
+  }
+
+  return groups;
+}
+
+function isProblemReportRow(row) {
+  return row.status === "Degraded" || row.status === "Down";
+}
+
+function average(values) {
+  const numericValues = values.map(Number).filter(value => Number.isFinite(value));
+
+  return numericValues.length === 0
+    ? 0
+    : numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length;
+}
+
+function averageAvailabilityFromRows(rows) {
+  if (rows.length === 0) {
+    return 0;
+  }
+
+  const healthyCount = rows.filter(row => row.status === "Healthy").length;
+  return healthyCount / rows.length * 100;
+}
+
+function sortReportRowsByCompletedAt(rows) {
+  return [...rows].sort((left, right) =>
+    new Date(right.completedAt).getTime() - new Date(left.completedAt).getTime());
+}
+
+function renderReportsTable(rows) {
+  updateReportSortButtons();
+
+  if (rows.length === 0) {
+    reportsTableBody.innerHTML = `<tr><td colspan="10" class="text-center text-secondary py-4">No history rows match the current filters.</td></tr>`;
+    return;
+  }
+
+  reportsTableBody.innerHTML = rows.map((row, index) => `
+    <tr>
+      <td class="text-end text-secondary">${index + 1}</td>
+      <td>${escapeHtml(formatDate(row.completedAt))}</td>
+      <td>
+        <div class="fw-semibold">${escapeHtml(row.deviceName)}</div>
+        <div class="small text-secondary">${escapeHtml(row.hostname || row.runId)}</div>
+      </td>
+      <td><code>${escapeHtml(row.ip)}</code></td>
+      <td>${escapeHtml(row.facility)}</td>
+      <td>${escapeHtml(row.category)}</td>
+      <td>${renderReportStatusBadge(row.status)}</td>
+      <td>${formatNumber(row.latencyMs)} ms</td>
+      <td>${escapeHtml(getCheckModeLabel(row.checkMode))}</td>
+      <td>${formatNumber(row.durationMs)} ms</td>
+    </tr>`).join("");
+}
+
+function renderReportStatusBadge(status) {
+  const badgeClass = status === "Healthy"
+    ? "text-bg-success"
+    : status === "Degraded" ? "text-bg-warning" : "text-bg-danger";
+
+  return `<span class="badge ${badgeClass}">${escapeHtml(status)}</span>`;
+}
+
+function updateReportSortButtons() {
+  document.querySelectorAll("[data-report-sort]").forEach(button => {
+    const isActive = button.dataset.reportSort === reportsSort.key;
+    const indicator = isActive ? (reportsSort.direction === "asc" ? " ↑" : " ↓") : "";
+    button.textContent = `${button.textContent.replace(/[ ↑↓]+$/u, "")}${indicator}`;
+    button.classList.toggle("active", isActive);
+  });
+}
+
+function resetReportsViewState() {
+  reportsFilters = createDefaultReportsFilters();
+  reportsSort = { key: "completedAt", direction: "desc" };
+
+  if (reportsSearchInput) reportsSearchInput.value = "";
+  if (reportsStatusFilter) reportsStatusFilter.value = "";
+  if (reportsModeFilter) reportsModeFilter.value = "";
+  if (reportsFacilityFilter) reportsFacilityFilter.value = "";
+  if (reportsCategoryFilter) reportsCategoryFilter.value = "";
+  if (reportsFromDateInput) reportsFromDateInput.value = "";
+  if (reportsToDateInput) reportsToDateInput.value = "";
+
+  clearReportsAlert();
+}
+
+function exportFilteredReports() {
+  const rows = sortReportRows(getFilteredReportRows());
+  const json = `${JSON.stringify({ exportedAt: new Date().toISOString(), filters: reportsFilters, rows }, null, 2)}\n`;
+  const blob = new Blob([json], { type: "application/json" });
+  downloadJsonBlob(blob, `netwatch-lite-report-${new Date().toISOString().slice(0, 19).replaceAll(":", "")}.json`);
+  showReportsAlert("success", "Filtered report exported as JSON.");
+}
+
+async function clearReportsHistory() {
+  if (!confirm("Clear all local monitor history? This cannot be undone.")) {
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/history/clear", { method: "POST" });
+    const payload = await readJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(payload.error || payload.detail || `Unable to clear history (${response.status}).`);
+    }
+
+    reportsState = payload;
+    reportsRows = [];
+    populateReportFilterOptions();
+    renderReports();
+    showReportsAlert("success", "Monitor history cleared.");
+  } catch (error) {
+    showReportsAlert("danger", error.message || "Unable to clear monitor history.");
+    console.error(error);
+  }
+}
+
+function showReportsAlert(type, message) {
+  reportsAlert.innerHTML = `
+    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+      ${escapeHtml(message)}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>`;
+}
+
+function clearReportsAlert() {
+  reportsAlert.innerHTML = "";
 }
 
 function getVisibleResults() {
@@ -1875,14 +2340,17 @@ function renderBulkEditDevices() {
   if (devices.length === 0) {
     bulkDevicesBody.innerHTML = `
       <tr>
-        <td colspan="9" class="text-center text-secondary py-4">${hasSearch || hasBulkFilters ? "No devices match the current filters." : "No devices configured."}</td>
+        <td colspan="10" class="text-center text-secondary py-4">${hasSearch || hasBulkFilters ? "No devices match the current filters." : "No devices configured."}</td>
       </tr>`;
+    updateBulkSelectionControls();
     return;
   }
 
   bulkDevicesBody.innerHTML = groupConfigDevicesByFacility(devices)
     .map(group => renderBulkEditFacilityGroup(group))
     .join("");
+  pruneBulkSelection();
+  updateBulkSelectionControls();
 }
 
 /**
@@ -1956,7 +2424,7 @@ function renderBulkEditFacilityGroup(group) {
 
   return `
     <tr class="bulk-group-row">
-      <td colspan="9">
+      <td colspan="10">
         <button class="btn btn-sm bulk-facility-toggle" type="button" data-bulk-facility-toggle="${escapeAttribute(group.name)}" aria-expanded="${!isCollapsed}">
           <i class="fa-solid fa-chevron-${isCollapsed ? "right" : "down"}"></i>
         </button>
@@ -1967,7 +2435,7 @@ function renderBulkEditFacilityGroup(group) {
     </tr>
     ${isCollapsed ? "" : group.categories.map(category => `
       <tr class="bulk-category-row">
-        <td colspan="9">
+        <td colspan="10">
           <span class="fw-semibold">${escapeHtml(category.name)}</span>
           <span class="badge text-bg-secondary ms-2">${category.devices.length} devices</span>
         </td>
@@ -1977,8 +2445,13 @@ function renderBulkEditFacilityGroup(group) {
 }
 
 function renderBulkEditRow(device, index) {
+  const isSelected = selectedBulkIndexes.has(index);
+
   return `
-    <tr class="bulk-edit-row" data-bulk-index="${index}">
+    <tr class="bulk-edit-row ${isSelected ? "table-active" : ""}" data-bulk-index="${index}">
+      <td class="text-center">
+        <input class="form-check-input" type="checkbox" data-bulk-select="${index}" ${isSelected ? "checked" : ""} aria-label="Select ${escapeAttribute(device.name ?? "device")}">
+      </td>
       <td>
         <input class="form-control form-control-sm" value="${escapeAttribute(device.name ?? "")}" data-bulk-field="name" required>
         <div class="small text-danger mt-1 d-none" data-bulk-error></div>
@@ -2006,6 +2479,134 @@ function renderBulkEditRow(device, index) {
         <div class="small text-secondary mt-1" data-bulk-status>${device.checks?.length ?? 0} checks</div>
       </td>
     </tr>`;
+}
+
+function getVisibleBulkIndexes() {
+  return Array.from(bulkDevicesBody.querySelectorAll("[data-bulk-index]"))
+    .map(row => Number(row.dataset.bulkIndex))
+    .filter(index => Number.isInteger(index));
+}
+
+function pruneBulkSelection() {
+  const validIndexes = new Set((configState.devices ?? []).map((_, index) => index));
+
+  selectedBulkIndexes = new Set(
+    Array.from(selectedBulkIndexes).filter(index => validIndexes.has(index)));
+}
+
+function updateBulkSelectionControls() {
+  const selectedCount = selectedBulkIndexes.size;
+  const visibleCount = getVisibleBulkIndexes().length;
+  const actionNeedsValue = bulkActionRequiresValue(bulkActionSelect?.value || "");
+
+  if (bulkSelectionSummary) {
+    bulkSelectionSummary.textContent = `${formatNumber(selectedCount)} selected / ${formatNumber(visibleCount)} visible`;
+  }
+
+  if (bulkActionValueInput) {
+    bulkActionValueInput.disabled = !actionNeedsValue;
+    bulkActionValueInput.placeholder = actionNeedsValue
+      ? bulkActionSelect.value === "facility" ? "Facility name" : "Category name"
+      : "Value";
+    if (!actionNeedsValue) {
+      bulkActionValueInput.value = "";
+    }
+  }
+
+  if (bulkApplyActionButton) {
+    bulkApplyActionButton.disabled = selectedCount === 0
+      || !bulkActionSelect?.value
+      || (actionNeedsValue && !bulkActionValueInput.value.trim());
+  }
+}
+
+function bulkActionRequiresValue(action) {
+  return action === "facility" || action === "category";
+}
+
+function selectVisibleBulkRows() {
+  for (const index of getVisibleBulkIndexes()) {
+    selectedBulkIndexes.add(index);
+  }
+
+  renderBulkEditDevices();
+}
+
+function clearBulkSelection() {
+  selectedBulkIndexes.clear();
+  renderBulkEditDevices();
+}
+
+function toggleBulkRowSelection(index, isSelected) {
+  if (isSelected) {
+    selectedBulkIndexes.add(index);
+  } else {
+    selectedBulkIndexes.delete(index);
+  }
+
+  const row = bulkDevicesBody.querySelector(`[data-bulk-index="${index}"]`);
+  row?.classList.toggle("table-active", isSelected);
+  updateBulkSelectionControls();
+}
+
+function syncBulkVisibleRowsToState() {
+  for (const row of bulkDevicesBody.querySelectorAll("[data-bulk-index]")) {
+    const device = readBulkRowDevice(row, { showErrors: true });
+
+    if (!device) {
+      return false;
+    }
+
+    configState.devices[Number(row.dataset.bulkIndex)] = device;
+  }
+
+  return true;
+}
+
+async function applyBulkAction() {
+  const action = bulkActionSelect.value;
+  const value = bulkActionValueInput.value.trim();
+  const selectedIndexes = Array.from(selectedBulkIndexes)
+    .filter(index => configState.devices[index])
+    .sort((left, right) => left - right);
+
+  if (selectedIndexes.length === 0 || !action) {
+    updateBulkSelectionControls();
+    return;
+  }
+
+  if (bulkActionRequiresValue(action) && !value) {
+    showConfigAlert("warning", "Enter a value before applying this bulk action.");
+    bulkActionValueInput.focus();
+    return;
+  }
+
+  if (!syncBulkVisibleRowsToState()) {
+    return;
+  }
+
+  for (const index of selectedIndexes) {
+    const device = configState.devices[index];
+
+    if (action === "facility") {
+      device.facility = value || "Unassigned";
+    } else if (action === "category") {
+      device.category = value || "Uncategorized";
+    } else if (action === "enable") {
+      device.enabled = true;
+    } else if (action === "disable") {
+      device.enabled = false;
+    } else if (action === "ping-hostname") {
+      device.useHostnameForPing = true;
+    } else if (action === "ping-address") {
+      device.useHostnameForPing = false;
+    }
+  }
+
+  const actionLabel = bulkActionSelect.options[bulkActionSelect.selectedIndex]?.text || "Bulk action";
+  selectedBulkIndexes.clear();
+  await saveConfig(`${actionLabel} applied to ${formatNumber(selectedIndexes.length)} selected device${selectedIndexes.length === 1 ? "" : "s"}. The previous file was backed up.`);
+  updateBulkSelectionControls();
 }
 
 function handleBulkRowChange(row) {
@@ -3116,6 +3717,35 @@ function createDefaultThemeState() {
           autoRefreshOff: "#dc3545",
           runFullCheck: "#ffc107"
         }
+      },
+      {
+        id: "corporate-logistics",
+        name: "Corporate Logistics",
+        builtIn: true,
+        colors: {
+          appBackground: "#f4f1ed",
+          surface: "#ffffff",
+          sidebarBackground: "#351c15",
+          sidebarText: "#f5e7c3",
+          primary: "#7a3e1d",
+          success: "#2f7d32",
+          warning: "#ffb500",
+          danger: "#b91c1c",
+          text: "#211a16",
+          mutedText: "#6f625a",
+          border: "#d8c9b7",
+          categoryHealthy: "#2f7d32",
+          categoryDegraded: "#c47a00",
+          categoryProblem: "#a52822",
+          categoryRunning: "#5b4636",
+          configFacilityHeader: "#351c15",
+          configFacilityText: "#ffdd75",
+          configCategoryHeader: "#fff3cd",
+          configCategoryText: "#4a2c1a",
+          autoRefreshOn: "#2f7d32",
+          autoRefreshOff: "#b91c1c",
+          runFullCheck: "#ffb500"
+        }
       }
     ]
   };
@@ -3505,6 +4135,7 @@ function navigateTo(route, replace = false) {
 
   dashboardPage.hidden = normalizedRoute !== "/";
   configPage.hidden = normalizedRoute !== "/config";
+  reportsPage.hidden = normalizedRoute !== "/reports";
   regionsPage.hidden = normalizedRoute !== "/regions";
   themesPage.hidden = normalizedRoute !== "/themes";
   manualPage.hidden = normalizedRoute !== "/manual";
@@ -3549,6 +4180,11 @@ function resetRouteViewState(route) {
 
   if (route === "/regions") {
     resetRegionsViewState();
+    return;
+  }
+
+  if (route === "/reports") {
+    resetReportsViewState();
     return;
   }
 
@@ -3635,6 +4271,11 @@ function refreshRouteData(route) {
     return;
   }
 
+  if (route === "/reports") {
+    void loadReports({ showBusy: true, showErrors: true });
+    return;
+  }
+
   if (route === "/themes") {
     void loadThemes({ showBusy: true, showErrors: true });
   }
@@ -3646,7 +4287,7 @@ async function refreshConfigFromActiveRegion() {
 }
 
 function normalizeRoute(pathname) {
-  const knownRoutes = new Set(["/", "/config", "/regions", "/themes", "/manual", "/about"]);
+  const knownRoutes = new Set(["/", "/config", "/regions", "/reports", "/themes", "/manual", "/about"]);
   return knownRoutes.has(pathname) ? pathname : "/";
 }
 
@@ -3655,6 +4296,7 @@ function getPageLabel(route) {
     "/": "Dashboard",
     "/config": "Configuration",
     "/regions": "Support Groups",
+    "/reports": "Reports",
     "/themes": "Themes",
     "/manual": "User Manual",
     "/about": "About"
@@ -3950,6 +4592,60 @@ bulkClearFiltersButton.addEventListener("click", () => {
   }
   renderBulkEditDevices();
 });
+bulkSelectVisibleButton.addEventListener("click", selectVisibleBulkRows);
+bulkClearSelectionButton.addEventListener("click", clearBulkSelection);
+bulkActionSelect.addEventListener("change", updateBulkSelectionControls);
+bulkActionValueInput.addEventListener("input", updateBulkSelectionControls);
+bulkApplyActionButton.addEventListener("click", applyBulkAction);
+refreshReportsButton.addEventListener("click", () => loadReports({ showBusy: true, showErrors: true }));
+exportReportsButton.addEventListener("click", exportFilteredReports);
+clearReportsButton.addEventListener("click", clearReportsHistory);
+resetReportFiltersButton.addEventListener("click", () => {
+  resetReportsViewState();
+  populateReportFilterOptions();
+  renderReports();
+});
+reportsSearchInput.addEventListener("input", debounce(event => {
+  reportsFilters.search = event.target.value;
+  renderReports();
+}, 150));
+reportsStatusFilter.addEventListener("change", event => {
+  reportsFilters.status = event.target.value;
+  renderReports();
+});
+reportsModeFilter.addEventListener("change", event => {
+  reportsFilters.mode = event.target.value;
+  renderReports();
+});
+reportsFacilityFilter.addEventListener("change", event => {
+  reportsFilters.facility = event.target.value;
+  renderReports();
+});
+reportsCategoryFilter.addEventListener("change", event => {
+  reportsFilters.category = event.target.value;
+  renderReports();
+});
+reportsFromDateInput.addEventListener("change", event => {
+  reportsFilters.fromDate = event.target.value;
+  renderReports();
+});
+reportsToDateInput.addEventListener("change", event => {
+  reportsFilters.toDate = event.target.value;
+  renderReports();
+});
+document.querySelector("#reports-page").addEventListener("click", event => {
+  const sortButton = event.target.closest("[data-report-sort]");
+
+  if (!sortButton) {
+    return;
+  }
+
+  const key = sortButton.dataset.reportSort;
+  reportsSort = reportsSort.key === key
+    ? { key, direction: reportsSort.direction === "asc" ? "desc" : "asc" }
+    : { key, direction: key === "completedAt" ? "desc" : "asc" };
+  renderReports();
+});
 if (intervalSecondsInput) {
   intervalSecondsInput.addEventListener("input", () => {
     showConfigAlert("info", "Auto refresh interval changed locally. Click Save Settings to persist changes.");
@@ -4022,6 +4718,13 @@ bulkDevicesBody.addEventListener("input", event => {
   }
 });
 bulkDevicesBody.addEventListener("change", event => {
+  const selectInput = event.target.closest("[data-bulk-select]");
+
+  if (selectInput) {
+    toggleBulkRowSelection(Number(selectInput.dataset.bulkSelect), selectInput.checked);
+    return;
+  }
+
   const row = event.target.closest("[data-bulk-index]");
 
   if (row) {

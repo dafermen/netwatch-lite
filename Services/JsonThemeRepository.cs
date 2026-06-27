@@ -204,21 +204,24 @@ public sealed partial class JsonThemeRepository
         }
 
         var defaultTheme = CreateDefaultTheme();
+        var builtInThemes = new[] { defaultTheme, CreateCorporateLogisticsTheme() };
         var themes = configuration.Themes
             .Where(theme => !string.IsNullOrWhiteSpace(theme.Id) && !string.IsNullOrWhiteSpace(theme.Name))
             .GroupBy(theme => theme.Id.Trim(), StringComparer.OrdinalIgnoreCase)
             .Select(group => NormalizeTheme(group.First()))
             .ToList();
 
-        var defaultIndex = themes.FindIndex(theme => string.Equals(theme.Id, defaultTheme.Id, StringComparison.OrdinalIgnoreCase));
+        for (var index = 0; index < builtInThemes.Length; index++)
+        {
+            var builtInTheme = builtInThemes[index];
+            var themeIndex = themes.FindIndex(theme => string.Equals(theme.Id, builtInTheme.Id, StringComparison.OrdinalIgnoreCase));
 
-        if (defaultIndex >= 0)
-        {
-            themes[defaultIndex] = defaultTheme;
-        }
-        else
-        {
-            themes.Insert(0, defaultTheme);
+            if (themeIndex >= 0)
+            {
+                themes.RemoveAt(themeIndex);
+            }
+
+            themes.Insert(Math.Min(index, themes.Count), builtInTheme);
         }
 
         var activeThemeId = themes.Any(theme => string.Equals(theme.Id, configuration.ActiveThemeId, StringComparison.OrdinalIgnoreCase))
@@ -299,7 +302,7 @@ public sealed partial class JsonThemeRepository
         return new ThemeConfiguration
         {
             ActiveThemeId = "default",
-            Themes = [CreateDefaultTheme()]
+            Themes = [CreateDefaultTheme(), CreateCorporateLogisticsTheme()]
         };
     }
 
@@ -311,6 +314,17 @@ public sealed partial class JsonThemeRepository
             Name = "NetWatch Default",
             BuiltIn = true,
             Colors = CreateDefaultColors()
+        };
+    }
+
+    private static ThemeDefinition CreateCorporateLogisticsTheme()
+    {
+        return new ThemeDefinition
+        {
+            Id = "corporate-logistics",
+            Name = "Corporate Logistics",
+            BuiltIn = true,
+            Colors = CreateCorporateLogisticsColors()
         };
     }
 
@@ -340,6 +354,35 @@ public sealed partial class JsonThemeRepository
             ["autoRefreshOn"] = "#198754",
             ["autoRefreshOff"] = "#dc3545",
             ["runFullCheck"] = "#ffc107"
+        };
+    }
+
+    private static Dictionary<string, string> CreateCorporateLogisticsColors()
+    {
+        return new Dictionary<string, string>
+        {
+            ["appBackground"] = "#f4f1ed",
+            ["surface"] = "#ffffff",
+            ["sidebarBackground"] = "#351c15",
+            ["sidebarText"] = "#f5e7c3",
+            ["primary"] = "#7a3e1d",
+            ["success"] = "#2f7d32",
+            ["warning"] = "#ffb500",
+            ["danger"] = "#b91c1c",
+            ["text"] = "#211a16",
+            ["mutedText"] = "#6f625a",
+            ["border"] = "#d8c9b7",
+            ["categoryHealthy"] = "#2f7d32",
+            ["categoryDegraded"] = "#c47a00",
+            ["categoryProblem"] = "#a52822",
+            ["categoryRunning"] = "#5b4636",
+            ["configFacilityHeader"] = "#351c15",
+            ["configFacilityText"] = "#ffdd75",
+            ["configCategoryHeader"] = "#fff3cd",
+            ["configCategoryText"] = "#4a2c1a",
+            ["autoRefreshOn"] = "#2f7d32",
+            ["autoRefreshOff"] = "#b91c1c",
+            ["runFullCheck"] = "#ffb500"
         };
     }
 

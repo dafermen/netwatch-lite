@@ -4,6 +4,11 @@ This guide explains how the source code is organized, how the main classes relat
 
 GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.com/dafermen/netwatch-lite).
 
+Operational readiness references:
+
+- [Quality Review](quality-review.md)
+- [Internal Release Checklist](internal-release-checklist.md)
+
 ## Runtime Overview
 
 NetWatch Lite is an ASP.NET Core Minimal API application with a static Bootstrap frontend.
@@ -54,6 +59,27 @@ Deployment expectations:
 - Do not expose the app directly to untrusted networks.
 - Treat IP addresses, hostnames, facilities, support groups, and theme/profile files as operational data.
 - Add authentication and role-based authorization before using it as a shared multi-user service outside a controlled internal context.
+
+## Future Identity, Audit, And Integrations
+
+Do not implement corporate SSO until the deployment model and enterprise requirements are approved. The planned direction is Microsoft Entra ID authentication, because it can provide a verified operator identity for shared internal use.
+
+When authentication is added, monitoring history should capture who or what started each run:
+
+- `executedBy`: stable user or service identifier.
+- `executedByDisplayName`: readable display name for reports.
+- `authProvider`: expected future value such as `microsoft-entra-id`.
+- `triggerSource`: `manual`, `auto-refresh`, `api`, `scheduler`, or `integration`.
+- `correlationId`: trace id shared across logs, history, and future integrations.
+
+Keep these fields optional so existing local `monitor-history.json` files continue to load. Until SSO exists, the UI and API should not claim verified user attribution.
+
+Future integrations should be built behind explicit boundaries:
+
+- Inbound: external systems can request checks, provide inventory metadata, or attach incident context.
+- Outbound: NetWatch Lite can publish events, report exports, ticket updates, or notification payloads.
+- Security: every integration needs authentication, authorization, input validation, request logging, correlation ids, and a clear data-retention decision.
+- Operations: failed outbound calls should be logged to `app-errors.json` or a future integration log without blocking the main monitoring run.
 
 ## Backend Entry Point
 
