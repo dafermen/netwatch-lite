@@ -460,3 +460,7 @@ Edit `config.json` in the same folder as `NetWatch-Lite.exe`, or use the `/confi
 - `retryDelayMs` controls the pause between retry attempts.
 - TCP checks treat timeouts, refused connections, invalid targets, and unexpected socket failures as unavailable ports; they do not validate application protocol behavior.
 - On small screens, wide device tables scroll horizontally while toolbars and forms stack vertically.
+
+## DOC-STD-20261002 — Documentation navigation
+
+Use the [documentation map](docs/README.md) for authoritative sources, reading paths and project-specific maintenance rules.
