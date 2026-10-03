@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NetWatch Lite Documentation</title>
+  <link rel="icon" type="image/png" href="/netwatch-lite-favicon.png">
   <style>
     :root {
       color-scheme: light;
@@ -156,19 +157,82 @@
     .degraded { color: var(--yellow); font-weight: 700; }
     .down { color: var(--red); font-weight: 700; }
   </style>
+  <link rel="stylesheet" href="styles.css?v=20260801">
+<link rel="stylesheet" href="innovalogic-docs.css">
+<script defer src="docs-reading-tools.js"></script>
 </head>
 <body>
-  <header>
-    <h1>NetWatch Lite Documentation</h1>
-    <p>Documentacion tecnica y operativa del monitor de red ASP.NET Core + Bootstrap. Cubre arquitectura, JSON editable, endpoints, servicios, UI y publicacion portable para Windows.</p>
+  <a class="skip-link" href="#docs-content">Saltar al contenido</a>
+
+  <header class="docs-topbar">
+    <button class="docs-button docs-menu-button" id="docs-menu-button" type="button" aria-label="Abrir menu de documentacion" aria-controls="docs-sidebar" aria-expanded="false">
+      <span class="docs-menu-icon" aria-hidden="true"></span>
+    </button>
+    <a class="docs-brand" href="/docs/" aria-label="Inicio de la documentacion de NetWatch Lite">
+      <img src="/netwatch-lite-logo.png" alt="">
+      <span>NetWatch Lite Docs</span>
+    </a>
+    <nav class="docs-primary-nav" aria-label="Navegacion principal">
+      <a href="#product-overview">Documentacion</a>
+      <a href="#execution-flow">Producto</a>
+      <a href="#project-structure">Arquitectura</a>
+      <a href="#versions">Estado</a>
+    </nav>
+    <div class="docs-topbar-actions">
+      <div class="docs-search" role="search">
+        <label class="visually-hidden" for="docs-search-input">Buscar documentacion</label>
+        <input id="docs-search-input" type="search" placeholder="Buscar documentacion" autocomplete="off" aria-controls="docs-search-results">
+        <div class="docs-search-results" id="docs-search-results" aria-live="polite" hidden></div>
+      </div>
+      <button class="docs-button" id="docs-theme-toggle" type="button" aria-pressed="false">Tema oscuro</button>
+      <a class="docs-app-link desktop-app-link" href="/" target="_self">Volver a la aplicacion</a>
+    </div>
   </header>
 
-  <main>
-    <section>
+  <div class="docs-layout">
+    <aside class="docs-sidebar" id="docs-sidebar" aria-label="Secciones de documentacion">
+      <nav>
+        <details class="docs-nav-group nav-section" open><summary>Producto</summary>
+          <a href="#product-overview">Introduccion</a>
+          <a href="#execution-flow">Flujo de ejecucion</a>
+          <a href="#configuration">Configuracion JSON</a>
+          <a href="#frontend">Experiencia web</a>
+          <a href="#health-status">Estados y metricas</a>
+        </details>
+        <details class="docs-nav-group nav-section" open><summary>Arquitectura</summary>
+          <a href="#project-structure">Vision general</a>
+          <a href="#api">API y contratos</a>
+          <a href="#code-reference">Recorrido por el codigo</a>
+          <a href="#wallboard">Wallboard</a>
+        </details>
+        <details class="docs-nav-group nav-section" open><summary>Entrega</summary>
+          <a href="#local-development">Desarrollo local</a>
+          <a href="#portable">Publicacion portable</a>
+          <a href="#operations">Operaciones</a>
+          <a href="#security">Seguridad</a>
+        </details>
+        <details class="docs-nav-group nav-section" open><summary>Gestion del proyecto</summary>
+          <a href="#versions">Estado y versiones</a>
+          <a href="https://github.com/dafermen/netwatch-lite/blob/main/CHANGELOG.md">Changelog</a>
+          <a href="https://github.com/dafermen/netwatch-lite/blob/main/CONTRIBUTING.md">Contribucion</a>
+        </details>
+      </nav>
+      <a class="mobile-app-link" href="/" target="_self">Volver a la aplicacion</a>
+    </aside>
+
+    <button class="docs-overlay" id="docs-overlay" type="button" aria-label="Cerrar menu de documentacion"></button>
+
+    <main class="docs-content" id="docs-content" tabindex="-1"><nav class="docs-reading-paths" aria-label="Recorridos de lectura"><a href="#product-overview"><strong>Conocer el producto</strong><span>Propósito y funciones.</span></a><a href="#frontend"><strong>Aprender a usarlo</strong><span>Monitoreo y configuración.</span></a><a href="#local-development"><strong>Explorar el desarrollo</strong><span>Entorno, arquitectura y pruebas.</span></a></nav>
+      <header class="docs-hero">
+        <h1>NetWatch Lite Documentation</h1>
+        <p>Documentacion tecnica y operativa del monitor de red ASP.NET Core + Bootstrap. Cubre arquitectura, JSON editable, endpoints, servicios, UI y publicacion portable para Windows.</p>
+      </header>
+
+    <section class="doc-section" id="product-overview">
       <h2>Resumen Del Proyecto</h2>
       <p>NetWatch Lite monitorea dispositivos desde un archivo JSON editable, ejecuta checks asincronos de ping y TCP, calcula estado agregado por dispositivo y muestra resultados en un dashboard web.</p>
       <p>Repositorio GitHub: <a href="https://github.com/dafermen/netwatch-lite">https://github.com/dafermen/netwatch-lite</a></p>
-      <p>La documentacion para programadores esta en <code>docs/developer-guide.md</code>. Ese archivo explica clases, metodos, servicios, endpoints, frontend y flujos internos.</p>
+      <p>La documentacion de ingenieria comienza en <code>docs/README.md</code>, con documentos separados para arquitectura, API, desarrollo, pruebas, despliegue, operaciones, seguridad y solucion de problemas.</p>
       <div class="grid">
         <div class="card">
           <h3>Backend</h3>
@@ -193,14 +257,14 @@
       </div>
     </section>
 
-    <section>
+    <section class="doc-section" id="project-structure">
       <h2>Estructura</h2>
       <pre>netwatch-lite/
 ├── Data/config.sample.json
 ├── Models/
 ├── Services/
 ├── wwwroot/
-├── docs/developer-guide.md
+├── docs/README.md
 ├── docs/index.html
 ├── appsettings.json
 ├── NetWatch.csproj
@@ -208,7 +272,7 @@
 └── README.md</pre>
     </section>
 
-    <section>
+    <section class="doc-section" id="execution-flow">
       <h2>Flujo De Ejecucion</h2>
       <ol>
         <li>La aplicacion inicia en <code>Program.cs</code>.</li>
@@ -223,7 +287,7 @@
       </ol>
     </section>
 
-    <section>
+    <section class="doc-section" id="configuration">
       <h2>Configuracion JSON</h2>
       <p>En desarrollo <code>Data/config.json</code>, <code>Data/regions.json</code> y <code>Data/regions/*.json</code> son locales e ignorados por Git. El ejemplo seguro versionado vive en <code>Data/config.sample.json</code>. Si no existen perfiles, la aplicacion crea un perfil <code>Support Team A</code> desde el config local cuando esta disponible y un perfil protegido <code>Demo</code> desde el sample.</p>
       <p>El archivo <code>themes.json</code> tambien es runtime e ignorado por Git. Guarda templates de color para el GUI y se crea automaticamente con el tema <code>NetWatch Default</code> si no existe.</p>
@@ -274,13 +338,13 @@
       </table>
     </section>
 
-    <section>
+    <section class="doc-section" id="wallboard">
       <h2>Proyecto Wallboard Hermano</h2>
       <p>El modo NOC WebView2 vive ahora en un repositorio separado: <code>netwatch-lite-wallboard</code>. Esa separacion mantiene este dashboard web enfocado en monitoreo de red y permite evolucionar el Wallboard como ejecutable Windows independiente.</p>
       <p>WebView2 carga cada panel como navegador nativo, no como iframe, por eso es el modo recomendado para paginas operativas que bloquean embedding en navegador.</p>
     </section>
 
-    <section>
+    <section class="doc-section" id="health-status">
       <h2>Estados Y Metricas</h2>
       <table>
         <thead>
@@ -295,7 +359,7 @@
       <p>Disponibilidad: <code>(HealthyDevices / TotalDevices) * 100</code>, redondeado a un decimal.</p>
     </section>
 
-    <section>
+    <section class="doc-section" id="api">
       <h2>Endpoints</h2>
       <table>
         <thead>
@@ -326,7 +390,7 @@
       </table>
     </section>
 
-    <section>
+    <section class="doc-section" id="code-reference">
       <h2>Referencia De Codigo</h2>
       <h3>Modelos</h3>
       <table>
@@ -380,7 +444,7 @@
       </table>
     </section>
 
-    <section>
+    <section class="doc-section" id="frontend">
       <h2>Frontend</h2>
       <p><code>wwwroot/index.html</code> define el layout compartido: sidebar hamburguesa, topbar, dashboard, pagina de configuracion, pagina de temas, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto. Cuando hay problemas aparece <code>Run Failed</code> para repetir solo los dispositivos fallidos, y cada fila con problema muestra <code>Run</code> junto al timestamp para repetir solo ese dispositivo.</p>
       <p>El dashboard muestra botones de facility para enfocar una sede y habilitar <code>Run Facility</code>. En vista general, las tablas se agrupan por facility y luego por categoria, por lo que dos equipos con el mismo nombre en sedes distintas se ven como registros diferentes.</p>
@@ -405,7 +469,7 @@
       </ul>
     </section>
 
-    <section>
+    <section class="doc-section" id="local-development">
       <h2>Build Y Ejecucion Local</h2>
       <pre>dotnet restore
 dotnet build
@@ -413,7 +477,7 @@ dotnet run</pre>
       <p>Al iniciar, abrir la URL que imprime la consola, usualmente <code>http://localhost:5000</code> o un puerto similar.</p>
     </section>
 
-    <section>
+    <section class="doc-section" id="versions">
       <h2>Versiones Y Commits</h2>
       <p>Los cambios relevantes del proyecto se documentan en <code>CHANGELOG.md</code>. Cada commit en GitHub debe tener un mensaje corto y claro. Los cambios visibles para usuarios deben agregarse tambien al changelog.</p>
       <table>
@@ -437,7 +501,7 @@ dotnet run</pre>
       </table>
     </section>
 
-    <section>
+    <section class="doc-section" id="portable">
       <h2>Crear Portable Windows</h2>
       <p>Comando recomendado:</p>
       <pre>dotnet publish NetWatch.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x64-v0.7.1</pre>
@@ -461,7 +525,7 @@ zip -r ../../releases/NetWatch-Lite-win-x64-portable-2026-06-27-v0.7.1-reports-i
       </ol>
     </section>
 
-    <section>
+    <section class="doc-section" id="operations">
       <h2>Notas Operativas</h2>
       <ul>
         <li>El archivo <code>config.json</code> puede recargarse desde el boton Reload JSON en Configuracion o administrarse desde <code>/config</code>.</li>
@@ -485,7 +549,7 @@ zip -r ../../releases/NetWatch-Lite-win-x64-portable-2026-06-27-v0.7.1-reports-i
       </ul>
     </section>
 
-    <section>
+    <section class="doc-section" id="security">
       <h2>Modelo De Seguridad</h2>
       <p>NetWatch Lite esta disenado como una herramienta operacional interna. La version actual no incluye autenticacion, roles de usuario ni autorizacion por permisos dentro de la aplicacion; por eso debe ejecutarse en una estacion o servidor interno confiable, o detras de controles existentes como VPN, firewall, autenticacion de reverse proxy o controles de acceso de Windows.</p>
       <ul>
@@ -498,6 +562,21 @@ zip -r ../../releases/NetWatch-Lite-win-x64-portable-2026-06-27-v0.7.1-reports-i
         <li>Direcciones IP, hostnames, facilities, support groups y perfiles JSON deben tratarse como informacion operacional interna.</li>
       </ul>
     </section>
-  </main>
+      <nav class="docs-pagination" aria-label="Navegacion entre secciones">
+        <a id="docs-previous" href="#product-overview" hidden></a>
+        <a id="docs-next" href="#project-structure"></a>
+      </nav>
+      <footer class="docs-footer">
+        NetWatch Lite documentation. Consulte <a href="https://github.com/dafermen/netwatch-lite">el repositorio</a> para el estado y el historial completos.
+      </footer>
+    </main>
+
+    <aside class="docs-toc" aria-label="En esta pagina">
+      <h2>En esta pagina</h2>
+      <nav id="on-page-nav"></nav>
+    </aside>
+  </div>
+  <script src="app.js?v=20260801"></script>
+<script defer src="docs-reading-init.js"></script>
 </body>
 </html>

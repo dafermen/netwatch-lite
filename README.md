@@ -464,3 +464,5 @@ Edit `config.json` in the same folder as `NetWatch-Lite.exe`, or use the `/confi
 ## DOC-STD-20261002 — Documentation navigation
 
 Use the [documentation map](docs/README.md) for authoritative sources, reading paths and project-specific maintenance rules.
+
+The documentation uses the configurable InnovaLogic reading theme, reading paths and keyboard controls; see [navigation maintenance](docs/WEB_NAVIGATION.md).
