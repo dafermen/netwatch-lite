@@ -263,6 +263,12 @@ body {
   justify-content: flex-end;
 }
 
+.topbar-status,
+#monitor-progress-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .reports-filter-grid {
   display: grid;
   gap: 0.85rem;
@@ -629,6 +635,12 @@ body {
 
 .group-check-control {
   width: 25rem;
+  max-width: 100%;
+}
+
+.device-type-filter-control {
+  width: 14rem;
+  max-width: 100%;
 }
 
 .config-toolbar {
@@ -1395,7 +1407,8 @@ body {
     width: 100%;
   }
 
-  .group-check-control {
+  .group-check-control,
+  .device-type-filter-control {
     width: 100%;
   }
 

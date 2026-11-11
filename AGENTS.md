@@ -47,9 +47,10 @@ These instructions are mandatory for any Codex session working on NetWatch Lite.
 
 ## Safety Rules
 
-- GitHub publication is on hold at the user's request (2026-11-10). Do not push,
-  tag, publish a release or upload artifacts until the user explicitly authorizes
-  it. Local changes, validation and versioned portable generation may continue.
+- The user authorized GitHub repository update and a new portable release for
+  the Dashboard Device Type filter on 2026-11-11, superseding the previous hold
+  for this delivery. Publish only reviewed public source and neutral ZIP/SHA.
+  This is not blanket authorization for later releases or stable deployment.
 - Do not commit runtime operational data. These files must stay private and ignored: `Data/config.json`, `Data/config.backup.json`, `Data/regions.json`, `Data/regions/`, `Data/themes.json`, `Data/monitor-history.json`, `Data/app-errors.json`, and `Data/integrations.json`.
 - Portable releases must include only safe sample data such as `Data/config.sample.json`.
 - Never package database/sidecar/lease files or storage-backups/storage-exports.
@@ -81,6 +82,12 @@ These instructions are mandatory for any Codex session working on NetWatch Lite.
   protected legacy keys/names, especially `workstation` and its exclusive
   peripheral behavior. Use catalog-only mutations with profile/revision guards;
   preserve catalogs in full configuration, row saves and profile copies.
+- Dashboard Device Type is independent from Category and intersects Facility,
+  search and status for presentation. Scoped runs enforce the type on the server,
+  not by IP alone; no-match/stale types must never broaden to all devices.
+  Global automatic runs remain global. Capture classification in new results and
+  optional history scope, leave old history unknown/unchanged, and include type
+  in dashboard identities so identical names/addresses do not share results.
 - HTTP/HTTPS definitions use `type: http`. Preserve their URL/expectations in
   all configuration workflows. Keep deadlines across body reads, bounded
   decompressed content, strict TLS, no cookies/redirects and sanitized results.

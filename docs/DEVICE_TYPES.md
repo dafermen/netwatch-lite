@@ -13,6 +13,13 @@ from Category (display grouping) and Checks (ping/TCP/HTTP monitoring). For a
 web application, a custom type such as Web application is only classification;
 configure an HTTP/HTTPS check to monitor its URL.
 
+Dashboard also offers Device Type immediately before Category. It reads this
+profile's catalog and filters both pending and checked inventory; scoped runs
+enforce the selection before executing checks. See [dashboard filters](DASHBOARD_FILTERS.md)
+for Facility intersections, global automatic runs and no-match behavior. New
+results snapshot their classification and scoped history records the selected
+type ID; missing legacy classifications remain unknown, without rewriting history.
+
 The five original system types remain protected:
 
 | Stable ID | Name | Special behavior |

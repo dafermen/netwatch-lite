@@ -40,6 +40,10 @@ public sealed class DeviceResult
     /// </summary>
     public required string Category { get; init; }
 
+    /// <summary>Classification ID captured when this device was checked; absent in legacy history.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? DeviceType { get; init; }
+
     /// <summary>
     /// Region copied from configuration and useful for historical reporting.
     /// </summary>

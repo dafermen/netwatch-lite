@@ -23,7 +23,7 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 
 ## Portable Download
 
-The new local Windows x64 candidate is `0.8.0-rc.12`, including dashboard
+The new Windows x64 candidate is `0.8.0-rc.13`, including dashboard
 inventory search, copy-only device Commands, exact single-device checks, filter
 reset/header controls, neutral Configuration layout and transition-safe device
 deletion, plus the redesigned Reports Summary/Runs/Devices views, historical
@@ -53,15 +53,23 @@ instead of leaving them filtered out or collapsed, and keeps HTTP-only forms
 compact by hiding Location/Command without deleting their saved values. It also
 shows field/API failures inside the editor and preserves safe save retries.
 Reports now waits for execution deletion to finish before refreshing SQL pages.
-GitHub publication is on hold until explicitly authorized by the owner.
+Candidate rc.13 adds a Device Type selector immediately before Category. It uses
+the active profile catalog, filters pending/checked inventory and intersects the
+server-side scope of Facility/Category, individual and failed checks. Global
+automatic monitoring remains global. See [dashboard filters](docs/DASHBOARD_FILTERS.md).
+The owner authorized this repository update and prerelease portable publication
+on 2026-11-11. Publication results are recorded in CURRENT_STATUS; a candidate is
+not stable-deployment approval.
+Candidate release page: [v0.8.0-rc.13](https://github.com/dafermen/netwatch-lite/releases/tag/v0.8.0-rc.13).
 See [storage](docs/STORAGE.md),
 [device form/search](docs/DEVICE_FORM.md) and [work-order validation](docs/VALIDATION_WORK_ORDER_2026-11-10.md).
 Every portable delivery includes its
 versioned folder, ZIP and SHA-256 sidecar under `artifacts/portable/` and
 `artifacts/packages/`; use the ZIP to copy/share the complete application.
-See [URL CRUD validation](docs/VALIDATION_URL_CRUD_2026-11-11.md)
-for final build evidence and limits. This is not a GitHub publication or stable
-deployment approval; private runtime data is excluded.
+See [dashboard validation](docs/VALIDATION_DASHBOARD_TYPES_2026-11-11.md)
+for current build evidence and limits; [URL CRUD validation](docs/VALIDATION_URL_CRUD_2026-11-11.md)
+is the preceding checkpoint. Stable deployment still requires its separate gates;
+private runtime data is excluded.
 The immutable rc.3 and older candidates predate the Reports redesign and remain
 unchanged. Generating another build always requires a new version.
 Candidate rc.4 includes Reports but predates Notes; older binaries/clients can
@@ -70,7 +78,7 @@ Candidate rc.5 includes Notes but predates Location and remains unchanged.
 Candidate rc.6 includes Location but predates peripheral Link type; all previous
 portable folders/ZIPs remain immutable.
 
-The last published historical Windows x64 portable ZIP is:
+Historical Windows x64 ZIP (predates the current candidate):
 
 [Download NetWatch Lite portable ZIP v0.7.1](https://github.com/dafermen/netwatch-lite/raw/refs/heads/main/releases/NetWatch-Lite-win-x64-portable-2026-06-27-v0.7.1-reports-integrations-polish.zip)
 

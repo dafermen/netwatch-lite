@@ -11,6 +11,8 @@ other development tools.
 
 ## Core Documents
 
+- [Dashboard filters](DASHBOARD_FILTERS.md): Device Type, scope, resets and safe execution.
+
 - [Local storage and SQLite](STORAGE.md): provider selection, migration, backup and reversal.
 - [Device form and search](DEVICE_FORM.md): visible matches, presets, dynamic fields and compatibility.
 - [Coordinated development plan](ROADMAP.md): delivery order, dynamic forms, SQLite stages and safety gates.
@@ -31,6 +33,8 @@ other development tools.
 - [Architecture Decisions](adr/README.md): decisions that materially affect the system.
 
 ## Other Documentation
+
+- [Dashboard Device Type and rc.13 - 2026-11-11](VALIDATION_DASHBOARD_TYPES_2026-11-11.md)
 
 - [URL CRUD visibility and portable rc.12 - 2026-11-11](VALIDATION_URL_CRUD_2026-11-11.md)
 

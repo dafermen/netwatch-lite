@@ -66,6 +66,7 @@ public sealed class MonitorExecutionService
     /// <param name="deviceIps">Optional device IP list used to limit the execution to selected devices.</param>
     /// <param name="checkMode">Execution mode: Full or PingOnly.</param>
     /// <param name="cancellationToken">Token used to cancel waiting, checks, or writes.</param>
+    /// <param name="deviceType">Optional classification ID intersected with the other scope filters.</param>
     /// <returns>True when streaming started; false when another execution is already running.</returns>
     public async Task<bool> TryStreamFullCheckAsync(
         Func<MonitorStreamEvent, CancellationToken, Task> writeEventAsync,
@@ -74,7 +75,8 @@ public sealed class MonitorExecutionService
         string? deviceName = null,
         IReadOnlyCollection<string>? deviceIps = null,
         string checkMode = NetworkMonitorService.FullCheckMode,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? deviceType = null)
     {
         if (!await _executionLock.WaitAsync(0, cancellationToken))
         {
@@ -84,7 +86,7 @@ public sealed class MonitorExecutionService
         try
         {
             var loadedConfiguration = await _deviceRepository.GetConfigurationAsync();
-            var configuration = FilterConfiguration(loadedConfiguration, facilityName, categoryName, deviceName, deviceIps);
+            var configuration = FilterConfiguration(loadedConfiguration, facilityName, categoryName, deviceName, deviceIps, deviceType);
             var normalizedCheckMode = NetworkMonitorService.NormalizeCheckMode(checkMode);
             var startedAt = DateTimeOffset.Now;
             var settings = configuration.Settings;
@@ -125,7 +127,7 @@ public sealed class MonitorExecutionService
             var response = CreateResponse(settings, results, "Completed", normalizedCheckMode, completedAt);
             await _historyRepository.AppendAsync(
                 response,
-                CreateHistoryScope(configuration, facilityName, categoryName, deviceName, deviceIps),
+                CreateHistoryScope(configuration, facilityName, categoryName, deviceName, deviceIps, deviceType),
                 startedAt,
                 completedAt,
                 cancellationToken);
@@ -192,13 +194,15 @@ public sealed class MonitorExecutionService
     /// <param name="categoryName">Optional category name to execute.</param>
     /// <param name="deviceName">Optional device name to execute.</param>
     /// <param name="deviceIps">Optional device IP list used to limit the execution to selected devices.</param>
+    /// <param name="deviceType">Optional classification ID; unknown IDs match no devices.</param>
     /// <returns>The original configuration, or a category-filtered configuration snapshot.</returns>
     private static MonitorConfiguration FilterConfiguration(
         MonitorConfiguration configuration,
         string? facilityName,
         string? categoryName,
         string? deviceName,
-        IReadOnlyCollection<string>? deviceIps)
+        IReadOnlyCollection<string>? deviceIps,
+        string? deviceType)
     {
         var requestedIps = deviceIps?
             .Where(ip => !string.IsNullOrWhiteSpace(ip))
@@ -207,12 +211,20 @@ public sealed class MonitorExecutionService
         if (string.IsNullOrWhiteSpace(facilityName)
             && string.IsNullOrWhiteSpace(categoryName)
             && string.IsNullOrWhiteSpace(deviceName)
+            && string.IsNullOrWhiteSpace(deviceType)
             && requestedIps.Count == 0)
         {
             return configuration;
         }
 
         var devices = configuration.Devices.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(deviceType))
+        {
+            var type = deviceType.Trim();
+            devices = devices.Where(device =>
+                string.Equals(device.DeviceType, type, StringComparison.OrdinalIgnoreCase));
+        }
 
         if (!string.IsNullOrWhiteSpace(facilityName))
         {
@@ -282,7 +294,8 @@ public sealed class MonitorExecutionService
         string? facilityName = null,
         string? categoryName = null,
         string? deviceName = null,
-        IReadOnlyCollection<string>? deviceIps = null)
+        IReadOnlyCollection<string>? deviceIps = null,
+        string? deviceType = null)
     {
         var firstDevice = configuration.Devices.FirstOrDefault();
 
@@ -292,6 +305,7 @@ public sealed class MonitorExecutionService
             SupportGroup = firstDevice?.SupportGroup,
             Facility = string.IsNullOrWhiteSpace(facilityName) ? null : facilityName,
             Category = string.IsNullOrWhiteSpace(categoryName) ? null : categoryName,
+            DeviceType = string.IsNullOrWhiteSpace(deviceType) ? null : deviceType.Trim().ToLowerInvariant(),
             DeviceName = string.IsNullOrWhiteSpace(deviceName) ? null : deviceName,
             DeviceIps = deviceIps?
                 .Where(ip => !string.IsNullOrWhiteSpace(ip))

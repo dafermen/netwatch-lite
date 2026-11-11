@@ -500,7 +500,7 @@
         <li>Manejar modo manual por defecto, auto refresh ON/OFF, selector <code>Full Check</code>/<code>Ping Only</code> y el boton principal <code>Run All Facilities</code>/<code>Run Facility</code>.</li>
         <li>Administrar dispositivos y checks desde la ruta <code>/config</code>.</li>
         <li>Administrar templates de color desde la ruta <code>/themes</code>.</li>
-        <li>Filtrar por texto, facility, categoria, online, offline y problemas.</li>
+        <li>Filtrar por Device Type antes de Category, texto, facility, online, offline y problemas. El tipo limita los Run por sede/categoria; la ejecucion automatica global conserva su alcance. Consulte <a href="DASHBOARD_FILTERS.md">la guia de filtros</a>.</li>
       </ul>
     </section>
 
@@ -548,14 +548,15 @@ dotnet run</pre>
       <p>Las instalaciones nuevas usan SQLite esquema 2. La actualizacion desde esquema 1 crea primero un respaldo verificado y conserva los documentos compatibles; volver al binario anterior requiere restaurar ese respaldo en una carpeta nueva. Configuration &gt; Data &amp; backups administra retencion, respaldos y cambios locales. Los JSON existentes requieren migracion explicita; no se importan por copiar archivos sobre una base ya creada. <a href="STORAGE.md">Migracion, respaldo y reversion</a>. <a href="ROADMAP.md">Estado del plan de desarrollo</a>.</p>
       <p>Comando recomendado:</p>
       <pre>.\scripts\test-packaging.ps1
-.\scripts\publish-portable.ps1 -Version 0.8.0-rc.11</pre>
+.\scripts\publish-portable.ps1 -Version 0.8.0-rc.13</pre>
       <p>Resultado esperado:</p>
       <pre>artifacts/
-|-- portable/NetWatch-Lite-v0.8.0-rc.11-win-x64/
-|-- packages/NetWatch-Lite-v0.8.0-rc.11-win-x64.zip
-|-- packages/NetWatch-Lite-v0.8.0-rc.11-win-x64.zip.sha256
+|-- portable/NetWatch-Lite-v0.8.0-rc.13-win-x64/
+|-- packages/NetWatch-Lite-v0.8.0-rc.13-win-x64.zip
+|-- packages/NetWatch-Lite-v0.8.0-rc.13-win-x64.zip.sha256
 `-- verification/{run-id}/</pre>
       <p>Las versiones anteriores no se sobrescriben. El ZIP exacto se valida en una copia aislada; no incluye inventarios privados ni ajustes locales. <a href="/docs/PORTABLE.md">Guia completa de portables</a>.</p>
+      <p>rc.13 incorpora Device Type antes de Category en Dashboard. Actualizar juntos backend y archivos web; publicar en GitHub no despliega el backend alojado aparte. <a href="DASHBOARD_FILTERS.md">Alcance de filtros y ejecuciones</a>.</p>
       <p>Uso en Windows:</p>
       <ol>
         <li>Descomprimir el ZIP.</li>
@@ -570,9 +571,9 @@ dotnet run</pre>
       <h2>Notas Operativas</h2>
       <ul>
         <li>El inventario activo puede recargarse con Reload en Configuracion; <code>/api/storage</code> identifica si usa SQLite o JSON.</li>
-        <li>El archivo <code>themes.json</code> se administra desde <code>/themes</code> y guarda el tema activo y los templates de color.</li>
-        <li>Si <code>config.json</code> no existe, se crea automaticamente con un check de ping a <code>127.0.0.1</code>.</li>
-        <li>Si <code>themes.json</code> no existe, se crea automaticamente con <code>NetWatch Default</code>.</li>
+        <li>Los temas se administran desde <code>/themes</code> y se guardan en el almacenamiento activo.</li>
+        <li>Las instalaciones nuevas usan SQLite con un check de ping neutro a <code>127.0.0.1</code> y el tema <code>NetWatch Default</code>.</li>
+        <li>En modo JSON se crean los archivos runtime faltantes; un inventario JSON existente no se importa automaticamente a SQLite.</li>
         <li>Import JSON rechaza archivos vacios, archivos que no terminan en <code>.json</code>, archivos mayores de 5 MB, JSON invalido y configuraciones que no pasen validacion.</li>
         <li>La aplicacion inicia en modo manual; el auto refresh solo empieza cuando el operador activa el boton y repite el full check segun <code>settings.intervalSeconds</code>.</li>
         <li>Los botones de facility permiten enfocar y ejecutar una sede especifica cuando existen cientos de dispositivos.</li>

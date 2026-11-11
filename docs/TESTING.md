@@ -31,6 +31,16 @@ the reason, risk, compensating control, and project-owner approval.
 
 ## Automated Suites
 
+`DashboardDeviceTypeTests.cs` verifies server-enforced classification intersections,
+identical names/addresses across types, unspecified legacy records, unknown IDs
+and unchanged global scope on both providers. Browser cases in
+`dashboard-device-type.spec.cjs` cover read-only selection, categories, search/
+status/Facility, exact scoped runs, individual/failed checks, removed types,
+automatic global monitoring and responsive layout. See [filter behavior](DASHBOARD_FILTERS.md).
+`scripts/test-monitoring-mutations.ps1` validates four sampled scope/classification
+mutants against a passing isolated baseline. Build/tool failures do not count as
+killed mutants; this is targeted coverage, not whole-application mutation testing.
+
 URL CRUD regressions additionally verify monitored-URL search, visibility after
 successful edits/copies, compact HTTP-only fields with hidden-value preservation,
 failure/retry, disabled devices and Dashboard pending rows without monitoring.

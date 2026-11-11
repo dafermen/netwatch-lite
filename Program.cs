@@ -929,6 +929,7 @@ app.MapGet("/api/monitor/stream", async (
     {
         var facilityName = context.Request.Query["facility"].FirstOrDefault();
         var categoryName = context.Request.Query["category"].FirstOrDefault();
+        var deviceType = context.Request.Query["deviceType"].FirstOrDefault();
         var deviceName = context.Request.Query["deviceName"].FirstOrDefault();
         var deviceIps = context.Request.Query["deviceIp"]
             .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -943,7 +944,8 @@ app.MapGet("/api/monitor/stream", async (
             deviceName,
             deviceIps,
             checkMode,
-            context.RequestAborted);
+            context.RequestAborted,
+            deviceType: deviceType);
 
         if (!started)
         {

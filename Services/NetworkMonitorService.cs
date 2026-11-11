@@ -148,6 +148,7 @@ public sealed class NetworkMonitorService
             SupportGroup = device.SupportGroup,
             Facility = device.Facility,
             Category = device.Category,
+            DeviceType = device.DeviceType,
             IsOnline = hasAvailableCheck,
             Status = status,
             LatencyMs = latencyMs,

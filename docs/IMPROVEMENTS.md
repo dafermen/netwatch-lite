@@ -8,6 +8,16 @@ explicit; technical/release risks remain in [CURRENT_STATUS.md](../CURRENT_STATU
 The user requested coordination on 2026-11-09. Delivery order and cross-cutting
 gates are in [ROADMAP.md](ROADMAP.md); queued work is not implemented work.
 
+## IMP-007 - Dashboard Device Type Filter
+
+- Authorized: 2026-11-11, including GitHub source and new portable publication.
+- Status: Implemented; full validation and delivery in progress.
+- Scope: Catalog-backed selector before Category, read-only view filtering and
+  server-enforced scoped executions, exact typed identities and Clear filters.
+- Compatibility: No schema migration, no old-history rewrite, no automatic checks
+  on selection; automatic global monitoring remains global.
+- Evidence: [Dashboard type validation](VALIDATION_DASHBOARD_TYPES_2026-11-11.md).
+
 ## IMP-006 - URL Save Visibility And Compact HTTP Form
 
 - Reported/authorized: 2026-11-11; edits/copies report success but disappear.

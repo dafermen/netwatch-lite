@@ -7,6 +7,12 @@ A deployment is not ready until every quality gate below has recorded evidence.
 If a gate cannot be executed, document the reason, risk, compensating control,
 and project-owner approval before deployment.
 
+Dashboard Device Type requires the matching rc.13-or-newer backend and static
+assets. Deploy them together: an older backend does not enforce the new
+`deviceType` execution parameter. Back up private storage before replacing an
+installation. Publishing source or a portable to GitHub does not deploy the
+separately hosted backend or update GitHub Pages.
+
 ## 1. Prepare
 
 - Confirm the working branch contains only intended changes.

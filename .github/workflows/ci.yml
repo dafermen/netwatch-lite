@@ -30,7 +30,7 @@ jobs:
         run: dotnet build netwatch.sln --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test netwatch.sln --configuration Release --no-build --collect "XPlat Code Coverage" --results-directory TestResults
+        run: dotnet test netwatch.sln --configuration Release --no-build -m:1 --collect "XPlat Code Coverage" --results-directory TestResults -- RunConfiguration.MaxCpuCount=1 xUnit.ParallelizeTestCollections=false
 
       - name: Check frontend JavaScript
         run: |
@@ -39,6 +39,8 @@ jobs:
           node --check wwwroot/peripherals.js
           node --check wwwroot/device-types.js
           node --check wwwroot/workstations.js
+          node --check wwwroot/reports-sql.js
+          node --check wwwroot/storage.js
           node --check docs/app.js
           node --check docs/docs-reading-tools.js
           node --check docs/docs-reading-init.js
@@ -51,13 +53,17 @@ jobs:
         shell: powershell
         run: .\scripts\test-storage-mutations.ps1
 
+      - name: Targeted monitoring scope mutations
+        shell: powershell
+        run: .\scripts\test-monitoring-mutations.ps1
+
       - name: Reject tracked runtime data
         shell: pwsh
         run: |
           $patterns = @(
             '\.(db|sqlite)(-[^/]*)?$',
             '(^|/)\.netwatch-runtime\.lock$',
-            '^(storage-backups|storage-exports)/',
+            '^(storage-backups|storage-exports|storage-restores)/',
             '^storage-migration-.*\.json$',
             '\.backup\.json$',
             '^Data/config(\.backup)?\.json$',
@@ -67,7 +73,8 @@ jobs:
             '^Data/monitor-history\.json$',
             '^Data/app-errors\.json$',
             '^Data/integrations\.json$',
-            '^(config|regions|themes|monitor-history|app-errors|integrations)\.json$'
+            '^(config|regions|themes|monitor-history|app-errors|integrations|storage-policy)\.json$',
+            '^Data/storage-policy\.json$'
           )
           $tracked = git ls-files
           $blocked = $tracked | Where-Object {
@@ -87,11 +94,12 @@ jobs:
           path: |
             TestResults
             artifacts/verification/storage-mutations-*/result.json
+            artifacts/verification/monitoring-mutations-*/result.json
           if-no-files-found: warn
 
   browser-regression:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:

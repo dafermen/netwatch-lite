@@ -7,7 +7,7 @@ Run from the repository with the .NET 8 SDK and Windows PowerShell 5.1 or newer:
 ```powershell
 cd C:\Projects\netwatch-lite
 .\scripts\test-packaging.ps1
-.\scripts\publish-portable.ps1 -Version 0.8.0-rc.11
+.\scripts\publish-portable.ps1 -Version 0.8.0-rc.13
 ```
 
 `-Version` is required. Use a new full version on every build, including a new
@@ -15,7 +15,7 @@ prerelease suffix when rebuilding a candidate. The version is passed to .NET
 publish and checked against the resulting assembly metadata. It is not inferred
 from the last directory name. The initial supported target is Windows x64.
 
-The local candidate is `0.8.0-rc.11`. It includes the dashboard inventory
+The current candidate is `0.8.0-rc.13`. It includes the dashboard inventory
 preview/search, copy-only Command, individual checks and filter/header controls,
 plus the updated neutral Configuration headers and aligned device action icons.
 It also includes the redesigned Reports Summary/Runs/Devices views, historical
@@ -35,7 +35,9 @@ Clean installs use SQLite; copying old JSON into an already initialized database
 does not import it. Follow migration instructions in a new deployment folder.
 All rc.7 and earlier artifacts remain immutable.
 Candidate rc.9 adds accessible Shortcuts/Command descriptions only. rc.8 is also
-immutable. Publication to GitHub is on hold until the user explicitly allows it.
+immutable. GitHub publication always requires explicit owner authorization;
+the owner authorized the rc.13 source/portable delivery on 2026-11-11, not future
+releases or stable deployment. See [current status](../CURRENT_STATUS.md).
 Candidate rc.10 removes the Shortcuts note and adds per-check Timeout/Expected
 text descriptions, keeping Command help. rc.9 and all earlier outputs remain immutable.
 Candidate rc.11 adds SQLite schema-2 relational projections/SQL Reports,
@@ -46,8 +48,15 @@ rollback. Data & backups is under Configuration. Native first-run validation
 expects schema 2; `test-portable.ps1 -ExpectedStorageSchema 1` changes only that
 startup expectation. Older candidates also require their release-compatible
 public-asset policy/validator; never modify an archive to satisfy a newer policy.
-Final candidate evidence and limitations are recorded in
-[validation](VALIDATION_SQLITE_RELATIONAL_2026-11-10.md); generation is not deployment approval.
+Candidate rc.12 fixes URL edit/copy visibility and the SQL Reports delete/read
+overlap; HTTP-only forms hide Location/Command without losing stored values.
+Candidate rc.13 adds the catalog-backed Dashboard Device Type filter before
+Category, including server-enforced scoped checks and typed result identities.
+No schema migration or old-history rewrite is needed. Deploy its backend and
+static assets together; publishing to GitHub does not deploy a hosted backend.
+All rc.12 and earlier outputs remain immutable. Final candidate evidence and
+limitations are recorded in [dashboard validation](VALIDATION_DASHBOARD_TYPES_2026-11-11.md);
+generation is not deployment approval.
 
 ```text
 artifacts/

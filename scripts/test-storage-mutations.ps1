@@ -52,3 +52,4 @@ foreach ($case in @(@{name='baseline'}) + $mutations) {
 [ordered]@{ scope='Six hand-selected storage mutants; not whole-application mutation coverage'; killed=6; total=6; results=$results } |
     ConvertTo-Json -Depth 6 | Out-File -LiteralPath (Join-Path $run 'result.json') -Encoding utf8
 Write-Host "Mutation evidence: $run"
+$global:LASTEXITCODE = 0

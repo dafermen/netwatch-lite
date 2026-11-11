@@ -2,6 +2,48 @@
 
 Last updated: 2026-11-11
 
+## Dashboard Device Type And GitHub Delivery - 2026-11-11
+
+IN PROGRESS: implement Device Type before Category, test complete regressions,
+update documentation, generate immutable rc.13 ZIP/SHA/folder and publish reviewed
+public source plus prerelease artifacts to GitHub. The owner explicitly authorized
+publication for this delivery, superseding the older hold below. Never upload
+private DB/JSON, backups, pilot evidence or copied operational inventories.
+
+Local previously validated rc.12 work was preserved as commit dfa7fd9, then upstream
+documentation commits through 9b632e1 were integrated in merge 8af125b. Documentation
+conflicts retained both navigation updates and later product guides; no remote
+history was overwritten. The original published releases/ ZIPs remain unchanged.
+The new public changes passed path/credential checks before remote publication.
+
+Backend type-scoped checks and typed results/history scope are implemented;
+12 focused .NET cases passed for SQLite/JSON, including same-name/address types,
+legacy unspecified devices, unknown types and global runs. A backed-up source
+restart now serves rc.13 / PID 34240 on port 5000. All document bytes, eight APIs
+and original Data JSON matched; no schema migration or stale JSON import occurred.
+Private evidence: `artifacts/verification/device-type-filter-20261111/`;
+activation: `activation-6ed18eb1528745fa967aaa5706496545/`.
+
+The user confirmed the preceding URL edit/copy visibility fix locally. Other-PC
+acceptance and stable-deployment gates remain separate from this delivery.
+Final .NET regression passed 373 cases (34 unit, 28 integration, 311 contract).
+Both providers passed all 48 focused desktop/mobile dashboard cases. A mutation
+coverage gap was closed with independent type/Facility and type/Category cases;
+four monitoring mutants and six storage mutants were killed against green baselines.
+Receipts: `monitoring-mutations-5444d8c160cc4ca193db56e579fdb4e9/` and
+`storage-mutations-6af5e4edc0874cc283412e1eab700661/` under artifacts/verification/.
+NuGet application/npm tooling audits found no known vulnerabilities. Both shells
+passed 58 package guards; documentation links and syntax/whitespace passed.
+Full browser regression passed all 356 cases (178 SQLite, 178 JSON), without
+failures, skips or retries. Desktop/mobile screenshots were reviewed, including
+100-character custom names and zero-match scopes. Ten JavaScript files and 296
+relative links across 60 Markdown files passed the final static checks.
+The historical/original-data hash baseline contains 4922 entries. Live verification
+matched eight operational APIs and five served assets; source remains PID 34240,
+rc.13, SQLite schema 2 on port 5000. Next: native packaging, GitHub publication/CI
+and final artifact checks. Older status and holds are historical; this is not
+stable-deployment approval.
+
 ## URL CRUD Visibility - 2026-11-11
 
 COMPLETE: source fixes, complete regression, backed-up source restart and native

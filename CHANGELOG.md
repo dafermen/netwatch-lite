@@ -1,5 +1,21 @@
 # Changelog
 
+## Dashboard Device Type Filter - 2026-11-11
+
+- Added a catalog-backed Device Type selector before Category, combining with
+  Facility, search and status without saving data or running checks on selection.
+- Scoped Facility/Category, individual and failed runs enforce the classification
+  on the server. Missing matches or a removed type never expand to all devices.
+- New results capture device classification; dashboard identities separate equal
+  names/addresses of different types. Old history remains unchanged/unknown.
+- Automatic global monitoring remains global. Clear filters also resets Device Type;
+  zero-match facilities remain selected rather than silently widening the scope.
+- The owner authorized a GitHub source update and new rc.13 prerelease portable.
+  Final validation/publication evidence is recorded in CURRENT_STATUS.
+- Source validation passed 373 .NET and 356 desktop/mobile browser cases across
+  SQLite/JSON, plus four monitoring and six storage sampled mutations. Updated
+  CI, current portable instructions and matching-backend deployment guidance.
+
 ## URL Editing Visibility And Portable 0.8.0-rc.12 - 2026-11-11
 
 - Configuration searches each monitored HTTP URL as well as inventory fields.

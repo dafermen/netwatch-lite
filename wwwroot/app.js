@@ -28,6 +28,7 @@ const runFacilityCheckSpinner = document.querySelector("#run-facility-check-spin
 const runFacilityCheckIcon = document.querySelector("#run-facility-check-icon");
 const runFacilityCheckLabel = document.querySelector("#run-facility-check-label");
 const groupCheckSelect = document.querySelector("#group-check-select");
+const dashboardDeviceTypeSelect = document.querySelector('#dashboard-device-type');
 const runGroupCheckButton = document.querySelector("#run-group-check");
 const runGroupCheckSpinner = document.querySelector("#run-group-check-spinner");
 const runGroupCheckIcon = document.querySelector("#run-group-check-icon");
@@ -213,6 +214,8 @@ let latestCategories = [];
 let activeFilter = "all";
 let activeSearch = "";
 let activeFacility = "";
+let activeDashboardDeviceType = '';
+let activeRunDeviceType = '';
 let autoRefreshEnabled = false;
 let hasCompletedFullCheck = false;
 let activeRunFacility = "";
@@ -303,7 +306,7 @@ const themeCssVariables = {
   runFullCheck: "--nw-run-full-check"
 };
 
-async function loadResults({ showErrors = true, facility = "", category = "", device = null, devices = [], reloadConfig = true } = {}) {
+async function loadResults({ showErrors = true, facility = "", category = "", deviceType = '', device = null, devices = [], reloadConfig = true } = {}) {
   if (!activeMonitorStream && reloadConfig) {
     try {
       await refreshConfigurationForRun();
@@ -316,17 +319,17 @@ async function loadResults({ showErrors = true, facility = "", category = "", de
     }
   }
 
-  return streamFullCheck({ showErrors, facility, category, device, devices });
+  return streamFullCheck({ showErrors, facility, category, deviceType, device, devices });
 }
 
 /**
  * Opens the Server-Sent Events monitoring stream and routes each event to the
  * dashboard renderer. This keeps large inventories responsive because each
  * device result is shown as soon as the backend finishes it.
- * @param {{ showErrors?: boolean, facility?: string, category?: string, device?: object | null, devices?: Array<object>, checkMode?: string }} options Controls whether stream errors are displayed and optional execution scope.
+ * @param {{ showErrors?: boolean, facility?: string, category?: string, deviceType?: string, device?: object | null, devices?: Array<object>, checkMode?: string }} options Controls whether stream errors are displayed and optional execution scope.
  * @returns {Promise<void>} Resolves when the stream completes, reports busy, or fails.
  */
-function streamFullCheck({ showErrors = true, facility = "", category = "", device = null, devices = [], checkMode = getSelectedCheckMode() } = {}) {
+function streamFullCheck({ showErrors = true, facility = "", category = "", deviceType = '', device = null, devices = [], checkMode = getSelectedCheckMode() } = {}) {
   if (activeMonitorStream) {
     lastCheck.textContent = "A monitoring execution is already running.";
     return Promise.resolve();
@@ -348,6 +351,8 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
     if (category) {
       streamParams.set("category", category);
     }
+
+    if (deviceType) streamParams.set('deviceType', deviceType);
 
     if (device?.name) {
       streamParams.set("deviceName", device.name);
@@ -375,14 +380,15 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
       const payload = JSON.parse(event.data);
       activeRunFacility = facility;
       activeRunCategory = category;
+      activeRunDeviceType = deviceType;
       activeRunDeviceName = device?.name || "";
       activeRunDeviceIp = device?.ip || "";
       activeRunFailedIps = new Set(devices.map(scopedDevice => scopedDevice.ip).filter(Boolean));
       activeRunKeepsDashboardStable = Boolean((device || devices.length > 0) && latestResults.length > 0);
       activeRunPreservesDashboard = Boolean(latestResults.length > 0
-        && ((facility || category) || (!device && devices.length === 0 && autoRefreshEnabled)));
+        && ((facility || category || deviceType) || (!device && devices.length === 0 && autoRefreshEnabled)));
       activeRunCheckMode = normalizeCheckMode(payload.checkMode || normalizedCheckMode);
-      resetStreamingDashboard(payload, getExecutionScopeLabel(facility, category, device, devices));
+      resetStreamingDashboard(payload, getExecutionScopeLabel(facility, category, device, devices, deviceType));
     });
 
     source.addEventListener("result", event => {
@@ -408,8 +414,8 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
         renderScopedDevicesPayload(completedPayload, devices);
       } else if (device) {
         renderScopedDevicePayload(completedPayload, device);
-      } else if (facility || category) {
-        renderScopedMonitorPayload(completedPayload, { facility, category });
+      } else if (facility || category || deviceType) {
+        renderScopedMonitorPayload(completedPayload, { facility, category, deviceType });
       } else {
         hasCompletedFullCheck = true;
         expandedFacilityNames.clear();
@@ -419,6 +425,7 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
 
       activeRunFacility = "";
       activeRunCategory = "";
+      activeRunDeviceType = '';
       activeRunDeviceName = "";
       activeRunDeviceIp = "";
       activeRunFailedIps = new Set();
@@ -434,6 +441,7 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
       closeMonitorStream();
       activeRunFacility = "";
       activeRunCategory = "";
+      activeRunDeviceType = '';
       activeRunDeviceName = "";
       activeRunDeviceIp = "";
       activeRunFailedIps = new Set();
@@ -453,7 +461,7 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
       const payload = JSON.parse(event.data);
       handleMonitorStreamFailure(
         payload.message || "Unable to stream monitoring results.",
-        getExecutionScopeLabel(facility, category, device, devices),
+        getExecutionScopeLabel(facility, category, device, devices, deviceType),
         showErrors);
       settled = true;
       resolve();
@@ -464,7 +472,7 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
         return;
       }
 
-      handleMonitorStreamFailure("Unable to stream monitoring results.", getExecutionScopeLabel(facility, category, device, devices), showErrors);
+      handleMonitorStreamFailure("Unable to stream monitoring results.", getExecutionScopeLabel(facility, category, device, devices, deviceType), showErrors);
 
       console.error(error);
       settled = true;
@@ -481,6 +489,7 @@ function handleMonitorStreamFailure(message, scopeLabel, showErrors) {
   closeMonitorStream();
   activeRunFacility = "";
   activeRunCategory = "";
+  activeRunDeviceType = '';
   activeRunDeviceName = "";
   activeRunDeviceIp = "";
   activeRunFailedIps = new Set();
@@ -523,7 +532,7 @@ function renderMonitorPayload(payload) {
   updateProgressPanel(payload.results?.length ?? 0, payload.results?.length ?? 0, "Completed", false);
 }
 
-function renderScopedMonitorPayload(payload, { facility = "", category = "" } = {}) {
+function renderScopedMonitorPayload(payload, { facility = "", category = "", deviceType = '' } = {}) {
   const scopedResults = payload.results ?? [];
   latestResults = mergeScopedResults(latestResults, scopedResults);
   latestCategories = groupResultsByCategory(latestResults);
@@ -535,7 +544,8 @@ function renderScopedMonitorPayload(payload, { facility = "", category = "" } = 
   renderFilteredCategories();
   updateRunFailedButton();
   executionMode.textContent = getDashboardExecutionText(payload.checkMode);
-  lastCheck.textContent = `Last ${[facility, category].filter(Boolean).join(' / ')} execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
+  const scope = [facility, category, deviceType ? dashboardDeviceTypeLabel(deviceType) : ''].filter(Boolean).join(' / ');
+  lastCheck.textContent = `Last ${scope} execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
   updateProgressPanel(scopedResults.length, scopedResults.length, "Completed", false);
   activeRunKeepsDashboardStable = false;
 }
@@ -617,7 +627,7 @@ function renderScopedDevicePayload(payload, requestedDevice) {
 function resetStreamingDashboard(payload, scopeLabel = "") {
   const scopedRun = Boolean(scopeLabel);
   const replacesDashboard = scopedRun
-    && (activeRunFacility || activeRunCategory)
+    && (activeRunFacility || activeRunCategory || activeRunDeviceType)
     && !activeRunDeviceName
     && activeRunFailedIps.size === 0;
   const targetLabel = scopeLabel || "devices";
@@ -1265,6 +1275,10 @@ function createRecentRunRows(rows) {
 
 function getRunScopeLabel(scope) {
   if (!scope) return 'Not recorded';
+  if (scope.deviceType) {
+    const base = getRunScopeLabel({ ...scope, deviceType: null });
+    return `${base} / Device type: ${scope.deviceType}`;
+  }
   if (scope.deviceName) return `Device: ${scope.deviceName}`;
   if (scope.deviceIps?.length) return `Selected devices: ${scope.deviceIps.length}`;
   if (scope.category) return scope.facility ? `${scope.facility} / ${scope.category}` : `Category: ${scope.category}`;
@@ -1720,7 +1734,7 @@ function clearIntegrationsAlert() {
 }
 
 function getVisibleResults() {
-  const dashboardDevices = getDashboardDevices();
+  const dashboardDevices = getDashboardDevices().filter(matchesDashboardDeviceType);
   if (!activeFacility) {
     return dashboardDevices;
   }
@@ -1732,9 +1746,40 @@ function getVisibleResults() {
 
 function getDashboardDevices() {
   if (!dashboardInventoryAvailable) return [];
-  const results = new Map(latestResults.map(result => [createDeviceKey(result), result]));
+  const configured = getConfiguredFacilityDevices();
+  const results = new Map(latestResults.filter(result => result.deviceType).map(result => [createDeviceKey(result), result]));
+  const legacyResults = new Map(latestResults.filter(result => !result.deviceType).map(result => [createDeviceKey(result), result]));
+  const legacyCounts = new Map();
+  for (const device of configured) {
+    const key = createDeviceKey({ ...device, deviceType: null });
+    legacyCounts.set(key, (legacyCounts.get(key) || 0) + 1);
+  }
   // Pending inventory is presentation only; latestResults/history contain measured results only.
-  return getConfiguredFacilityDevices().map(device => ({ ...device, ...results.get(createDeviceKey(device)) }));
+  return configured.map(device => {
+    const legacyKey = createDeviceKey({ ...device, deviceType: null });
+    const result = results.get(createDeviceKey(device))
+      || (legacyCounts.get(legacyKey) === 1 ? legacyResults.get(legacyKey) : null);
+    return { ...device, ...result, deviceType: device.deviceType || 'unspecified' };
+  });
+}
+
+function matchesDashboardDeviceType(device) {
+  return !activeDashboardDeviceType || (device.deviceType || 'unspecified') === activeDashboardDeviceType;
+}
+
+function dashboardDeviceTypeLabel(id) {
+  return configState.deviceTypes?.find(type => type.id === id)?.name || id;
+}
+
+function renderDashboardDeviceTypeOptions() {
+  const types = configState.deviceTypes ?? initialDeviceTypes;
+  dashboardDeviceTypeSelect.innerHTML = '<option value="">All device types</option>' + types.map(type =>
+    `<option value="${escapeAttribute(type.id)}">${escapeHtml(type.name)}</option>`).join('');
+  if (activeDashboardDeviceType && !types.some(type => type.id === activeDashboardDeviceType)) {
+    dashboardDeviceTypeSelect.add(new Option(`Unavailable type: ${activeDashboardDeviceType}`, activeDashboardDeviceType));
+  }
+  dashboardDeviceTypeSelect.value = activeDashboardDeviceType;
+  dashboardDeviceTypeSelect.disabled = !dashboardInventoryAvailable || Boolean(activeMonitorStream);
 }
 
 function filterCategories(categories) {
@@ -1775,7 +1820,10 @@ function matchesSearch(device, search) {
 
 function renderFacilityTabs() {
   const facilitySource = getDashboardDevices();
-  const facilitySummaries = getFacilitySummaries(facilitySource);
+  const typedSource = facilitySource.filter(matchesDashboardDeviceType);
+  const typedSummaries = new Map(getFacilitySummaries(typedSource).map(facility => [facility.name, facility]));
+  const facilitySummaries = getFacilitySummaries(facilitySource).map(facility => typedSummaries.get(facility.name)
+    || { ...facility, totalDevices: 0, onlineDevices: 0, pendingDevices: 0, problemDevices: 0 });
 
   if (!facilitySummaries.some(facility => facility.name === activeFacility)) {
     activeFacility = "";
@@ -1785,7 +1833,8 @@ function renderFacilityTabs() {
   activeFacilityLabel.textContent = activeFacility
     ? `Showing ${activeFacility}`
     : "Showing all facilities";
-  runFacilityCheckButton.disabled = !dashboardInventoryAvailable;
+  runFacilityCheckButton.disabled = !dashboardInventoryAvailable || Boolean(activeMonitorStream)
+    || !typedSource.some(device => !activeFacility || device.facility === activeFacility);
   runFacilityCheckButton.title = activeFacility
     ? `Run checks for ${activeFacility}`
     : "Run checks for all facilities";
@@ -1797,10 +1846,10 @@ function renderFacilityTabs() {
     renderFacilityButton({
       name: "",
       label: "All Facilities",
-      totalDevices: facilitySource.length,
-      onlineDevices: facilitySource.filter(device => device.isOnline).length,
-      pendingDevices: facilitySource.filter(device => device.status === 'Pending').length,
-      problemDevices: facilitySource.filter(device => device.status === "Degraded" || device.status === "Down").length
+      totalDevices: typedSource.length,
+      onlineDevices: typedSource.filter(device => device.isOnline).length,
+      pendingDevices: typedSource.filter(device => device.status === 'Pending').length,
+      problemDevices: typedSource.filter(device => device.status === "Degraded" || device.status === "Down").length
     }, !hasActiveFacility),
     ...facilitySummaries.map(facility => renderFacilityButton(facility, facility.name === activeFacility))
   ].join("");
@@ -1845,7 +1894,8 @@ function getFacilitySummaries(results) {
 }
 
 function renderFacilityButton(facility, isActive) {
-  const problemClass = facility.problemDevices > 0 ? 'facility-tab-problem' : facility.pendingDevices > 0 ? 'facility-tab-pending' : 'facility-tab-healthy';
+  const problemClass = facility.problemDevices > 0 ? 'facility-tab-problem'
+    : !facility.totalDevices || facility.pendingDevices > 0 ? 'facility-tab-pending' : 'facility-tab-healthy';
   const activeClass = isActive ? "active" : "";
   const value = facility.name || "";
 
@@ -2087,7 +2137,8 @@ function renderRow(result) {
   const hasPingCheck = Boolean(pingCheck);
   const isPingAvailable = Boolean(pingCheck?.isAvailable);
   const isRunningDevice = isActiveRunDevice(result);
-  const isRunningFailedDevice = activeRunFailedIps.has(result.ip);
+  const isRunningFailedDevice = activeRunFailedIps.has(result.ip)
+    && (!activeRunDeviceType || (result.deviceType || 'unspecified') === activeRunDeviceType);
   const statusClass = isPending || !hasPingCheck ? "text-bg-secondary" : isPingAvailable ? "text-bg-success" : "text-bg-danger";
   const statusIcon = isPending ? 'fa-clock' : !hasPingCheck ? "fa-minus" : isPingAvailable ? "fa-check" : "fa-xmark";
   const statusText = isPending && hasPingCheck ? 'Not checked' : isPingAvailable
@@ -2098,7 +2149,7 @@ function renderRow(result) {
     : "No ping check is configured for this device.";
 
   return `
-    <tr data-dashboard-device="${escapeAttribute(result.name)}">
+    <tr data-dashboard-device="${escapeAttribute(result.name)}" data-device-type="${escapeAttribute(result.deviceType || 'unspecified')}">
       <td class="fw-semibold">
         <div>${escapeHtml(result.name)}</div>
         ${renderDeviceLocation(result)}
@@ -2136,6 +2187,7 @@ function renderDeviceRunButton(result, isRunning = false) {
       ${isRunning || activeMonitorStream ? "disabled" : ""}
       data-run-device-name="${escapeHtml(result.name)}"
       data-run-device-ip="${escapeHtml(result.ip)}"
+      data-run-device-type="${escapeAttribute(result.deviceType || 'unspecified')}"
       data-run-device-facility="${escapeHtml(result.facility || "")}"
       data-run-device-category="${escapeHtml(result.category || "")}">
       ${isRunning
@@ -2148,6 +2200,7 @@ function isActiveRunDevice(result) {
   return Boolean(activeRunDeviceName && activeRunDeviceIp)
     && result.name === activeRunDeviceName
     && result.ip === activeRunDeviceIp
+    && (!activeRunDeviceType || (result.deviceType || 'unspecified') === activeRunDeviceType)
     && (!activeRunFacility || activeRunFacility === (result.facility || "Unassigned"));
 }
 
@@ -2537,7 +2590,7 @@ async function runFacilityCheck(facility = "") {
   setDashboardRunButtonsDisabled(true);
 
   try {
-    await loadResults({ facility: facility || "" });
+    await loadResults({ facility: facility || "", deviceType: activeDashboardDeviceType });
   } finally {
     activeRunFacility = previousRunFacility;
     if (isSelectedFacilityRun) {
@@ -2572,7 +2625,7 @@ async function runGroupCheck(category, facility = activeFacility) {
   setDashboardRunButtonsDisabled(true);
 
   try {
-    await loadResults({ facility, category });
+    await loadResults({ facility, category, deviceType: activeDashboardDeviceType });
   } finally {
     activeRunFacility = previousRunFacility;
     setButtonLoading(runGroupCheckButton, runGroupCheckSpinner, runGroupCheckIcon, false);
@@ -2589,6 +2642,7 @@ async function runDeviceCheck(device) {
   }
 
   activeRunDeviceName = device.name;
+  activeRunDeviceType = device.deviceType || 'unspecified';
   activeRunDeviceIp = device.ip;
   activeRunFacility = device.facility || "";
   runFacilityCheckButton.disabled = true;
@@ -2598,9 +2652,10 @@ async function runDeviceCheck(device) {
   setOtherDashboardRunButtonsDisabled(true, device);
 
   try {
-    await loadResults({ facility: device.facility || "", category: device.category || '', device });
+    await loadResults({ facility: device.facility || "", category: device.category || '', deviceType: device.deviceType || 'unspecified', device });
   } finally {
     activeRunDeviceName = "";
+    activeRunDeviceType = '';
     activeRunDeviceIp = "";
     activeRunFacility = "";
     runFacilityCheckButton.disabled = false;
@@ -2627,7 +2682,7 @@ async function runFailedChecks() {
   setOtherDashboardRunButtonsDisabled(true);
 
   try {
-    await loadResults({ devices: failedDevices });
+    await loadResults({ devices: failedDevices, facility: activeFacility, deviceType: activeDashboardDeviceType });
   } finally {
     activeRunFailedIps = new Set();
     setButtonLoading(runFailedCheckButton, runFailedCheckSpinner, runFailedCheckIcon, false);
@@ -2788,6 +2843,7 @@ function applyConfigPayload(payload) {
   dashboardInventoryAvailable = true;
   configState.peripheralCatalog ??= [];
   configState.deviceTypes ??= initialDeviceTypes.map(type => ({ ...type }));
+  renderDashboardDeviceTypeOptions();
   configState.settings ??= {
     intervalSeconds: defaultAutoFullCheckIntervalSeconds,
     timeoutMs: 1000,
@@ -2866,6 +2922,7 @@ async function refreshDashboardFromActiveRegion() {
 async function loadDashboardGroups({ resetResults = false } = {}) {
   dashboardInventoryAvailable = false;
   runFacilityCheckButton.disabled = true;
+  dashboardDeviceTypeSelect.disabled = true;
   runGroupCheckButton.disabled = true;
   renderGroupCheckOptions([]);
   facilityTabs.innerHTML = '';
@@ -2916,7 +2973,7 @@ function renderGroupCheckOptions(devices, { preserveSelection = false } = {}) {
     : devices ?? [];
   const categories = Array.from(new Set(
     scopedDevices
-      .filter(device => device.enabled !== false)
+      .filter(device => device.enabled !== false && matchesDashboardDeviceType(device))
       .map(device => device.category || "Uncategorized")))
     .sort((left, right) => left.localeCompare(right));
 
@@ -2928,11 +2985,13 @@ function renderGroupCheckOptions(devices, { preserveSelection = false } = {}) {
 }
 
 function updateDashboardFilterReset() {
-  clearDashboardFiltersButton.disabled = !activeFacility && !activeSearch.trim() && activeFilter === 'all' && !groupCheckSelect.value;
+  clearDashboardFiltersButton.disabled = !activeFacility && !activeDashboardDeviceType && !activeSearch.trim() && activeFilter === 'all' && !groupCheckSelect.value;
 }
 
 function clearDashboardFilters() {
   activeFacility = '';
+  activeDashboardDeviceType = '';
+  dashboardDeviceTypeSelect.value = '';
   activeSearch = '';
   activeFilter = 'all';
   searchInput.value = '';
@@ -3588,7 +3647,8 @@ function createDeviceKey(device) {
     device.facility || "Unassigned",
     device.category || "Uncategorized",
     device.name || "",
-    device.ip || ""
+    device.ip || "",
+    device.deviceType || 'unspecified'
   ].join("\u001f").toLowerCase();
 }
 
@@ -3824,6 +3884,10 @@ function revealSavedDashboardDevice() {
   const device = getDashboardDevices().find(entry => createDeviceKey(entry) === target.key);
   if (!device) return;
   if (activeFacility && activeFacility !== device.facility) activeFacility = '';
+  if (!matchesDashboardDeviceType(device)) {
+    activeDashboardDeviceType = '';
+    dashboardDeviceTypeSelect.value = '';
+  }
   if (!matchesSearch(device, activeSearch.trim().toLowerCase())) {
     activeSearch = '';
     searchInput.value = '';
@@ -4371,6 +4435,9 @@ function resetDashboardViewState() {
   activeSearch = "";
   activeFilter = "all";
   activeFacility = "";
+  activeDashboardDeviceType = '';
+  activeRunDeviceType = '';
+  dashboardDeviceTypeSelect.value = '';
   activeRunCategory = "";
   activeRunDeviceName = "";
   activeRunDeviceIp = "";
@@ -4540,6 +4607,7 @@ function setButtonLoading(button, spinner, icon, isLoading) {
 }
 
 function setDashboardRunButtonsDisabled(isDisabled) {
+  if (!isDisabled) renderFacilityTabs();
   resultsBody
     .querySelectorAll("[data-run-facility-only], [data-run-category], [data-run-device-name]")
     .forEach(button => {
@@ -4548,12 +4616,14 @@ function setDashboardRunButtonsDisabled(isDisabled) {
 }
 
 function setOtherDashboardRunButtonsDisabled(isDisabled, activeDevice = null) {
+  if (!isDisabled) renderFacilityTabs();
   resultsBody
     .querySelectorAll("[data-run-facility-only], [data-run-category], [data-run-device-name]")
     .forEach(button => {
       const isActiveDeviceButton = activeDevice
         && button.dataset.runDeviceName === activeDevice.name
-        && button.dataset.runDeviceIp === activeDevice.ip;
+        && button.dataset.runDeviceIp === activeDevice.ip
+        && button.dataset.runDeviceType === (activeDevice.deviceType || 'unspecified');
 
       if (!isActiveDeviceButton) {
         button.disabled = isDisabled;
@@ -4561,7 +4631,7 @@ function setOtherDashboardRunButtonsDisabled(isDisabled, activeDevice = null) {
     });
 }
 
-function getExecutionScopeLabel(facility, category, device, devices = []) {
+function getExecutionScopeLabel(facility, category, device, devices = [], deviceType = '') {
   if (devices.length > 0) {
     return "failed devices";
   }
@@ -4569,6 +4639,8 @@ function getExecutionScopeLabel(facility, category, device, devices = []) {
   if (device?.name) {
     return `device ${device.name}`;
   }
+
+  if (deviceType) return `${[facility, category, dashboardDeviceTypeLabel(deviceType)].filter(Boolean).join(' / ')} devices`;
 
   if (facility && category) {
     return `${facility} / ${category} devices`;
@@ -4609,6 +4681,7 @@ function getDashboardExecutionText(checkMode = getSelectedCheckMode()) {
 }
 
 function setCheckModeInputsDisabled(isDisabled) {
+  dashboardDeviceTypeSelect.disabled = isDisabled || !dashboardInventoryAvailable;
   checkModeInputs.forEach(input => {
     input.disabled = isDisabled;
   });
@@ -4734,6 +4807,12 @@ groupCheckSelect.addEventListener("change", () => {
   runGroupCheckButton.disabled = !groupCheckSelect.value;
   updateDashboardFilterReset();
 });
+dashboardDeviceTypeSelect.addEventListener('change', event => {
+  activeDashboardDeviceType = event.target.value;
+  renderGroupCheckOptions(configState.devices, { preserveSelection: true });
+  renderFilteredCategories();
+  updateRunFailedButton();
+});
 clearDashboardFiltersButton.addEventListener('click', clearDashboardFilters);
 facilityTabs.addEventListener("click", event => {
   const facilityButton = event.target.closest("[data-facility-filter]");
@@ -4800,7 +4879,8 @@ resultsBody.addEventListener("click", event => {
       name: runDeviceButton.dataset.runDeviceName,
       ip: runDeviceButton.dataset.runDeviceIp,
       facility: runDeviceButton.dataset.runDeviceFacility,
-      category: runDeviceButton.dataset.runDeviceCategory
+      category: runDeviceButton.dataset.runDeviceCategory,
+      deviceType: runDeviceButton.dataset.runDeviceType || 'unspecified'
     });
     return;
   }

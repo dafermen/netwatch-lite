@@ -197,7 +197,13 @@ added to the existing full-theme/configuration replacement endpoints.
 | POST | `/api/errors/clear` | Clear the local error file. |
 
 Monitor endpoints accept `checkMode=Full` or `checkMode=PingOnly`. The stream
-also supports facility, category, device name, and repeated device IP filters.
+also supports `facility`, `category`, `deviceName`, repeated `deviceIp` and optional
+`deviceType=<catalog-id>` filters. These intersect before probes execute. Unknown
+type IDs match zero devices rather than expanding scope. New results include the
+captured `deviceType`; type-filtered history scope records it too. Null legacy
+values remain omitted, and no history/database migration is performed. Requests
+without the parameter retain their previous/global behavior. See
+[Dashboard filter scope](DASHBOARD_FILTERS.md).
 Full executes configured HTTP checks as well as ping/TCP. PingOnly skips HTTP.
 HTTP entries in `checks` add nullable `url` (without query/fragment),
 `statusCode`, `expectedStatusCode`, `timeoutMs`, `durationMs` and `message`.

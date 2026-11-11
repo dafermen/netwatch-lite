@@ -92,6 +92,10 @@ public sealed class MonitorHistoryScope
     /// </summary>
     public string? Category { get; init; }
 
+    /// <summary>Requested classification ID, or null for all types and legacy executions.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? DeviceType { get; init; }
+
     /// <summary>
     /// Device name requested by the user, or null for multiple devices.
     /// </summary>
