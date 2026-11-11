@@ -11,7 +11,10 @@ gates are in [ROADMAP.md](ROADMAP.md); queued work is not implemented work.
 ## IMP-007 - Dashboard Device Type Filter
 
 - Authorized: 2026-11-11, including GitHub source and new portable publication.
-- Status: Implemented; full validation and delivery in progress.
+- Status: Completed 2026-11-11; 373 .NET/356 browser passes and native rc.13
+  folder/ZIP/SHA validated. Source and prerelease are published, all four remote
+  CI jobs passed and the downloaded ZIP/checksum matched. Other-PC acceptance
+  remains pending.
 - Scope: Catalog-backed selector before Category, read-only view filtering and
   server-enforced scoped executions, exact typed identities and Clear filters.
 - Compatibility: No schema migration, no old-history rewrite, no automatic checks

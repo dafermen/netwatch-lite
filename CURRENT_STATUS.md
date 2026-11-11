@@ -4,9 +4,9 @@ Last updated: 2026-11-11
 
 ## Dashboard Device Type And GitHub Delivery - 2026-11-11
 
-IN PROGRESS: implement Device Type before Category, test complete regressions,
-update documentation, generate immutable rc.13 ZIP/SHA/folder and publish reviewed
-public source plus prerelease artifacts to GitHub. The owner explicitly authorized
+COMPLETE: Dashboard Device Type, complete local/remote regression, documentation
+and immutable rc.13 folder/ZIP/SHA delivery. Source is published to main and the
+prerelease is public with a verified download. The owner explicitly authorized
 publication for this delivery, superseding the older hold below. Never upload
 private DB/JSON, backups, pilot evidence or copied operational inventories.
 
@@ -16,8 +16,8 @@ conflicts retained both navigation updates and later product guides; no remote
 history was overwritten. The original published releases/ ZIPs remain unchanged.
 The new public changes passed path/credential checks before remote publication.
 
-Backend type-scoped checks and typed results/history scope are implemented;
-12 focused .NET cases passed for SQLite/JSON, including same-name/address types,
+Backend type-scoped checks and typed results/history scope are implemented.
+An initial 12 focused .NET cases passed for SQLite/JSON, including same-name/address types,
 legacy unspecified devices, unknown types and global runs. A backed-up source
 restart now serves rc.13 / PID 34240 on port 5000. All document bytes, eight APIs
 and original Data JSON matched; no schema migration or stale JSON import occurred.
@@ -40,9 +40,41 @@ failures, skips or retries. Desktop/mobile screenshots were reviewed, including
 relative links across 60 Markdown files passed the final static checks.
 The historical/original-data hash baseline contains 4922 entries. Live verification
 matched eight operational APIs and five served assets; source remains PID 34240,
-rc.13, SQLite schema 2 on port 5000. Next: native packaging, GitHub publication/CI
-and final artifact checks. Older status and holds are historical; this is not
-stable-deployment approval.
+rc.13, SQLite schema 2 on port 5000. Next: operator/other-PC acceptance and the
+remaining stable-deployment gates. Older status and holds are historical;
+this is not stable-deployment approval.
+
+Immutable rc.13 delivery (source commit `8ceaaf8680ceb73edfa4e8d040654d7108a7fa50`,
+clean tree, already pushed normally to main):
+
+- Folder: `artifacts/portable/NetWatch-Lite-v0.8.0-rc.13-win-x64/`.
+- ZIP: `artifacts/packages/NetWatch-Lite-v0.8.0-rc.13-win-x64.zip` and adjacent SHA sidecar.
+- ZIP bytes: 47472644; 423 package files and 79 public assets.
+- SHA-256: `8f80303123128e2ab0195eb444ed619efc5379ed17932a20b3abf8c02ea09ad5`.
+
+Generation/final ZIP/folder-copy each passed 26 routes/eight negative checks,
+neutral SQLite startup and unchanged artifact bytes on PowerShell 5.1/7.
+Receipts: `49f3783888f64ac3ac96faa9b216595d`,
+`c83a1a35eb6d47aa832fd0b79b5ea1df`, `67509f8564ee4a518f1459c7fdc71adc`.
+Four additional native EXE scope cases passed (Workstation/Server, unknown type,
+global), with unchanged synthetic inventory and ZIP. Receipt under this task's
+evidence root: `native-scope-b8b39a01af9d4351800dce8512486950/`.
+`package-audit.json` confirmed all 4922 protected historical/original files,
+15 original Data JSON, 79 build-time source matches, manifest/checksum and no lock.
+The archive is a frozen build-time checkpoint; these final receipts do not rewrite it.
+GitHub assets report the same SHA/size and exact source commit. Remote CI:
+[run 43067504093](https://github.com/dafermen/netwatch-lite/actions/runs/43067504093)
+passed all four jobs: validate, portable-validation and both browser providers.
+Public release: [v0.8.0-rc.13](https://github.com/dafermen/netwatch-lite/releases/tag/v0.8.0-rc.13).
+The downloaded ZIP and SHA sidecar matched the local files exactly; receipts:
+`github-ci.json`, `github-release.json`, `github-download.json` under this task's
+evidence root. The existing latest stable v0.6.2 was not replaced. No GitHub Pages
+or separately hosted backend deployment was performed.
+The final receipt commit is documentation-only, intentionally skips redundant CI
+and does not change runtime code/workflows or retag/repack the tested commit.
+GitHub reports that checkout/setup-dotnet/setup-node/upload-artifact v4 target
+deprecated Node 20 and are forced onto Node 24. Refresh these action references in
+a separately validated maintenance change; this warning is not a test failure.
 
 ## URL CRUD Visibility - 2026-11-11
 

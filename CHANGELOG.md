@@ -1,6 +1,6 @@
 # Changelog
 
-## Dashboard Device Type Filter - 2026-11-11
+## Dashboard Device Type Filter And Portable 0.8.0-rc.13 - 2026-11-11
 
 - Added a catalog-backed Device Type selector before Category, combining with
   Facility, search and status without saving data or running checks on selection.
@@ -15,6 +15,11 @@
 - Source validation passed 373 .NET and 356 desktop/mobile browser cases across
   SQLite/JSON, plus four monitoring and six storage sampled mutations. Updated
   CI, current portable instructions and matching-backend deployment guidance.
+- Generated immutable rc.13 folder/ZIP/SHA from clean commit 8ceaaf8; native
+  checks and historical/privacy audits passed. Published the GitHub prerelease
+  after all four CI jobs passed; downloaded ZIP/checksum match the local files.
+  Publication receipts live
+  in the validation guide and CURRENT_STATUS, without rewriting the archive.
 
 ## URL Editing Visibility And Portable 0.8.0-rc.12 - 2026-11-11
 

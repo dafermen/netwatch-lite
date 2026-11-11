@@ -50,6 +50,41 @@ publication are pending at this build-time checkpoint. Final receipts must be
 recorded without overwriting historical folders or ZIPs. No checks or test writes
 target operational inventory.
 
+## Native Portable Receipts
+
+Source commit: `8ceaaf8680ceb73edfa4e8d040654d7108a7fa50`, clean tree. Native
+rc.13 includes 423 files/79 public assets; ZIP size is 47472644 bytes and SHA-256
+is `8f80303123128e2ab0195eb444ed619efc5379ed17932a20b3abf8c02ea09ad5`.
+Generation (PowerShell 5.1), final ZIP (7) and folder-copy (5.1) passed 26 HTTP
+routes/eight negative checks, neutral schema-2 startup and unchanged artifact
+bytes. Receipts under artifacts/verification/: `49f3783888f64ac3ac96faa9b216595d`,
+`c83a1a35eb6d47aa832fd0b79b5ea1df`, `67509f8564ee4a518f1459c7fdc71adc`.
+
+The native EXE also passed four isolated scope cases: two same-name/address
+devices remain separated by type/Facility, unknown type matches zero, global
+matches all three synthetic devices. Inventory and ZIP stayed unchanged;
+receipt: `native-scope-b8b39a01af9d4351800dce8512486950/` under this task's root.
+`package-audit.json` confirms 4922 protected files (15 original Data JSON), all
+79 build-time source matches, neutral package policy, checksum and no publisher
+lock. Archive documentation remains frozen; later delivery receipts do not
+rewrite its folder, ZIP or manifest. Source was pushed normally to main and
+the new GitHub prerelease draft has matching asset hashes, sizes and source SHA.
+These native receipts supersede the pending package checks in the frozen
+build-time checkpoint above.
+
+## GitHub Delivery
+
+Published [v0.8.0-rc.13](https://github.com/dafermen/netwatch-lite/releases/tag/v0.8.0-rc.13)
+as a prerelease targeting the exact clean source commit above. All four jobs in
+[CI run 43067504093](https://github.com/dafermen/netwatch-lite/actions/runs/43067504093)
+passed: .NET/guards/mutations, portable validation, browser JSON and browser SQLite.
+The public ZIP/checksum were downloaded into a new verification folder and matched
+the local bytes, 47472644-byte size and recorded SHA-256. GitHub asset digests also
+match. Receipts: `github-ci.json`, `github-release.json`, `github-download.json`.
+Latest stable v0.6.2 remains unchanged; no Pages or hosted-backend deployment ran.
+The subsequent receipt-only documentation commit skips redundant CI, with no
+runtime/workflow changes. The release stays frozen at the fully tested commit.
+
 ## Publication Boundaries
 
 Preserve upstream Git history: source had uncommitted validated rc.12 work and
