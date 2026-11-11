@@ -10,7 +10,6 @@ namespace NetWatch.Services;
 /// </summary>
 public sealed class JsonMonitorHistoryRepository
 {
-    private const int MaxStoredRuns = 500;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -23,6 +22,8 @@ public sealed class JsonMonitorHistoryRepository
 
     private readonly IWebHostEnvironment _environment;
     private readonly NetworkMonitorOptions _options;
+    private readonly LocalDataStore _storage;
+    private readonly StorageOperations? _operations;
     private readonly SemaphoreSlim _historyLock = new(1, 1);
 
     /// <summary>
@@ -30,12 +31,18 @@ public sealed class JsonMonitorHistoryRepository
     /// </summary>
     /// <param name="environment">ASP.NET Core hosting environment used to resolve relative file paths.</param>
     /// <param name="options">Network monitor options containing the history file path.</param>
+    /// <param name="storage">Shared JSON/SQLite persistence adapter; JSON when omitted by legacy callers.</param>
+    /// <param name="operations">Optional global retention and archive operations.</param>
     public JsonMonitorHistoryRepository(
         IWebHostEnvironment environment,
-        IOptions<NetworkMonitorOptions> options)
+        IOptions<NetworkMonitorOptions> options,
+        LocalDataStore? storage = null,
+        StorageOperations? operations = null)
     {
         _environment = environment;
         _options = options.Value;
+        _storage = storage ?? new LocalDataStore(environment, Options.Create(new StorageOptions { Provider = "json" }));
+        _operations = operations;
     }
 
     /// <summary>
@@ -93,10 +100,13 @@ public sealed class JsonMonitorHistoryRepository
 
             store.Runs.Add(run);
 
-            if (store.Runs.Count > MaxStoredRuns)
-            {
-                store.Runs.RemoveRange(0, store.Runs.Count - MaxStoredRuns);
-            }
+            var policy = _operations is null ? new StoragePolicy() : await _operations.GetPolicyAsync(cancellationToken);
+            var cutoff = DateTimeOffset.UtcNow.AddDays(-policy.HistoryMaxAgeDays);
+            var removed = store.Runs.Where(item => policy.HistoryMaxAgeDays > 0 && item.CompletedAt < cutoff).ToList();
+            var retained = store.Runs.Except(removed).ToList();
+            removed.AddRange(retained.Take(Math.Max(0,retained.Count-policy.HistoryMaxRuns)));
+            if (policy.ExportBeforePrune && _operations is not null) await _operations.ArchiveAsync(removed,cancellationToken);
+            store.Runs.RemoveAll(removed.Contains);
 
             await SaveAsync(store, cancellationToken);
             return run;
@@ -169,7 +179,7 @@ public sealed class JsonMonitorHistoryRepository
     {
         var filePath = ResolveHistoryFilePath();
 
-        if (!File.Exists(filePath))
+        if (!_storage.Exists(filePath))
         {
             var empty = new MonitorHistoryStore();
             await SaveAsync(empty, cancellationToken);
@@ -178,7 +188,7 @@ public sealed class JsonMonitorHistoryRepository
 
         try
         {
-            await using var stream = File.OpenRead(filePath);
+            await using var stream = _storage.OpenRead(filePath);
             return await JsonSerializer.DeserializeAsync<MonitorHistoryStore>(stream, JsonOptions, cancellationToken)
                 ?? new MonitorHistoryStore();
         }
@@ -198,11 +208,10 @@ public sealed class JsonMonitorHistoryRepository
             Directory.CreateDirectory(directory);
         }
 
-        await using var stream = File.Create(filePath);
-        await JsonSerializer.SerializeAsync(stream, store, JsonOptions, cancellationToken);
+        await _storage.WriteJsonAsync(filePath, store, JsonOptions, cancellationToken);
     }
 
-    private string ResolveHistoryFilePath()
+    internal string ResolveHistoryFilePath()
     {
         if (Path.IsPathRooted(_options.HistoryFilePath))
         {
@@ -211,14 +220,14 @@ public sealed class JsonMonitorHistoryRepository
 
         var contentRootPath = Path.Combine(_environment.ContentRootPath, _options.HistoryFilePath);
 
-        if (File.Exists(contentRootPath))
+        if (_storage.Exists(contentRootPath))
         {
             return contentRootPath;
         }
 
         var developmentDataPath = Path.Combine(_environment.ContentRootPath, "Data", _options.HistoryFilePath);
 
-        if (File.Exists(developmentDataPath))
+        if (_storage.Exists(developmentDataPath))
         {
             return developmentDataPath;
         }
@@ -231,6 +240,6 @@ public sealed class JsonMonitorHistoryRepository
     private static string CreateRunId(DateTimeOffset completedAt, string checkMode)
     {
         var timestamp = completedAt.UtcDateTime.ToString("yyyyMMdd-HHmmss-fff");
-        return $"{timestamp}-{checkMode.ToLowerInvariant()}";
+        return $"{timestamp}-{checkMode.ToLowerInvariant()}-{Guid.NewGuid():N}";
     }
 }

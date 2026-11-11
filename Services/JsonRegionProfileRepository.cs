@@ -24,6 +24,7 @@ public sealed class JsonRegionProfileRepository
 
     private readonly IWebHostEnvironment _environment;
     private readonly NetworkMonitorOptions _options;
+    private readonly LocalDataStore _storage;
     private readonly SemaphoreSlim _profileLock = new(1, 1);
     private RegionProfileConfiguration? _configuration;
 
@@ -32,12 +33,15 @@ public sealed class JsonRegionProfileRepository
     /// </summary>
     /// <param name="environment">ASP.NET Core hosting environment used to resolve runtime data paths.</param>
     /// <param name="options">Network monitor options bound from appsettings.json.</param>
+    /// <param name="storage">Shared JSON/SQLite persistence adapter; JSON when omitted by legacy callers.</param>
     public JsonRegionProfileRepository(
         IWebHostEnvironment environment,
-        IOptions<NetworkMonitorOptions> options)
+        IOptions<NetworkMonitorOptions> options,
+        LocalDataStore? storage = null)
     {
         _environment = environment;
         _options = options.Value;
+        _storage = storage ?? new LocalDataStore(environment, Options.Create(new StorageOptions { Provider = "json" }));
     }
 
     /// <summary>
@@ -51,7 +55,15 @@ public sealed class JsonRegionProfileRepository
 
         try
         {
-            return await LoadConfigurationUnsafeAsync(cancellationToken);
+            return await _storage.WithTransactionAsync(async () =>
+            {
+                return await LoadConfigurationUnsafeAsync(cancellationToken);
+            }, cancellationToken);
+        }
+        catch
+        {
+            _configuration = null;
+            throw;
         }
         finally
         {
@@ -70,11 +82,19 @@ public sealed class JsonRegionProfileRepository
 
         try
         {
-            var configuration = await LoadConfigurationUnsafeAsync(cancellationToken);
-            var profile = configuration.Profiles.First(current =>
-                string.Equals(current.Id, configuration.ActiveProfileId, StringComparison.OrdinalIgnoreCase));
+            return await _storage.WithTransactionAsync(async () =>
+            {
+                var configuration = await LoadConfigurationUnsafeAsync(cancellationToken);
+                var profile = configuration.Profiles.First(current =>
+                    string.Equals(current.Id, configuration.ActiveProfileId, StringComparison.OrdinalIgnoreCase));
 
-            return ResolveProfileDeviceFilePath(profile.File);
+                return ResolveProfileDeviceFilePath(profile.File);
+            }, cancellationToken);
+        }
+        catch
+        {
+            _configuration = null;
+            throw;
         }
         finally
         {
@@ -93,9 +113,17 @@ public sealed class JsonRegionProfileRepository
 
         try
         {
-            var configuration = await LoadConfigurationUnsafeAsync(cancellationToken);
-            return configuration.Profiles.First(current =>
-                string.Equals(current.Id, configuration.ActiveProfileId, StringComparison.OrdinalIgnoreCase));
+            return await _storage.WithTransactionAsync(async () =>
+            {
+                var configuration = await LoadConfigurationUnsafeAsync(cancellationToken);
+                return configuration.Profiles.First(current =>
+                    string.Equals(current.Id, configuration.ActiveProfileId, StringComparison.OrdinalIgnoreCase));
+            }, cancellationToken);
+        }
+        catch
+        {
+            _configuration = null;
+            throw;
         }
         finally
         {
@@ -115,23 +143,31 @@ public sealed class JsonRegionProfileRepository
 
         try
         {
-            var configuration = await LoadConfigurationUnsafeAsync(cancellationToken);
-            var profile = configuration.Profiles.FirstOrDefault(current =>
-                string.Equals(current.Id, profileId, StringComparison.OrdinalIgnoreCase));
-
-            if (profile is null)
+            return await _storage.WithTransactionAsync(async () =>
             {
-                throw new InvalidDataException("Region profile was not found.");
-            }
+                var configuration = await LoadConfigurationUnsafeAsync(cancellationToken);
+                var profile = configuration.Profiles.FirstOrDefault(current =>
+                    string.Equals(current.Id, profileId, StringComparison.OrdinalIgnoreCase));
 
-            var updated = new RegionProfileConfiguration
-            {
-                ActiveProfileId = profile.Id,
-                Profiles = configuration.Profiles
-            };
+                if (profile is null)
+                {
+                    throw new InvalidDataException("Region profile was not found.");
+                }
 
-            await SaveConfigurationUnsafeAsync(updated, cancellationToken);
-            return updated;
+                var updated = new RegionProfileConfiguration
+                {
+                    ActiveProfileId = profile.Id,
+                    Profiles = configuration.Profiles
+                };
+
+                await SaveConfigurationUnsafeAsync(updated, cancellationToken);
+                return updated;
+            }, cancellationToken);
+        }
+        catch
+        {
+            _configuration = null;
+            throw;
         }
         finally
         {
@@ -153,47 +189,55 @@ public sealed class JsonRegionProfileRepository
 
         try
         {
-            var configuration = await LoadConfigurationUnsafeAsync(cancellationToken);
-            var name = NormalizeRequiredText(request.Name, "Support group name");
-            var region = NormalizeOptionalText(request.Region) ?? DefaultRegionName;
-            var id = CreateUniqueProfileId(name, configuration.Profiles);
-            var file = $"regions/{id}.json";
-            var filePath = ResolveProfileDeviceFilePath(file);
-
-            if (request.CopyFromActive)
+            return await _storage.WithTransactionAsync(async () =>
             {
-                var activeProfile = configuration.Profiles.First(current =>
-                    string.Equals(current.Id, configuration.ActiveProfileId, StringComparison.OrdinalIgnoreCase));
-                var activePath = ResolveProfileDeviceFilePath(activeProfile.File);
-                if (File.Exists(activePath))
+                var configuration = await LoadConfigurationUnsafeAsync(cancellationToken);
+                var name = NormalizeRequiredText(request.Name, "Support group name");
+                var region = NormalizeOptionalText(request.Region) ?? DefaultRegionName;
+                var id = CreateUniqueProfileId(name, configuration.Profiles);
+                var file = $"regions/{id}.json";
+                var filePath = ResolveProfileDeviceFilePath(file);
+
+                if (request.CopyFromActive)
+                {
+                    var activeProfile = configuration.Profiles.First(current =>
+                        string.Equals(current.Id, configuration.ActiveProfileId, StringComparison.OrdinalIgnoreCase));
+                    var activePath = ResolveProfileDeviceFilePath(activeProfile.File);
+                    if (_storage.Exists(activePath))
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+                        await _storage.CopyAsync(activePath, filePath, overwrite: false, cancellationToken);
+                    }
+                }
+
+                if (!_storage.Exists(filePath))
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
-                    File.Copy(activePath, filePath, overwrite: false);
+                    await _storage.WriteTextAsync(filePath, CreateStarterConfigurationJson(region, name), cancellationToken);
                 }
-            }
 
-            if (!File.Exists(filePath))
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
-                await File.WriteAllTextAsync(filePath, CreateStarterConfigurationJson(region, name), cancellationToken);
-            }
+                configuration.Profiles.Add(new RegionProfile
+                {
+                    Id = id,
+                    Name = name,
+                    Region = region,
+                    File = file
+                });
 
-            configuration.Profiles.Add(new RegionProfile
-            {
-                Id = id,
-                Name = name,
-                Region = region,
-                File = file
-            });
+                var updated = new RegionProfileConfiguration
+                {
+                    ActiveProfileId = id,
+                    Profiles = SortProfiles(configuration.Profiles)
+                };
 
-            var updated = new RegionProfileConfiguration
-            {
-                ActiveProfileId = id,
-                Profiles = SortProfiles(configuration.Profiles)
-            };
-
-            await SaveConfigurationUnsafeAsync(updated, cancellationToken);
-            return updated;
+                await SaveConfigurationUnsafeAsync(updated, cancellationToken);
+                return updated;
+            }, cancellationToken);
+        }
+        catch
+        {
+            _configuration = null;
+            throw;
         }
         finally
         {
@@ -213,47 +257,55 @@ public sealed class JsonRegionProfileRepository
 
         try
         {
-            var configuration = await LoadConfigurationUnsafeAsync(cancellationToken);
-            var source = configuration.Profiles.FirstOrDefault(current =>
-                string.Equals(current.Id, sourceProfileId, StringComparison.OrdinalIgnoreCase));
-
-            if (source is null)
+            return await _storage.WithTransactionAsync(async () =>
             {
-                throw new InvalidDataException("Region profile was not found.");
-            }
+                var configuration = await LoadConfigurationUnsafeAsync(cancellationToken);
+                var source = configuration.Profiles.FirstOrDefault(current =>
+                    string.Equals(current.Id, sourceProfileId, StringComparison.OrdinalIgnoreCase));
 
-            var name = CreateCopyProfileName(source.Name, configuration.Profiles);
-            var id = CreateUniqueProfileId(name, configuration.Profiles);
-            var file = $"regions/{id}.json";
-            var sourcePath = ResolveProfileDeviceFilePath(source.File);
-            var targetPath = ResolveProfileDeviceFilePath(file);
-            Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+                if (source is null)
+                {
+                    throw new InvalidDataException("Region profile was not found.");
+                }
 
-            if (File.Exists(sourcePath))
-            {
-                File.Copy(sourcePath, targetPath, overwrite: false);
-            }
-            else
-            {
-                await File.WriteAllTextAsync(targetPath, CreateStarterConfigurationJson(source.Region, name), cancellationToken);
-            }
+                var name = CreateCopyProfileName(source.Name, configuration.Profiles);
+                var id = CreateUniqueProfileId(name, configuration.Profiles);
+                var file = $"regions/{id}.json";
+                var sourcePath = ResolveProfileDeviceFilePath(source.File);
+                var targetPath = ResolveProfileDeviceFilePath(file);
+                Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
 
-            configuration.Profiles.Add(new RegionProfile
-            {
-                Id = id,
-                Name = name,
-                Region = source.Region,
-                File = file
-            });
+                if (_storage.Exists(sourcePath))
+                {
+                    await _storage.CopyAsync(sourcePath, targetPath, overwrite: false, cancellationToken);
+                }
+                else
+                {
+                    await _storage.WriteTextAsync(targetPath, CreateStarterConfigurationJson(source.Region, name), cancellationToken);
+                }
 
-            var updated = new RegionProfileConfiguration
-            {
-                ActiveProfileId = id,
-                Profiles = SortProfiles(configuration.Profiles)
-            };
+                configuration.Profiles.Add(new RegionProfile
+                {
+                    Id = id,
+                    Name = name,
+                    Region = source.Region,
+                    File = file
+                });
 
-            await SaveConfigurationUnsafeAsync(updated, cancellationToken);
-            return updated;
+                var updated = new RegionProfileConfiguration
+                {
+                    ActiveProfileId = id,
+                    Profiles = SortProfiles(configuration.Profiles)
+                };
+
+                await SaveConfigurationUnsafeAsync(updated, cancellationToken);
+                return updated;
+            }, cancellationToken);
+        }
+        catch
+        {
+            _configuration = null;
+            throw;
         }
         finally
         {
@@ -277,45 +329,53 @@ public sealed class JsonRegionProfileRepository
 
         try
         {
-            var configuration = await LoadConfigurationUnsafeAsync(cancellationToken);
-            var profile = configuration.Profiles.FirstOrDefault(current =>
-                string.Equals(current.Id, profileId, StringComparison.OrdinalIgnoreCase));
-
-            if (profile is null)
+            return await _storage.WithTransactionAsync(async () =>
             {
-                throw new InvalidDataException("Region profile was not found.");
-            }
+                var configuration = await LoadConfigurationUnsafeAsync(cancellationToken);
+                var profile = configuration.Profiles.FirstOrDefault(current =>
+                    string.Equals(current.Id, profileId, StringComparison.OrdinalIgnoreCase));
 
-            var name = NormalizeRequiredText(request.Name, "Support group name");
-            var region = NormalizeOptionalText(request.Region) ?? DefaultRegionName;
-            var file = profile.File;
+                if (profile is null)
+                {
+                    throw new InvalidDataException("Region profile was not found.");
+                }
 
-            if (!profile.BuiltIn)
-            {
-                file = RenameProfileFile(profile.File, name, configuration.Profiles);
-            }
+                var name = NormalizeRequiredText(request.Name, "Support group name");
+                var region = NormalizeOptionalText(request.Region) ?? DefaultRegionName;
+                var file = profile.File;
 
-            var profiles = configuration.Profiles
-                .Select(current => string.Equals(current.Id, profile.Id, StringComparison.OrdinalIgnoreCase)
-                    ? new RegionProfile
-                    {
-                        Id = current.Id,
-                        Name = name,
-                        Region = region,
-                        File = file,
-                        BuiltIn = current.BuiltIn
-                    }
-                    : current)
-                .ToList();
+                if (!profile.BuiltIn)
+                {
+                    file = RenameProfileFile(profile.File, name, configuration.Profiles);
+                }
 
-            var updated = new RegionProfileConfiguration
-            {
-                ActiveProfileId = configuration.ActiveProfileId,
-                Profiles = SortProfiles(profiles)
-            };
+                var profiles = configuration.Profiles
+                    .Select(current => string.Equals(current.Id, profile.Id, StringComparison.OrdinalIgnoreCase)
+                        ? new RegionProfile
+                        {
+                            Id = current.Id,
+                            Name = name,
+                            Region = region,
+                            File = file,
+                            BuiltIn = current.BuiltIn
+                        }
+                        : current)
+                    .ToList();
 
-            await SaveConfigurationUnsafeAsync(updated, cancellationToken);
-            return updated;
+                var updated = new RegionProfileConfiguration
+                {
+                    ActiveProfileId = configuration.ActiveProfileId,
+                    Profiles = SortProfiles(profiles)
+                };
+
+                await SaveConfigurationUnsafeAsync(updated, cancellationToken);
+                return updated;
+            }, cancellationToken);
+        }
+        catch
+        {
+            _configuration = null;
+            throw;
         }
         finally
         {
@@ -335,50 +395,58 @@ public sealed class JsonRegionProfileRepository
 
         try
         {
-            var configuration = await LoadConfigurationUnsafeAsync(cancellationToken);
-            var profile = configuration.Profiles.FirstOrDefault(current =>
-                string.Equals(current.Id, profileId, StringComparison.OrdinalIgnoreCase));
-
-            if (profile is null)
+            return await _storage.WithTransactionAsync(async () =>
             {
-                throw new InvalidDataException("Region profile was not found.");
-            }
+                var configuration = await LoadConfigurationUnsafeAsync(cancellationToken);
+                var profile = configuration.Profiles.FirstOrDefault(current =>
+                    string.Equals(current.Id, profileId, StringComparison.OrdinalIgnoreCase));
 
-            if (configuration.Profiles.Count == 1)
-            {
-                throw new InvalidDataException("At least one region profile is required.");
-            }
+                if (profile is null)
+                {
+                    throw new InvalidDataException("Region profile was not found.");
+                }
 
-            if (profile.BuiltIn)
-            {
-                throw new InvalidDataException("Built-in region profiles cannot be deleted.");
-            }
+                if (configuration.Profiles.Count == 1)
+                {
+                    throw new InvalidDataException("At least one region profile is required.");
+                }
 
-            var profiles = configuration.Profiles
-                .Where(current => !string.Equals(current.Id, profile.Id, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-            var activeProfileId = string.Equals(configuration.ActiveProfileId, profile.Id, StringComparison.OrdinalIgnoreCase)
-                ? profiles[0].Id
-                : configuration.ActiveProfileId;
+                if (profile.BuiltIn)
+                {
+                    throw new InvalidDataException("Built-in region profiles cannot be deleted.");
+                }
 
-            var updated = new RegionProfileConfiguration
-            {
-                ActiveProfileId = activeProfileId,
-                Profiles = SortProfiles(profiles)
-            };
+                var profiles = configuration.Profiles
+                    .Where(current => !string.Equals(current.Id, profile.Id, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                var activeProfileId = string.Equals(configuration.ActiveProfileId, profile.Id, StringComparison.OrdinalIgnoreCase)
+                    ? profiles[0].Id
+                    : configuration.ActiveProfileId;
 
-            await SaveConfigurationUnsafeAsync(updated, cancellationToken);
+                var updated = new RegionProfileConfiguration
+                {
+                    ActiveProfileId = activeProfileId,
+                    Profiles = SortProfiles(profiles)
+                };
 
-            var filePath = ResolveProfileDeviceFilePath(profile.File);
-            if (File.Exists(filePath))
-            {
-                var deletedPath = Path.Combine(
-                    Path.GetDirectoryName(filePath)!,
-                    $"{Path.GetFileNameWithoutExtension(filePath)}.deleted-{DateTimeOffset.Now:yyyyMMddHHmmss}{Path.GetExtension(filePath)}");
-                File.Move(filePath, deletedPath, overwrite: false);
-            }
+                await SaveConfigurationUnsafeAsync(updated, cancellationToken);
 
-            return updated;
+                var filePath = ResolveProfileDeviceFilePath(profile.File);
+                if (_storage.Exists(filePath))
+                {
+                    var deletedPath = Path.Combine(
+                        Path.GetDirectoryName(filePath)!,
+                        $"{Path.GetFileNameWithoutExtension(filePath)}.deleted-{DateTimeOffset.Now:yyyyMMddHHmmss}{Path.GetExtension(filePath)}");
+                    _storage.Move(filePath, deletedPath, overwrite: false);
+                }
+
+                return updated;
+            }, cancellationToken);
+        }
+        catch
+        {
+            _configuration = null;
+            throw;
         }
         finally
         {
@@ -395,7 +463,7 @@ public sealed class JsonRegionProfileRepository
 
         var filePath = ResolveProfilesFilePath();
 
-        if (!File.Exists(filePath))
+        if (!_storage.Exists(filePath))
         {
             _configuration = await CreateInitialConfigurationAsync(cancellationToken);
             await SaveConfigurationUnsafeAsync(_configuration, cancellationToken);
@@ -404,7 +472,7 @@ public sealed class JsonRegionProfileRepository
 
         try
         {
-            var json = await File.ReadAllTextAsync(filePath, cancellationToken);
+            var json = await _storage.ReadAllTextAsync(filePath, cancellationToken);
             var configuration = JsonSerializer.Deserialize<RegionProfileConfiguration>(
                 json,
                 JsonOptions);
@@ -432,13 +500,13 @@ public sealed class JsonRegionProfileRepository
 
         Directory.CreateDirectory(Path.GetDirectoryName(activePath)!);
 
-        if (File.Exists(legacyPath))
+        if (_storage.Exists(legacyPath))
         {
-            File.Copy(legacyPath, activePath, overwrite: true);
+            await _storage.CopyAsync(legacyPath, activePath, overwrite: true, cancellationToken);
         }
         else
         {
-            await File.WriteAllTextAsync(activePath, CreateStarterConfigurationJson(DefaultRegionName, DefaultSupportGroupName), cancellationToken);
+            await _storage.WriteTextAsync(activePath, CreateStarterConfigurationJson(DefaultRegionName, DefaultSupportGroupName), cancellationToken);
         }
 
         profiles.Add(new RegionProfile
@@ -453,13 +521,13 @@ public sealed class JsonRegionProfileRepository
         var demoPath = ResolveProfileDeviceFilePath(demoFile);
         var samplePath = Path.Combine(ResolveDataRoot(), "config.sample.json");
 
-        if (File.Exists(samplePath))
+        if (_storage.Exists(samplePath))
         {
-            File.Copy(samplePath, demoPath, overwrite: true);
+            await _storage.CopyAsync(samplePath, demoPath, overwrite: true, cancellationToken);
         }
         else
         {
-            await File.WriteAllTextAsync(demoPath, CreateStarterConfigurationJson(DefaultRegionName, "Demo"), cancellationToken);
+            await _storage.WriteTextAsync(demoPath, CreateStarterConfigurationJson(DefaultRegionName, "Demo"), cancellationToken);
         }
 
         profiles.Add(new RegionProfile
@@ -484,13 +552,13 @@ public sealed class JsonRegionProfileRepository
         {
             var filePath = ResolveProfileDeviceFilePath(profile.File);
 
-            if (File.Exists(filePath))
+            if (_storage.Exists(filePath))
             {
                 continue;
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
-            await File.WriteAllTextAsync(filePath, CreateStarterConfigurationJson(profile.Region, profile.Name), cancellationToken);
+            await _storage.WriteTextAsync(filePath, CreateStarterConfigurationJson(profile.Region, profile.Name), cancellationToken);
         }
     }
 
@@ -498,11 +566,11 @@ public sealed class JsonRegionProfileRepository
         RegionProfileConfiguration configuration,
         CancellationToken cancellationToken)
     {
-        _configuration = Normalize(configuration);
+        var normalized = Normalize(configuration);
         var filePath = ResolveProfilesFilePath();
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
-        await using var stream = File.Create(filePath);
-        await JsonSerializer.SerializeAsync(stream, _configuration, JsonOptions, cancellationToken);
+        await _storage.WriteJsonAsync(filePath, normalized, JsonOptions, cancellationToken);
+        _configuration = normalized;
     }
 
     private string ResolveProfilesFilePath()
@@ -519,7 +587,7 @@ public sealed class JsonRegionProfileRepository
         return Path.Combine(ResolveDataRoot(), profileFilePath);
     }
 
-    private string ResolveProfileDeviceFilePath(string profileFile)
+    internal string ResolveProfileDeviceFilePath(string profileFile)
     {
         var fileName = string.IsNullOrWhiteSpace(profileFile)
             ? "regions/sg1.json"
@@ -542,7 +610,7 @@ public sealed class JsonRegionProfileRepository
 
         var contentRootPath = Path.Combine(_environment.ContentRootPath, _options.DeviceFilePath);
 
-        if (File.Exists(contentRootPath))
+        if (_storage.Exists(contentRootPath))
         {
             return contentRootPath;
         }
@@ -677,9 +745,9 @@ public sealed class JsonRegionProfileRepository
 
         Directory.CreateDirectory(currentDirectory);
 
-        if (File.Exists(currentPath) && !File.Exists(newPath))
+        if (_storage.Exists(currentPath) && !_storage.Exists(newPath))
         {
-            File.Move(currentPath, newPath);
+            _storage.Move(currentPath, newPath);
         }
 
         return newFile;

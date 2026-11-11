@@ -1,0 +1,150 @@
+# HTTP And HTTPS Checks
+
+## Configure A Web Application
+
+Open Configuration, add/edit a device and choose **HTTP / HTTPS** in its checks.
+Enter the complete URL, timeout in milliseconds, expected status and optional
+expected response text. Use Full Check or Auto Refresh to execute these checks.
+You can add several URLs to one device, or create one record per application.
+
+For HTTP-only devices, the editor can leave Address empty and saves the first
+URL's hostname as the address. API/import callers still supply `ip` as before;
+it may be a DNS name. HTTP always uses its own URL, not this address or the
+separate Website URL shortcut. Website URL alone does not create a check.
+
+For a website-only record, change the initial Ping check to HTTP / HTTPS or
+remove Ping after adding the HTTP check; do not leave an unwanted Ping check.
+If keeping Ping, Address must be a hostname/IP such as `host.example.invalid`,
+not `https://host.example.invalid`. For availability based only on HTTP status,
+use the complete URL, expected status 200 and leave Expected text empty.
+An HTTP 200 with ExpectedTextMissing means a response arrived but did not match
+the configured literal text; it does not mean the endpoint failed to respond.
+Text is checked against the backend's anonymous response, not JavaScript-rendered
+or signed-in browser content. Execute Full Check, not Ping Only.
+
+```json
+{
+  "name": "Example application",
+  "ip": "app.example.invalid",
+  "category": "Web Apps",
+  "checks": [
+    {
+      "type": "http",
+      "url": "https://app.example.invalid/health",
+      "timeoutMs": 10000,
+      "expectedStatusCode": 200,
+      "expectedText": "READY"
+    }
+  ]
+}
+```
+
+The example host is deliberately non-operational. Use an approved target that
+the backend machine can reach, preferably a read-only application health URL.
+
+## Fields And Semantics
+
+| Field | Rule |
+| --- | --- |
+| `type` | `http` for both HTTP and HTTPS; input is case-insensitive. |
+| `url` | Absolute HTTP/HTTPS URL, at most 2048 characters; no credentials, fragments or control characters. A custom port belongs in the URL, not `port`. |
+| `timeoutMs` | 100-60000 ms; defaults to 10000. Independent of the global ping/TCP timeout. Applies per attempt, from request through required body reading. |
+| `expectedStatusCode` | Exact status 200-599; defaults to 200. Explicitly expecting an error status will count it as successful. |
+| `expectedText` | Optional literal, case-sensitive substring, at most 4096 characters. Empty means status-only. Whitespace is preserved. No regex, HTML parsing or JavaScript execution. |
+
+HTTP checks send anonymous GET requests with `NetWatch-Lite/1.0` as User-Agent.
+They do not follow redirects, share cookies, or send operator/browser login
+credentials. A 302 login redirect fails an expected 200 instead of validating
+the login page. Point to the final approved URL or explicitly expect the
+redirect status. TLS certificates are validated normally against the backend
+machine's trust store; there is no bypass switch.
+
+If text is configured, at most 1 MiB of decompressed body is accepted. The
+declared character encoding is used, or UTF-8 when absent. Over-limit and
+unsupported-encoding responses fail clearly. Text matching requires the whole
+bounded response to finish; finding a substring in an unfinished stream is
+not enough. Status-only checks finish at response headers and do not prove
+that the response body is complete.
+
+Existing global concurrency and retry settings apply. With `retryCount=N`,
+there are at most N+1 attempts, each with its own timeout and the configured
+delay between failures. Total run time also includes queue time and retries.
+The displayed HTTP duration is the final attempt, not total run duration.
+Device-level latency retains its ICMP meaning; use the individual HTTP
+duration for web response timing, not a zero/no-ping device latency.
+
+Configure retries in **Configuration > Settings**: **Retries** accepts 0-5
+(0 means one attempt; 2 means at most three after failures), and **Retry delay**
+accepts 0-10000 milliseconds between failed attempts. Use **Save Settings**.
+These settings belong to the active support group and apply to Ping, TCP and
+HTTP; they are not a per-URL retry override. A successful attempt stops retries.
+
+The HTTP editor has concise Spanish helper text below Timeout and Expected text.
+Timeout is a per-attempt duration, not a ping count; blank expected text checks
+only the expected HTTP status. Literal text is case-sensitive and comes from
+the anonymous backend response, not a JavaScript-rendered/authenticated browser.
+Each row has independent accessible description IDs; mobile fields stack.
+
+Full Check aggregates all configured ping/TCP/HTTP results: all successful is
+Healthy, some successful is Degraded, none successful is Down. An HTTP failure
+is not hidden by a successful TCP connection. Ping Only skips HTTP and TCP;
+the legacy synthetic ping is still used when no ping was configured. A
+successful Ping Only run is not evidence that a web application works.
+
+## Results And Diagnostics
+
+Dashboard's TCP / HTTP column shows actual status, elapsed time, target and
+failure message. Reports show the recorded HTTP checks beside device health;
+filtered JSON exports and local history retain those details.
+
+HTTP `CheckResult` adds `url`, `statusCode`, `expectedStatusCode`, `timeoutMs`,
+`durationMs` and `message`. `statusCode` can be null before headers arrive, or
+present on body-read timeouts. Status strings include:
+
+| Status | Meaning / action |
+| --- | --- |
+| `Success` | Configured status and optional text matched. |
+| `UnexpectedStatus` | Inspect the returned code, server health, authentication requirement or redirect. |
+| `ExpectedTextMissing` | Check the expected case/content; a 200 error/login/maintenance page is not sufficient. |
+| `TimedOut` | Check server latency and reachability; adjust the deadline deliberately. |
+| `DnsError` | Verify DNS from the backend host. |
+| `ConnectionError` | Verify listener, port, routing, proxy and firewall. |
+| `TlsError` | Correct certificate chain, hostname, expiry and backend trust configuration; do not disable validation. |
+| `ResponseTooLarge` | Use a smaller health endpoint or remove content matching only when appropriate. |
+| `UnsupportedEncoding` | Correct the server's declared charset. |
+| `HttpError` / `ResponseReadError` | Inspect malformed, interrupted or incomplete HTTP responses. |
+
+Caller cancellation is propagated, not recorded as a normal website outage.
+Expected probe failures are monitoring results, not unexpected application 500s.
+
+## Compatibility And Security
+
+Old ping/TCP configuration and stored history require no migration. New fields
+are optional; normalization materializes HTTP defaults on load/save. HTTP
+definitions survive device edits/copies, bulk updates, profile copies and JSON
+import/export. Old application binaries do not support HTTP checks; back up
+configuration before upgrading or rolling back, and do not save new profiles
+through an older binary.
+
+This adds outbound requests to configured destinations, including internal and
+loopback addresses by design. It is not an SSRF-safe public API. Only trusted
+operators may reach this unauthenticated tool. Restrict inbound access and
+outbound destinations through host/network controls, and only monitor URLs
+that are authorized and safe to GET. Avoid tokens in URLs. Full URLs and
+expected text remain private operational configuration/export data; results
+strip query strings, diagnostics do not echo exceptions/bodies/expected text,
+and named HttpClient URL logging is disabled. Host/path are still sensitive;
+avoid secrets in path segments as well. Body content is never retained.
+
+No email, webhook, desktop notification, authenticated transaction, browser
+journey, background scheduler or certificate-expiry warning was added. Auto
+Refresh follows the existing open-dashboard workflow. Operator acceptance on
+real approved applications and the thirteen deployment gates remain separate.
+
+## References
+
+The deadline explicitly covers body reads because `ResponseHeadersRead` alone
+does not do so; see the [.NET completion-option documentation](https://learn.microsoft.com/dotnet/api/system.net.http.httpcompletionoption).
+Transport behavior follows the [.NET SocketsHttpHandler API](https://learn.microsoft.com/dotnet/api/system.net.http.socketshttphandler).
+See [testing](TESTING.md), [security](SECURITY.md) and the
+[architecture decision](adr/0003-bounded-http-checks.md).

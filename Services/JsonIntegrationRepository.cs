@@ -39,6 +39,7 @@ public sealed class JsonIntegrationRepository
 
     private readonly IWebHostEnvironment _environment;
     private readonly NetworkMonitorOptions _options;
+    private readonly LocalDataStore _storage;
     private readonly SemaphoreSlim _integrationLock = new(1, 1);
     private IntegrationConfiguration _configuration = CreateDefaultConfiguration();
 
@@ -47,12 +48,15 @@ public sealed class JsonIntegrationRepository
     /// </summary>
     /// <param name="environment">ASP.NET Core hosting environment used to resolve relative file paths.</param>
     /// <param name="options">Network monitor options containing the integrations file path.</param>
+    /// <param name="storage">Shared JSON/SQLite persistence adapter; JSON when omitted by legacy callers.</param>
     public JsonIntegrationRepository(
         IWebHostEnvironment environment,
-        IOptions<NetworkMonitorOptions> options)
+        IOptions<NetworkMonitorOptions> options,
+        LocalDataStore? storage = null)
     {
         _environment = environment;
         _options = options.Value;
+        _storage = storage ?? new LocalDataStore(environment, Options.Create(new StorageOptions { Provider = "json" }));
     }
 
     /// <summary>
@@ -68,7 +72,7 @@ public sealed class JsonIntegrationRepository
         {
             var filePath = ResolveIntegrationFilePath();
 
-            if (!File.Exists(filePath))
+            if (!_storage.Exists(filePath))
             {
                 _configuration = CreateDefaultConfiguration();
                 await SaveNormalizedConfigurationAsync(filePath, _configuration, cancellationToken);
@@ -77,7 +81,7 @@ public sealed class JsonIntegrationRepository
 
             IntegrationConfiguration? configuration;
 
-            await using (var stream = File.OpenRead(filePath))
+            await using (var stream = _storage.OpenRead(filePath))
             {
                 configuration = await JsonSerializer.DeserializeAsync<IntegrationConfiguration>(
                     stream,
@@ -134,14 +138,14 @@ public sealed class JsonIntegrationRepository
 
         var contentRootPath = Path.Combine(_environment.ContentRootPath, _options.IntegrationFilePath);
 
-        if (File.Exists(contentRootPath))
+        if (_storage.Exists(contentRootPath))
         {
             return contentRootPath;
         }
 
         var developmentDataPath = Path.Combine(_environment.ContentRootPath, "Data", _options.IntegrationFilePath);
 
-        if (File.Exists(developmentDataPath))
+        if (_storage.Exists(developmentDataPath))
         {
             return developmentDataPath;
         }
@@ -209,7 +213,7 @@ public sealed class JsonIntegrationRepository
         return NormalizeText(value, fallback).ToUpperInvariant();
     }
 
-    private static async Task SaveNormalizedConfigurationAsync(
+    private async Task SaveNormalizedConfigurationAsync(
         string filePath,
         IntegrationConfiguration configuration,
         CancellationToken cancellationToken)
@@ -221,8 +225,7 @@ public sealed class JsonIntegrationRepository
             Directory.CreateDirectory(directory);
         }
 
-        await using var stream = File.Create(filePath);
-        await JsonSerializer.SerializeAsync(stream, configuration, JsonOptions, cancellationToken);
+        await _storage.WriteJsonAsync(filePath, configuration, JsonOptions, cancellationToken);
     }
 
     private static IntegrationConfiguration CreateDefaultConfiguration()

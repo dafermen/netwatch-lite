@@ -48,6 +48,7 @@ public sealed partial class JsonThemeRepository
 
     private readonly IWebHostEnvironment _environment;
     private readonly NetworkMonitorOptions _options;
+    private readonly LocalDataStore _storage;
     private readonly SemaphoreSlim _themeLock = new(1, 1);
     private ThemeConfiguration _configuration = CreateDefaultConfiguration();
 
@@ -56,12 +57,15 @@ public sealed partial class JsonThemeRepository
     /// </summary>
     /// <param name="environment">ASP.NET Core hosting environment used to resolve relative file paths.</param>
     /// <param name="options">Network monitor options containing the theme file path.</param>
+    /// <param name="storage">Shared JSON/SQLite persistence adapter; JSON when omitted by legacy callers.</param>
     public JsonThemeRepository(
         IWebHostEnvironment environment,
-        IOptions<NetworkMonitorOptions> options)
+        IOptions<NetworkMonitorOptions> options,
+        LocalDataStore? storage = null)
     {
         _environment = environment;
         _options = options.Value;
+        _storage = storage ?? new LocalDataStore(environment, Options.Create(new StorageOptions { Provider = "json" }));
     }
 
     /// <summary>
@@ -77,7 +81,7 @@ public sealed partial class JsonThemeRepository
         {
             var filePath = ResolveThemeFilePath();
 
-            if (!File.Exists(filePath))
+            if (!_storage.Exists(filePath))
             {
                 _configuration = CreateDefaultConfiguration();
                 await SaveNormalizedConfigurationAsync(filePath, _configuration, cancellationToken);
@@ -86,7 +90,7 @@ public sealed partial class JsonThemeRepository
 
             ThemeConfiguration? configuration;
 
-            await using (var stream = File.OpenRead(filePath))
+            await using (var stream = _storage.OpenRead(filePath))
             {
                 configuration = await JsonSerializer.DeserializeAsync<ThemeConfiguration>(
                     stream,
@@ -163,14 +167,14 @@ public sealed partial class JsonThemeRepository
 
         var contentRootPath = Path.Combine(_environment.ContentRootPath, _options.ThemeFilePath);
 
-        if (File.Exists(contentRootPath))
+        if (_storage.Exists(contentRootPath))
         {
             return contentRootPath;
         }
 
         var developmentDataPath = Path.Combine(_environment.ContentRootPath, "Data", _options.ThemeFilePath);
 
-        if (File.Exists(developmentDataPath))
+        if (_storage.Exists(developmentDataPath))
         {
             return developmentDataPath;
         }
@@ -180,7 +184,7 @@ public sealed partial class JsonThemeRepository
             : contentRootPath;
     }
 
-    private static async Task SaveNormalizedConfigurationAsync(
+    private async Task SaveNormalizedConfigurationAsync(
         string filePath,
         ThemeConfiguration configuration,
         CancellationToken cancellationToken)
@@ -192,8 +196,7 @@ public sealed partial class JsonThemeRepository
             Directory.CreateDirectory(directory);
         }
 
-        await using var stream = File.Create(filePath);
-        await JsonSerializer.SerializeAsync(stream, configuration, JsonOptions, cancellationToken);
+        await _storage.WriteJsonAsync(filePath, configuration, JsonOptions, cancellationToken);
     }
 
     private static ThemeConfiguration Normalize(ThemeConfiguration? configuration)
@@ -347,10 +350,10 @@ public sealed partial class JsonThemeRepository
             ["categoryDegraded"] = "#f59e0b",
             ["categoryProblem"] = "#be302b",
             ["categoryRunning"] = "#465464",
-            ["configFacilityHeader"] = "#111827",
-            ["configFacilityText"] = "#e5e7eb",
-            ["configCategoryHeader"] = "#eef2f7",
-            ["configCategoryText"] = "#334155",
+            ["configFacilityHeader"] = "#f1f3f5",
+            ["configFacilityText"] = "#212529",
+            ["configCategoryHeader"] = "#f8f9fa",
+            ["configCategoryText"] = "#495057",
             ["autoRefreshOn"] = "#198754",
             ["autoRefreshOff"] = "#dc3545",
             ["runFullCheck"] = "#ffc107"

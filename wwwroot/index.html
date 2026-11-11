@@ -7,7 +7,7 @@
   <link rel="icon" type="image/png" href="/netwatch-lite-favicon.png">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
-  <link href="/styles.css?v=reports-20260627" rel="stylesheet">
+  <link href="/styles.css?v=http-help-20261110" rel="stylesheet">
 </head>
 <body>
   <div class="app-shell">
@@ -25,9 +25,21 @@
           <i class="fa-solid fa-sliders"></i>
           Configuration
         </a>
+        <a class="nav-link" href="/workstations" data-route="/workstations">
+          <i class="fa-solid fa-desktop"></i>
+          Workstations
+        </a>
+        <a class="nav-link" href="/device-types" data-route="/device-types">
+          <i class="fa-solid fa-tags"></i>
+          Device Types
+        </a>
         <a class="nav-link" href="/regions" data-route="/regions">
           <i class="fa-solid fa-diagram-project"></i>
           Support Groups
+        </a>
+        <a class="nav-link" href="/peripherals" data-route="/peripherals">
+          <i class="fa-solid fa-print"></i>
+          Peripherals
         </a>
         <a class="nav-link" href="/reports" data-route="/reports">
           <i class="fa-solid fa-chart-column"></i>
@@ -44,6 +56,10 @@
         <a class="nav-link" href="/manual" data-route="/manual">
           <i class="fa-solid fa-book-open"></i>
           User Manual
+        </a>
+        <a class="nav-link" href="/docs/" target="_self">
+          <i class="fa-solid fa-book"></i>
+          Documentation
         </a>
         <a class="nav-link" href="/about" data-route="/about">
           <i class="fa-solid fa-circle-info"></i>
@@ -155,7 +171,7 @@
               <div class="facility-actions">
                 <div class="btn-group btn-group-sm check-mode-toggle" role="group" aria-label="Execution check mode">
                   <input type="radio" class="btn-check" name="check-mode" id="check-mode-full" value="full" checked>
-                  <label class="btn btn-outline-secondary" for="check-mode-full" title="Run configured ping and TCP checks">Full Check</label>
+                  <label class="btn btn-outline-secondary" for="check-mode-full" title="Run configured ping, TCP and HTTP/HTTPS checks">Full Check</label>
 
                   <input type="radio" class="btn-check" name="check-mode" id="check-mode-ping" value="ping">
                   <label class="btn btn-outline-secondary" for="check-mode-ping" title="Run ping connectivity checks only">Ping Only</label>
@@ -185,8 +201,10 @@
                 type="search"
                 class="form-control"
                 id="device-search"
-                placeholder="Search by name or IP"
+                aria-label="Search devices"
+                placeholder="Search devices"
                 autocomplete="off">
+              <button class="btn btn-outline-secondary" type="button" id="clear-dashboard-filters" title="Clear all dashboard filters" aria-label="Clear all dashboard filters" disabled><i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i></button>
             </div>
 
             <div class="dashboard-toolbar-actions">
@@ -241,7 +259,7 @@
           </div>
 
           <div id="results-body">
-            <div class="text-center text-secondary py-4">Run a check to load monitoring results.</div>
+            <div class="text-center text-secondary py-4">Loading inventory...</div>
           </div>
         </section>
 
@@ -249,7 +267,7 @@
           <div class="config-toolbar config-page-toolbar mb-3">
             <div>
               <h2 class="h4 mb-1">Configuration</h2>
-              <p class="text-secondary mb-0">Manage devices stored in the active support group JSON.</p>
+              <p class="text-secondary mb-0">Active support group inventory</p>
             </div>
             <div class="config-actions">
               <button class="btn btn-outline-primary btn-sm" type="button" id="export-config">
@@ -263,12 +281,39 @@
               <input class="visually-hidden" type="file" id="import-config-file" accept="application/json,.json">
               <button class="btn btn-outline-secondary btn-sm" type="button" id="reload-config">
                 <i class="fa-solid fa-rotate-right me-1"></i>
-                Reload JSON
+                Reload
               </button>
             </div>
           </div>
 
           <div id="config-alert"></div>
+
+          <details class="storage-tools mb-3" id="storage-tools">
+            <summary class="fw-semibold">Data &amp; backups <span class="badge text-bg-secondary ms-2" id="storage-provider">...</span></summary>
+            <div class="py-3">
+              <div id="storage-alert" role="status" aria-live="polite"></div>
+              <form id="storage-policy-form">
+                <fieldset id="storage-policy-fields" disabled>
+                  <div class="row g-3 align-items-end">
+                    <div class="col-6 col-lg-3"><label class="form-label" for="history-max-runs">Retained runs</label><input class="form-control form-control-sm" id="history-max-runs" type="number" min="1" max="100000" required></div>
+                    <div class="col-6 col-lg-3"><label class="form-label" for="history-max-days">Retained days (0 = no age limit)</label><input class="form-control form-control-sm" id="history-max-days" type="number" min="0" max="3650" required></div>
+                    <div class="col-6 col-lg-3"><label class="form-label" for="backup-hours">Backup interval (hours)</label><input class="form-control form-control-sm" id="backup-hours" type="number" min="1" max="168" required></div>
+                    <div class="col-6 col-lg-3"><label class="form-label" for="backup-copies">Automatic backup copies</label><input class="form-control form-control-sm" id="backup-copies" type="number" min="1" max="100" required></div>
+                  </div>
+                  <div class="d-flex flex-wrap gap-3 align-items-center mt-3">
+                    <label class="form-check"><input class="form-check-input" id="history-export-first" type="checkbox"><span class="form-check-label">Export before pruning</span></label>
+                    <label class="form-check form-switch"><input class="form-check-input" id="backup-automatic" type="checkbox"><span class="form-check-label">Automatic backups</span></label>
+                    <button class="btn btn-success btn-sm" type="submit"><i class="fa-solid fa-floppy-disk me-1" aria-hidden="true"></i>Save data policy</button>
+                  </div>
+                </fieldset>
+              </form>
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-4 mb-2"><h3 class="h6 mb-0">Verified backups</h3><button class="btn btn-outline-primary btn-sm" id="storage-backup-now" type="button" disabled><i class="fa-solid fa-database me-1" aria-hidden="true"></i>Back up now</button></div>
+              <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Created</th><th>File</th><th class="text-end">Size</th></tr></thead><tbody id="storage-backups-body"></tbody></table></div>
+              <div class="d-flex justify-content-between align-items-center mt-4 mb-2"><h3 class="h6 mb-0">Change history</h3><button class="btn btn-outline-secondary btn-sm icon-button" id="storage-audit-refresh" type="button" title="Refresh data and changes" aria-label="Refresh data and changes"><i class="fa-solid fa-rotate-right" aria-hidden="true"></i></button></div>
+              <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Changed</th><th>Document</th><th>Action</th><th>Fields</th></tr></thead><tbody id="storage-audit-body"></tbody></table></div>
+              <div class="d-flex gap-2 justify-content-end align-items-center"><span class="small text-secondary" id="storage-audit-page"></span><button class="btn btn-outline-secondary btn-sm icon-button" id="storage-audit-prev" type="button" title="Previous changes" aria-label="Previous changes"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button><button class="btn btn-outline-secondary btn-sm icon-button" id="storage-audit-next" type="button" title="Next changes" aria-label="Next changes"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button></div>
+            </div>
+          </details>
 
           <div class="row g-3">
             <div class="col-12">
@@ -336,7 +381,7 @@
                         type="search"
                         class="form-control"
                         id="config-device-search"
-                        placeholder="Filter by name, address, or hostname"
+                        placeholder="Filter devices"
                         autocomplete="off">
                     </div>
                     <button class="btn btn-primary btn-sm" type="button" id="add-device">
@@ -464,353 +509,171 @@
         </section>
 
         <section id="reports-page" data-page="/reports" hidden>
-          <div class="config-toolbar config-page-toolbar mb-3">
+          <header class="reports-heading">
             <div>
               <h2 class="h4 mb-1">Reports</h2>
-              <p class="text-secondary mb-0">Review local monitor history stored in monitor-history.json.</p>
+              <div class="small text-secondary" id="reports-coverage" aria-live="polite">Loading history...</div>
             </div>
-            <div class="config-actions">
-              <button class="btn btn-outline-secondary btn-sm" type="button" id="refresh-reports">
-                <i class="fa-solid fa-rotate-right me-1"></i>
-                Refresh
-              </button>
-              <button class="btn btn-outline-primary btn-sm" type="button" id="export-reports">
-                <i class="fa-solid fa-file-export me-1"></i>
-                Export Filtered JSON
-              </button>
+            <div class="d-flex align-items-center gap-2">
+              <button class="btn btn-outline-secondary icon-button" type="button" id="refresh-reports" title="Refresh history" aria-label="Refresh history"><i class="fa-solid fa-rotate-right" aria-hidden="true"></i></button>
+              <div class="dropdown">
+                <button class="btn btn-outline-primary btn-sm dropdown-toggle" type="button" id="reports-export-menu" data-bs-toggle="dropdown" aria-expanded="false" disabled><i class="fa-solid fa-file-export me-1" aria-hidden="true"></i>Export</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li><button class="dropdown-item" type="button" id="export-reports-csv"><i class="fa-solid fa-file-csv me-2" aria-hidden="true"></i>CSV for Excel</button></li>
+                  <li><button class="dropdown-item" type="button" id="export-reports"><i class="fa-solid fa-file-code me-2" aria-hidden="true"></i>JSON</button></li>
+                </ul>
+              </div>
             </div>
-          </div>
-
+          </header>
           <div id="reports-alert"></div>
-
-          <section class="row g-2 mb-3" aria-label="Report summary">
-            <div class="col-12 col-md-6 col-xl">
-              <div class="card metric-card h-100">
-                <div class="card-body">
-                  <div class="metric-icon text-bg-secondary"><i class="fa-solid fa-list-check"></i></div>
-                  <div>
-                    <div class="text-secondary small">Runs</div>
-                    <div class="h4 mb-0" id="reports-run-count">-</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="col-12 col-md-6 col-xl">
-              <div class="card metric-card h-100">
-                <div class="card-body">
-                  <div class="metric-icon text-bg-primary"><i class="fa-solid fa-microchip"></i></div>
-                  <div>
-                    <div class="text-secondary small">Device rows</div>
-                    <div class="h4 mb-0" id="reports-row-count">-</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="col-12 col-md-6 col-xl">
-              <div class="card metric-card h-100">
-                <div class="card-body">
-                  <div class="metric-icon text-bg-success"><i class="fa-solid fa-circle-check"></i></div>
-                  <div>
-                    <div class="text-secondary small">Healthy</div>
-                    <div class="h4 mb-0" id="reports-healthy-count">-</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="col-12 col-md-6 col-xl">
-              <div class="card metric-card h-100">
-                <div class="card-body">
-                  <div class="metric-icon text-bg-warning"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                  <div>
-                    <div class="text-secondary small">Problems</div>
-                    <div class="h4 mb-0" id="reports-problem-count">-</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="col-12 col-md-6 col-xl">
-              <div class="card metric-card h-100">
-                <div class="card-body">
-                  <div class="metric-icon text-bg-success"><i class="fa-solid fa-chart-line"></i></div>
-                  <div>
-                    <div class="text-secondary small">Avg availability</div>
-                    <div class="h4 mb-0" id="reports-avg-availability">-</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section class="reports-executive-grid mb-3" aria-label="Executive report summary">
-            <div class="card config-card reports-executive-card">
-              <div class="card-header config-settings-header reports-card-header">
-                <span class="fw-semibold">Facility Performance</span>
-                <div class="reports-table-controls">
-                  <span class="small text-secondary" id="reports-facility-performance-summary">No rows loaded</span>
-                  <label class="small text-secondary" for="reports-facility-page-size">Rows</label>
-                  <select class="form-select form-select-sm reports-page-size" id="reports-facility-page-size">
-                    <option value="5">5</option>
-                    <option value="10" selected>10</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                  </select>
-                  <button class="btn btn-outline-secondary btn-sm reports-collapse-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#reports-facility-panel" aria-expanded="false" aria-controls="reports-facility-panel" title="Expand Facility Performance">
-                    <i class="fa-solid fa-chevron-down"></i>
-                  </button>
-                </div>
-              </div>
-              <div class="collapse reports-executive-collapse" id="reports-facility-panel">
-                <div class="table-responsive">
-                  <table class="table table-sm align-middle mb-0 reports-summary-table">
-                    <thead class="table-light">
-                      <tr>
-                        <th><button class="table-sort-button" type="button" data-report-facility-sort="facility">Facility</button></th>
-                        <th class="text-end"><button class="table-sort-button" type="button" data-report-facility-sort="rowCount">Rows</button></th>
-                        <th class="text-end"><button class="table-sort-button" type="button" data-report-facility-sort="availability">Availability</button></th>
-                        <th class="text-end"><button class="table-sort-button" type="button" data-report-facility-sort="problemCount">Problems</button></th>
-                        <th class="text-end"><button class="table-sort-button" type="button" data-report-facility-sort="averageLatency">Avg latency</button></th>
-                      </tr>
-                    </thead>
-                    <tbody id="reports-facility-executive-body">
-                      <tr>
-                        <td colspan="5" class="text-center text-secondary py-3">No report data loaded.</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div class="reports-pagination border-top px-3 py-2">
-                  <span class="small text-secondary" id="reports-facility-page-summary">No page loaded</span>
-                  <div class="btn-group btn-group-sm" role="group" aria-label="Facility performance pages">
-                    <button class="btn btn-outline-secondary" type="button" id="reports-facility-prev-page">
-                      <i class="fa-solid fa-chevron-left me-1"></i>
-                      Previous
-                    </button>
-                    <button class="btn btn-outline-secondary" type="button" id="reports-facility-next-page">
-                      Next
-                      <i class="fa-solid fa-chevron-right ms-1"></i>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="card config-card reports-executive-card">
-              <div class="card-header config-settings-header reports-card-header">
-                <span class="fw-semibold">Category Performance</span>
-                <div class="reports-table-controls">
-                  <span class="small text-secondary" id="reports-category-performance-summary">No rows loaded</span>
-                  <label class="small text-secondary" for="reports-category-page-size">Rows</label>
-                  <select class="form-select form-select-sm reports-page-size" id="reports-category-page-size">
-                    <option value="5">5</option>
-                    <option value="10" selected>10</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                  </select>
-                  <button class="btn btn-outline-secondary btn-sm reports-collapse-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#reports-category-panel" aria-expanded="false" aria-controls="reports-category-panel" title="Expand Category Performance">
-                    <i class="fa-solid fa-chevron-down"></i>
-                  </button>
-                </div>
-              </div>
-              <div class="collapse reports-executive-collapse" id="reports-category-panel">
-                <div class="table-responsive">
-                  <table class="table table-sm align-middle mb-0 reports-summary-table">
-                    <thead class="table-light">
-                      <tr>
-                        <th><button class="table-sort-button" type="button" data-report-category-sort="category">Category</button></th>
-                        <th class="text-end"><button class="table-sort-button" type="button" data-report-category-sort="facilityCount">Facilities</button></th>
-                        <th class="text-end"><button class="table-sort-button" type="button" data-report-category-sort="rowCount">Rows</button></th>
-                        <th class="text-end"><button class="table-sort-button" type="button" data-report-category-sort="availability">Availability</button></th>
-                        <th class="text-end"><button class="table-sort-button" type="button" data-report-category-sort="problemCount">Problems</button></th>
-                        <th class="text-end"><button class="table-sort-button" type="button" data-report-category-sort="averageLatency">Avg latency</button></th>
-                      </tr>
-                    </thead>
-                    <tbody id="reports-category-executive-body">
-                      <tr>
-                        <td colspan="6" class="text-center text-secondary py-3">No category data loaded.</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div class="reports-pagination border-top px-3 py-2">
-                  <span class="small text-secondary" id="reports-category-page-summary">No page loaded</span>
-                  <div class="btn-group btn-group-sm" role="group" aria-label="Category performance pages">
-                    <button class="btn btn-outline-secondary" type="button" id="reports-category-prev-page">
-                      <i class="fa-solid fa-chevron-left me-1"></i>
-                      Previous
-                    </button>
-                    <button class="btn btn-outline-secondary" type="button" id="reports-category-next-page">
-                      Next
-                      <i class="fa-solid fa-chevron-right ms-1"></i>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="card config-card reports-executive-card">
-              <div class="card-header config-settings-header reports-card-header">
-                <span class="fw-semibold">Recent Runs</span>
-                <div class="reports-table-controls">
-                  <span class="small text-secondary" id="reports-runs-summary">No rows loaded</span>
-                  <label class="small text-secondary" for="reports-runs-page-size">Rows</label>
-                  <select class="form-select form-select-sm reports-page-size" id="reports-runs-page-size">
-                    <option value="5">5</option>
-                    <option value="10" selected>10</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                  </select>
-                  <button class="btn btn-outline-secondary btn-sm reports-collapse-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#reports-runs-panel" aria-expanded="false" aria-controls="reports-runs-panel" title="Expand Recent Runs">
-                    <i class="fa-solid fa-chevron-down"></i>
-                  </button>
-                </div>
-              </div>
-              <div class="collapse reports-executive-collapse" id="reports-runs-panel">
-                <div class="table-responsive">
-                  <table class="table table-sm align-middle mb-0 reports-summary-table">
-                    <thead class="table-light">
-                      <tr>
-                        <th><button class="table-sort-button" type="button" data-report-run-sort="completedAt">Completed</button></th>
-                        <th><button class="table-sort-button" type="button" data-report-run-sort="checkMode">Mode</button></th>
-                        <th><button class="table-sort-button" type="button" data-report-run-sort="scopeLabel">Scope</button></th>
-                        <th class="text-end"><button class="table-sort-button" type="button" data-report-run-sort="rowCount">Rows</button></th>
-                        <th class="text-end"><button class="table-sort-button" type="button" data-report-run-sort="availability">Availability</button></th>
-                        <th class="text-end"><button class="table-sort-button" type="button" data-report-run-sort="problemCount">Problems</button></th>
-                        <th class="text-end"><button class="table-sort-button" type="button" data-report-run-sort="durationMs">Run time</button></th>
-                        <th class="text-end">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody id="reports-recent-runs-body">
-                      <tr>
-                        <td colspan="8" class="text-center text-secondary py-3">No recent runs loaded.</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div class="reports-pagination border-top px-3 py-2">
-                  <span class="small text-secondary" id="reports-runs-page-summary">No page loaded</span>
-                  <div class="btn-group btn-group-sm" role="group" aria-label="Recent run pages">
-                    <button class="btn btn-outline-secondary" type="button" id="reports-runs-prev-page">
-                      <i class="fa-solid fa-chevron-left me-1"></i>
-                      Previous
-                    </button>
-                    <button class="btn btn-outline-secondary" type="button" id="reports-runs-next-page">
-                      Next
-                      <i class="fa-solid fa-chevron-right ms-1"></i>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <div class="card config-card mb-3">
-            <div class="card-header config-settings-header">
-              <span class="fw-semibold">Filters</span>
-            </div>
-            <div class="card-body">
-              <div class="reports-filter-grid">
-                <div>
-                  <label class="form-label" for="reports-search">Search</label>
-                  <input class="form-control" type="search" id="reports-search" placeholder="Device, IP, facility, category" autocomplete="off">
-                </div>
-                <div>
-                  <label class="form-label" for="reports-status-filter">Status</label>
-                  <select class="form-select" id="reports-status-filter">
-                    <option value="">All statuses</option>
-                    <option value="Healthy">Healthy</option>
-                    <option value="Degraded">Degraded</option>
-                    <option value="Down">Down</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="form-label" for="reports-mode-filter">Mode</label>
-                  <select class="form-select" id="reports-mode-filter">
-                    <option value="">All modes</option>
-                    <option value="Full">Full Check</option>
-                    <option value="PingOnly">Ping Only</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="form-label" for="reports-facility-filter">Facility</label>
-                  <select class="form-select" id="reports-facility-filter">
-                    <option value="">All facilities</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="form-label" for="reports-category-filter">Category</label>
-                  <select class="form-select" id="reports-category-filter">
-                    <option value="">All categories</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="form-label" for="reports-from-date">From</label>
-                  <input class="form-control" type="date" id="reports-from-date">
-                </div>
-                <div>
-                  <label class="form-label" for="reports-to-date">To</label>
-                  <input class="form-control" type="date" id="reports-to-date">
-                </div>
-                <div class="reports-filter-actions">
-                  <button class="btn btn-outline-secondary" type="button" id="reset-report-filters">
-                    <i class="fa-solid fa-filter-circle-xmark me-1"></i>
-                    Reset Filters
-                  </button>
-                </div>
-              </div>
-            </div>
+          <div class="reports-filterbar" role="search" aria-label="History filters">
+            <label class="reports-search-field">Search<input class="form-control form-control-sm" type="search" id="reports-search" placeholder="Device, address, hostname" autocomplete="off"></label>
+            <label>Period<select class="form-select form-select-sm" id="reports-period-filter"><option value="all">All recorded history</option><option value="today">Today</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="custom">Custom dates</option></select></label>
+            <label>Support group<select class="form-select form-select-sm" id="reports-profile-filter"><option value="">All support groups</option></select></label>
+            <label>Facility<select class="form-select form-select-sm" id="reports-facility-filter"><option value="">All facilities</option></select></label>
+            <label>Category<select class="form-select form-select-sm" id="reports-category-filter"><option value="">All categories</option></select></label>
+            <label>Result<select class="form-select form-select-sm" id="reports-status-filter"><option value="">All results</option><option value="Problems">Problems</option><option value="Healthy">Healthy</option><option value="Degraded">Degraded</option><option value="Down">Down</option><option value="Unknown">Not recorded</option></select></label>
+            <label>Mode<select class="form-select form-select-sm" id="reports-mode-filter"><option value="">All modes</option><option value="Full">Full Check</option><option value="PingOnly">Ping Only</option></select></label>
           </div>
-
-          <div class="card config-card">
-            <div class="card-header config-devices-header reports-table-header">
-              <span class="fw-semibold">Detailed Monitor History</span>
-              <div class="reports-table-controls">
-                <span class="small text-secondary" id="reports-table-summary">No rows loaded</span>
-                <label class="small text-secondary" for="reports-page-size">Rows</label>
-                <select class="form-select form-select-sm reports-page-size" id="reports-page-size">
-                  <option value="10" selected>10</option>
-                  <option value="50">50</option>
-                  <option value="100">100</option>
-                  <option value="250">250</option>
-                </select>
+          <div id="reports-custom-dates" class="reports-custom-dates" hidden>
+            <label>From<input class="form-control form-control-sm" type="date" id="reports-from-date"></label>
+            <label>To<input class="form-control form-control-sm" type="date" id="reports-to-date"></label>
+            <span class="text-danger small" id="reports-range-error" role="alert"></span>
+          </div>
+          <div class="reports-filter-context">
+            <div id="reports-active-filters" class="reports-active-filters" aria-label="Active history filters"></div>
+            <button class="btn btn-outline-secondary icon-button" type="button" id="reset-report-filters" title="Clear all report filters" aria-label="Clear all report filters" disabled><i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i></button>
+          </div>
+          <section class="reports-metrics" aria-label="Filtered history summary">
+            <div><span>Runs</span><strong id="reports-run-count">-</strong></div>
+            <div><span>Unique devices</span><strong id="reports-device-count">-</strong></div>
+            <div><span>Evaluations</span><strong id="reports-row-count">-</strong></div>
+            <div><span>Problem evaluations</span><strong id="reports-problem-count">-</strong></div>
+            <div><span>Healthy evaluations</span><strong id="reports-avg-availability">-</strong><small id="reports-healthy-count"></small></div>
+          </section>
+          <div class="reports-tabs" role="tablist" aria-label="Report views">
+            <button type="button" role="tab" id="reports-tab-summary" data-report-view="summary" aria-selected="true" aria-controls="reports-summary-view"><i class="fa-solid fa-chart-simple" aria-hidden="true"></i>Summary</button>
+            <button type="button" role="tab" id="reports-tab-runs" data-report-view="runs" aria-selected="false" aria-controls="reports-runs-view" tabindex="-1"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>Runs</button>
+            <button type="button" role="tab" id="reports-tab-devices" data-report-view="devices" aria-selected="false" aria-controls="reports-devices-view" tabindex="-1"><i class="fa-solid fa-desktop" aria-hidden="true"></i>Devices</button>
+          </div>
+          <div class="reports-state" id="reports-state" role="status" aria-live="polite"></div>
+          <section id="reports-summary-view" role="tabpanel" aria-labelledby="reports-tab-summary">
+            <div class="reports-section-heading">
+              <h3 class="h6 mb-0">Recorded results</h3>
+              <label class="reports-mobile-sort">Order<select class="form-select form-select-sm" id="reports-summary-sort" aria-label="Order summary"></select></label>
+              <div class="btn-group btn-group-sm" role="group" aria-label="Summary grouping">
+                <button class="btn btn-outline-secondary active" type="button" data-report-group="facility" aria-pressed="true">Facilities</button>
+                <button class="btn btn-outline-secondary" type="button" data-report-group="category" aria-pressed="false">Categories</button>
               </div>
             </div>
-            <div class="table-responsive">
-              <table class="table table-hover align-middle mb-0 reports-table">
-                <thead class="table-light">
-                  <tr>
-                    <th class="text-end">#</th>
-                    <th><button class="table-sort-button" type="button" data-report-sort="completedAt">Completed</button></th>
-                    <th><button class="table-sort-button" type="button" data-report-sort="deviceName">Device</button></th>
-                    <th><button class="table-sort-button" type="button" data-report-sort="ip">IP</button></th>
-                    <th><button class="table-sort-button" type="button" data-report-sort="facility">Facility</button></th>
-                    <th><button class="table-sort-button" type="button" data-report-sort="category">Category</button></th>
-                    <th><button class="table-sort-button" type="button" data-report-sort="status">Status</button></th>
-                    <th><button class="table-sort-button" type="button" data-report-sort="latencyMs">Latency</button></th>
-                    <th><button class="table-sort-button" type="button" data-report-sort="checkMode">Mode</button></th>
-                    <th><button class="table-sort-button" type="button" data-report-sort="durationMs">Run time</button></th>
-                  </tr>
-                </thead>
-                <tbody id="reports-table-body">
-                  <tr>
-                    <td colspan="10" class="text-center text-secondary py-4">Loading report history...</td>
-                  </tr>
-                </tbody>
+            <div id="reports-facility-panel">
+              <div class="small text-secondary mb-2" id="reports-facility-performance-summary"></div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle reports-summary-table mb-0">
+                  <thead><tr>
+                    <th><button class="table-sort-button" type="button" data-report-facility-sort="facility">Facility</button></th>
+                    <th class="text-end"><button class="table-sort-button" type="button" data-report-facility-sort="rowCount">Evaluations</button></th>
+                    <th class="text-end"><button class="table-sort-button" type="button" data-report-facility-sort="availability">Healthy %</button></th>
+                    <th class="text-end"><button class="table-sort-button" type="button" data-report-facility-sort="problemCount">Problems</button></th>
+                    <th class="text-end"><button class="table-sort-button" type="button" data-report-facility-sort="averageLatency">Avg ping</button></th>
+                  </tr></thead>
+                  <tbody id="reports-facility-executive-body"></tbody>
+                </table>
+              </div>
+              <div class="reports-pagination">
+                <span class="small text-secondary" id="reports-facility-page-summary"></span>
+                <div class="reports-table-controls">
+                  <label class="small" for="reports-facility-page-size">Rows</label>
+                  <select class="form-select form-select-sm reports-page-size" id="reports-facility-page-size"><option value="5">5</option><option value="10" selected>10</option><option value="25">25</option><option value="50">50</option></select>
+                  <div class="btn-group btn-group-sm" role="group" aria-label="facility pages">
+                    <button class="btn btn-outline-secondary icon-button" type="button" id="reports-facility-prev-page" title="Previous page" aria-label="Previous facility page"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+                    <button class="btn btn-outline-secondary icon-button" type="button" id="reports-facility-next-page" title="Next page" aria-label="Next facility page"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="reports-category-panel" hidden>
+              <div class="small text-secondary mb-2" id="reports-category-performance-summary"></div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle reports-summary-table mb-0">
+                  <thead><tr>
+                    <th><button class="table-sort-button" type="button" data-report-category-sort="category">Category</button></th>
+                    <th class="text-end"><button class="table-sort-button" type="button" data-report-category-sort="facilityCount">Facilities</button></th>
+                    <th class="text-end"><button class="table-sort-button" type="button" data-report-category-sort="rowCount">Evaluations</button></th>
+                    <th class="text-end"><button class="table-sort-button" type="button" data-report-category-sort="availability">Healthy %</button></th>
+                    <th class="text-end"><button class="table-sort-button" type="button" data-report-category-sort="problemCount">Problems</button></th>
+                    <th class="text-end"><button class="table-sort-button" type="button" data-report-category-sort="averageLatency">Avg ping</button></th>
+                  </tr></thead>
+                  <tbody id="reports-category-executive-body"></tbody>
+                </table>
+              </div>
+              <div class="reports-pagination">
+                <span class="small text-secondary" id="reports-category-page-summary"></span>
+                <div class="reports-table-controls">
+                  <label class="small" for="reports-category-page-size">Rows</label>
+                  <select class="form-select form-select-sm reports-page-size" id="reports-category-page-size"><option value="5">5</option><option value="10" selected>10</option><option value="25">25</option><option value="50">50</option></select>
+                  <div class="btn-group btn-group-sm" role="group" aria-label="category pages">
+                    <button class="btn btn-outline-secondary icon-button" type="button" id="reports-category-prev-page" title="Previous page" aria-label="Previous category page"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+                    <button class="btn btn-outline-secondary icon-button" type="button" id="reports-category-next-page" title="Next page" aria-label="Next category page"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section id="reports-runs-view" role="tabpanel" aria-labelledby="reports-tab-runs" hidden>
+            <div class="reports-section-heading"><h3 class="h6 mb-0">Recorded executions</h3><span class="small text-secondary" id="reports-runs-summary"></span><label class="reports-mobile-sort">Order<select class="form-select form-select-sm" id="reports-run-sort" aria-label="Order executions"></select></label></div>
+            <div id="reports-runs-panel" class="table-responsive">
+              <table class="table table-hover align-middle reports-runs-table mb-0">
+                <thead><tr>
+                  <th><button class="table-sort-button" type="button" data-report-run-sort="completedAt">Completed</button></th>
+                  <th>Support group</th>
+                  <th><button class="table-sort-button" type="button" data-report-run-sort="scopeLabel">Original scope</button></th>
+                  <th class="text-end"><button class="table-sort-button" type="button" data-report-run-sort="rowCount">Evaluations</button></th>
+                  <th class="text-end"><button class="table-sort-button" type="button" data-report-run-sort="availability">Healthy %</button></th>
+                  <th class="text-end">Actions</th>
+                </tr></thead>
+                <tbody id="reports-recent-runs-body"></tbody>
               </table>
             </div>
-            <div class="reports-pagination border-top px-3 py-2">
-              <span class="small text-secondary" id="reports-page-summary">No page loaded</span>
-              <div class="btn-group btn-group-sm" role="group" aria-label="Report table pages">
-                <button class="btn btn-outline-secondary" type="button" id="reports-prev-page">
-                  <i class="fa-solid fa-chevron-left me-1"></i>
-                  Previous
-                </button>
-                <button class="btn btn-outline-secondary" type="button" id="reports-next-page">
-                  Next
-                  <i class="fa-solid fa-chevron-right ms-1"></i>
-                </button>
+              <div class="reports-pagination">
+                <span class="small text-secondary" id="reports-runs-page-summary"></span>
+                <div class="reports-table-controls">
+                  <label class="small" for="reports-runs-page-size">Rows</label>
+                  <select class="form-select form-select-sm reports-page-size" id="reports-runs-page-size"><option value="5">5</option><option value="10" selected>10</option><option value="25">25</option><option value="50">50</option></select>
+                  <div class="btn-group btn-group-sm" role="group" aria-label="execution pages">
+                    <button class="btn btn-outline-secondary icon-button" type="button" id="reports-runs-prev-page" title="Previous page" aria-label="Previous execution page"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+                    <button class="btn btn-outline-secondary icon-button" type="button" id="reports-runs-next-page" title="Next page" aria-label="Next execution page"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                  </div>
+                </div>
               </div>
+          </section>
+          <section id="reports-devices-view" role="tabpanel" aria-labelledby="reports-tab-devices" hidden>
+            <div class="reports-section-heading"><h3 class="h6 mb-0">Device history</h3><span class="small text-secondary" id="reports-table-summary"></span><label class="reports-mobile-sort">Order<select class="form-select form-select-sm" id="reports-device-sort" aria-label="Order device history"></select></label></div>
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0 reports-table">
+                <thead><tr>
+                  <th><button class="table-sort-button" type="button" data-report-sort="deviceName">Device</button></th>
+                  <th><button class="table-sort-button" type="button" data-report-sort="facility">Facility</button></th>
+                  <th><button class="table-sort-button" type="button" data-report-sort="completedAt">Recorded</button></th>
+                  <th><button class="table-sort-button" type="button" data-report-sort="status">Result</button></th>
+                  <th><button class="table-sort-button" type="button" data-report-sort="checkMode">Mode</button></th>
+                  <th class="text-end">Detail</th>
+                </tr></thead>
+                <tbody id="reports-table-body"></tbody>
+              </table>
             </div>
-          </div>
+              <div class="reports-pagination">
+                <span class="small text-secondary" id="reports-page-summary"></span>
+                <div class="reports-table-controls">
+                  <label class="small" for="reports-page-size">Rows</label>
+                  <select class="form-select form-select-sm reports-page-size" id="reports-page-size"><option value="10" selected>10</option><option value="25">25</option><option value="50">50</option><option value="100">100</option></select>
+                  <div class="btn-group btn-group-sm" role="group" aria-label="device history pages">
+                    <button class="btn btn-outline-secondary icon-button" type="button" id="reports-prev-page" title="Previous page" aria-label="Previous device history page"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+                    <button class="btn btn-outline-secondary icon-button" type="button" id="reports-next-page" title="Next page" aria-label="Next device history page"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                  </div>
+                </div>
+              </div>
+          </section>
         </section>
 
         <section id="integrations-page" data-page="/integrations" hidden>
@@ -908,190 +771,96 @@
           </div>
         </section>
 
-        <section id="regions-page" data-page="/regions" hidden>
-          <div class="config-toolbar config-page-toolbar mb-3">
-            <div>
-              <h2 class="h4 mb-1">Support Groups</h2>
-              <p class="text-secondary mb-0">Manage independent JSON profiles for support groups inside each region.</p>
+        <section id="regions-page" class="management-page" data-page="/regions" hidden>
+          <div class="management-heading">
+            <h2 class="h4 mb-0">Support Groups</h2>
+            <div class="management-heading-actions">
+              <span class="spinner-border spinner-border-sm" id="regions-loading" role="status" aria-label="Loading support groups" hidden></span>
+              <button class="btn btn-outline-secondary btn-sm management-icon" id="reload-regions" type="button" title="Reload support groups" aria-label="Reload support groups"><i class="fa-solid fa-rotate"></i></button>
+              <button class="btn btn-primary btn-sm" id="new-region" type="button" disabled><i class="fa-solid fa-plus me-1"></i>New Group</button>
             </div>
           </div>
-
+          <div class="management-active"><span class="badge text-bg-success">Active</span><span id="active-region-summary" class="text-break">Loading support group...</span></div>
           <div id="region-alert"></div>
-
-          <div class="row g-3">
-            <div class="col-12 col-xl-4">
-              <div class="card config-card h-100">
-                <div class="card-header config-settings-header">
-                  <span class="fw-semibold">Active Support Group</span>
-                </div>
-                <div class="card-body">
-                  <label class="form-label" for="region-select">Support group profile</label>
-                  <select class="form-select mb-3" id="region-select"></select>
-                  <div class="small text-secondary" id="region-details">Select a support group profile.</div>
-                  <div class="region-action-grid mt-3">
-                    <button class="btn btn-outline-primary btn-sm" type="button" id="new-region">
-                      <i class="fa-solid fa-plus me-1"></i>
-                      New
-                    </button>
-                    <button class="btn btn-outline-secondary btn-sm" type="button" id="copy-region">
-                      <i class="fa-solid fa-copy me-1"></i>
-                      Copy
-                    </button>
-                    <button class="btn btn-outline-secondary btn-sm" type="button" id="rename-region">
-                      <i class="fa-solid fa-pen me-1"></i>
-                      Rename
-                    </button>
-                    <button class="btn btn-success btn-sm" type="button" id="activate-region">
-                      <span class="spinner-border spinner-border-sm me-1 d-none" id="activate-region-spinner" aria-hidden="true"></span>
-                      <i class="fa-solid fa-check me-1" id="activate-region-icon"></i>
-                      Set Active
-                    </button>
-                    <button class="btn btn-outline-danger btn-sm region-action-danger" type="button" id="delete-region">
-                      <i class="fa-solid fa-trash me-1"></i>
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="col-12 col-xl-8">
-              <div class="card config-card h-100">
-                <div class="card-header config-devices-header">
-                  <span class="fw-semibold">Support Group Profiles</span>
-                </div>
-                <div class="table-responsive">
-                  <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                      <tr>
-                        <th>Support Group</th>
-                        <th>Region</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody id="regions-body">
-                      <tr>
-                        <td colspan="3" class="text-center text-secondary py-4">Loading support groups...</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+          <div class="management-filters management-filters-three">
+            <label>Search<input class="form-control" id="regions-search" type="search" placeholder="Group, region or ID" disabled></label>
+            <label>Region<select class="form-select" id="regions-region-filter" disabled><option value="">All regions</option></select></label>
+            <label>Status<select class="form-select" id="regions-status-filter" disabled><option value="">All statuses</option><option value="active">Active</option><option value="available">Available</option><option value="protected">Protected</option></select></label>
           </div>
+          <div class="management-table-container"><table class="table table-hover management-table">
+            <thead><tr><th scope="col">Support Group</th><th scope="col" class="management-status-column">Status</th><th scope="col" class="management-actions-column text-end">Actions</th></tr></thead>
+            <tbody id="regions-body"><tr><td colspan="3" class="management-empty">Loading support groups...</td></tr></tbody>
+          </table></div>
+          <div class="management-count" id="regions-count" role="status"></div>
         </section>
 
-        <section id="themes-page" data-page="/themes" hidden>
-          <div class="config-toolbar config-page-toolbar mb-3">
-            <div>
-              <h2 class="h4 mb-1">Themes</h2>
-              <p class="text-secondary mb-0">Create, edit, and activate color templates stored in themes.json.</p>
+        <section id="themes-page" class="management-page" data-page="/themes" hidden>
+          <div class="management-heading">
+            <h2 class="h4 mb-0">Themes</h2>
+            <div class="management-heading-actions">
+              <span class="spinner-border spinner-border-sm" id="themes-loading" role="status" aria-label="Loading themes" hidden></span>
+              <button class="btn btn-outline-secondary btn-sm management-icon" id="reload-themes" type="button" title="Reload themes" aria-label="Reload themes"><i class="fa-solid fa-rotate"></i></button>
+              <button class="btn btn-primary btn-sm" id="new-theme" type="button" disabled><i class="fa-solid fa-plus me-1"></i>New Theme</button>
+              <div class="dropdown"><button class="btn btn-outline-secondary btn-sm management-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Theme library actions" title="Theme library actions"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+                <ul class="dropdown-menu dropdown-menu-end"><li><button class="dropdown-item text-danger" id="reset-themes" type="button" disabled><i class="fa-solid fa-rotate-left me-2"></i>Restore defaults</button></li></ul>
+              </div>
             </div>
           </div>
-
+          <div class="management-active"><span class="badge text-bg-success">Active</span><span id="active-theme-summary" class="text-break">Loading theme...</span></div>
           <div id="theme-alert"></div>
-
-          <div class="row g-3">
-            <div class="col-12 col-xl-4">
-              <div class="card config-card h-100">
-                <div class="card-header config-settings-header">
-                  <span class="fw-semibold">Theme Templates</span>
-                </div>
-                <div class="card-body">
-                  <label class="form-label" for="theme-select">Theme</label>
-                  <select class="form-select mb-3" id="theme-select"></select>
-
-                  <div class="region-action-grid">
-                    <button class="btn btn-outline-primary btn-sm" type="button" id="new-theme">
-                      <i class="fa-solid fa-plus me-1"></i>
-                      New
-                    </button>
-                    <button class="btn btn-outline-secondary btn-sm" type="button" id="copy-theme">
-                      <i class="fa-solid fa-copy me-1"></i>
-                      Copy
-                    </button>
-                    <button class="btn btn-outline-secondary btn-sm" type="button" id="rename-theme">
-                      <i class="fa-solid fa-pen me-1"></i>
-                      Rename
-                    </button>
-                    <button class="btn btn-success btn-sm" type="button" id="activate-theme">
-                      <i class="fa-solid fa-check me-1"></i>
-                      Set Active
-                    </button>
-                    <button class="btn btn-outline-danger btn-sm region-action-danger" type="button" id="delete-theme">
-                      <i class="fa-solid fa-trash me-1"></i>
-                      Delete
-                    </button>
-                    <button class="btn btn-outline-secondary btn-sm region-action-danger" type="button" id="reset-themes" title="Delete all custom themes and restore the default theme">
-                      <i class="fa-solid fa-rotate-left me-1"></i>
-                      Restore Defaults
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="col-12 col-xl-8">
-              <div class="card config-card">
-                <div class="card-header config-devices-header">
-                  <span class="fw-semibold">Colors</span>
-                  <button class="btn btn-success btn-sm" type="button" id="save-themes">
-                    <span class="spinner-border spinner-border-sm me-1 d-none" id="save-themes-spinner" aria-hidden="true"></span>
-                    <i class="fa-solid fa-floppy-disk me-1" id="save-themes-icon"></i>
-                    Save Themes
-                  </button>
-                </div>
-                <div class="card-body">
-                  <div class="theme-color-grid">
-                    <label class="theme-color-field">App background<input type="color" data-theme-color="appBackground"></label>
-                    <label class="theme-color-field">Surface<input type="color" data-theme-color="surface"></label>
-                    <label class="theme-color-field">Sidebar background<input type="color" data-theme-color="sidebarBackground"></label>
-                    <label class="theme-color-field">Sidebar text<input type="color" data-theme-color="sidebarText"></label>
-                    <label class="theme-color-field">Primary<input type="color" data-theme-color="primary"></label>
-                    <label class="theme-color-field">Success<input type="color" data-theme-color="success"></label>
-                    <label class="theme-color-field">Warning<input type="color" data-theme-color="warning"></label>
-                    <label class="theme-color-field">Danger<input type="color" data-theme-color="danger"></label>
-                    <label class="theme-color-field">Text<input type="color" data-theme-color="text"></label>
-                    <label class="theme-color-field">Muted text<input type="color" data-theme-color="mutedText"></label>
-                    <label class="theme-color-field">Border<input type="color" data-theme-color="border"></label>
-                    <label class="theme-color-field">Healthy category<input type="color" data-theme-color="categoryHealthy"></label>
-                    <label class="theme-color-field">Degraded category<input type="color" data-theme-color="categoryDegraded"></label>
-                    <label class="theme-color-field">Problem category<input type="color" data-theme-color="categoryProblem"></label>
-                    <label class="theme-color-field">Running category<input type="color" data-theme-color="categoryRunning"></label>
-                    <label class="theme-color-field">Configuration facility<input type="color" data-theme-color="configFacilityHeader"></label>
-                    <label class="theme-color-field">Configuration facility text<input type="color" data-theme-color="configFacilityText"></label>
-                    <label class="theme-color-field">Configuration category<input type="color" data-theme-color="configCategoryHeader"></label>
-                    <label class="theme-color-field">Configuration category text<input type="color" data-theme-color="configCategoryText"></label>
-                    <label class="theme-color-field">Auto Refresh ON<input type="color" data-theme-color="autoRefreshOn"></label>
-                    <label class="theme-color-field">Auto Refresh OFF<input type="color" data-theme-color="autoRefreshOff"></label>
-                    <label class="theme-color-field">Primary Run Button<input type="color" data-theme-color="runFullCheck"></label>
-                  </div>
-                </div>
-              </div>
-
-              <div class="theme-preview mt-3" id="theme-preview">
-                <div class="theme-preview-sidebar">NetWatch</div>
-                <div class="theme-preview-main">
-                  <div class="theme-preview-card">Surface card</div>
-                  <div class="theme-preview-states">
-                    <span class="badge theme-preview-success">Healthy</span>
-                    <span class="badge theme-preview-warning">Degraded</span>
-                    <span class="badge theme-preview-danger">Down</span>
-                  </div>
-                  <div class="theme-preview-actions">
-                    <span class="btn btn-sm" style="background: var(--nw-config-facility-header); border-color: var(--nw-config-facility-header); color: var(--nw-config-facility-text);">Configuration facility</span>
-                    <span class="btn btn-sm" style="background: var(--nw-config-category-header); border-color: var(--nw-border); color: var(--nw-config-category-text);">Configuration category</span>
-                    <span class="btn btn-sm" style="background: var(--nw-category-degraded); border-color: var(--nw-category-degraded); color: #111827;">Degraded category</span>
-                  </div>
-                  <div class="theme-preview-actions">
-                    <span class="btn btn-sm" style="background: var(--nw-auto-refresh-off); border-color: var(--nw-auto-refresh-off); color: #fff;">Auto Refresh: OFF</span>
-                    <span class="btn btn-sm" style="background: var(--nw-auto-refresh-on); border-color: var(--nw-auto-refresh-on); color: #fff;">Auto Refresh: ON</span>
-                    <span class="btn btn-sm" style="background: var(--nw-run-full-check); border-color: var(--nw-run-full-check); color: #111827;">Run All Facilities</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div class="management-filters">
+            <label>Search<input class="form-control" id="themes-search" type="search" placeholder="Theme name or ID" disabled></label>
+            <label>Status<select class="form-select" id="themes-status-filter" disabled><option value="">All statuses</option><option value="active">Active</option><option value="available">Available</option><option value="protected">Protected</option><option value="custom">Custom</option></select></label>
           </div>
+          <div class="management-table-container"><table class="table table-hover management-table">
+            <thead><tr><th scope="col">Theme</th><th scope="col" class="management-palette-column">Palette</th><th scope="col" class="management-status-column">Status</th><th scope="col" class="management-actions-column text-end">Actions</th></tr></thead>
+            <tbody id="themes-body"><tr><td colspan="4" class="management-empty">Loading themes...</td></tr></tbody>
+          </table></div>
+          <div class="management-count" id="themes-count" role="status"></div>
+
+          <section class="theme-editor" id="theme-editor" aria-labelledby="theme-editor-name" hidden>
+            <div class="management-heading">
+              <div class="theme-editor-heading"><h3 class="h5 mb-0" id="theme-editor-name" tabindex="-1">Colors</h3><span class="badge text-bg-secondary" id="theme-editor-protected">Protected</span><span class="badge text-bg-warning" id="theme-dirty-label" role="status" hidden>Unsaved changes</span></div>
+              <div class="management-heading-actions">
+                <button class="btn btn-outline-secondary btn-sm management-icon" id="discard-theme-colors" type="button" title="Discard color changes" aria-label="Discard color changes" disabled><i class="fa-solid fa-rotate-left"></i></button>
+                <button class="btn btn-success btn-sm" type="button" id="save-themes" disabled><span class="spinner-border spinner-border-sm me-1 d-none" id="save-themes-spinner" aria-hidden="true"></span><i class="fa-solid fa-floppy-disk me-1" id="save-themes-icon"></i>Save Colors</button>
+                <button class="btn btn-outline-secondary btn-sm management-icon" id="close-theme-editor" type="button" title="Close color editor" aria-label="Close color editor"><i class="fa-solid fa-xmark"></i></button>
+              </div>
+            </div>
+            <div class="theme-color-grid">
+              <label class="theme-color-field">App background<input type="color" data-theme-color="appBackground"></label>
+              <label class="theme-color-field">Surface<input type="color" data-theme-color="surface"></label>
+              <label class="theme-color-field">Sidebar background<input type="color" data-theme-color="sidebarBackground"></label>
+              <label class="theme-color-field">Sidebar text<input type="color" data-theme-color="sidebarText"></label>
+              <label class="theme-color-field">Primary<input type="color" data-theme-color="primary"></label>
+              <label class="theme-color-field">Success<input type="color" data-theme-color="success"></label>
+              <label class="theme-color-field">Warning<input type="color" data-theme-color="warning"></label>
+              <label class="theme-color-field">Danger<input type="color" data-theme-color="danger"></label>
+              <label class="theme-color-field">Text<input type="color" data-theme-color="text"></label>
+              <label class="theme-color-field">Muted text<input type="color" data-theme-color="mutedText"></label>
+              <label class="theme-color-field">Border<input type="color" data-theme-color="border"></label>
+              <label class="theme-color-field">Healthy category<input type="color" data-theme-color="categoryHealthy"></label>
+              <label class="theme-color-field">Degraded category<input type="color" data-theme-color="categoryDegraded"></label>
+              <label class="theme-color-field">Problem category<input type="color" data-theme-color="categoryProblem"></label>
+              <label class="theme-color-field">Running category<input type="color" data-theme-color="categoryRunning"></label>
+              <label class="theme-color-field">Configuration facility<input type="color" data-theme-color="configFacilityHeader"></label>
+              <label class="theme-color-field">Configuration facility text<input type="color" data-theme-color="configFacilityText"></label>
+              <label class="theme-color-field">Configuration category<input type="color" data-theme-color="configCategoryHeader"></label>
+              <label class="theme-color-field">Configuration category text<input type="color" data-theme-color="configCategoryText"></label>
+              <label class="theme-color-field">Auto Refresh ON<input type="color" data-theme-color="autoRefreshOn"></label>
+              <label class="theme-color-field">Auto Refresh OFF<input type="color" data-theme-color="autoRefreshOff"></label>
+              <label class="theme-color-field">Primary Run Button<input type="color" data-theme-color="runFullCheck"></label>
+            </div>
+            <div class="theme-preview mt-3" id="theme-preview">
+              <div class="theme-preview-sidebar">NetWatch</div>
+              <div class="theme-preview-main">
+                <div class="theme-preview-card">Surface card</div>
+                <div class="theme-preview-states"><span class="badge theme-preview-success">Healthy</span><span class="badge theme-preview-warning">Degraded</span><span class="badge theme-preview-danger">Down</span></div>
+                <div class="theme-preview-actions"><span class="badge" style="background:var(--nw-config-facility-header);color:var(--nw-config-facility-text)">Configuration facility</span><span class="badge" style="background:var(--nw-config-category-header);color:var(--nw-config-category-text)">Configuration category</span><span class="badge" style="background:var(--nw-category-degraded);color:#111827">Degraded category</span></div>
+                <div class="theme-preview-actions"><span class="badge" style="background:var(--nw-auto-refresh-off);color:#fff">Auto Refresh: OFF</span><span class="badge" style="background:var(--nw-auto-refresh-on);color:#fff">Auto Refresh: ON</span><span class="badge" style="background:var(--nw-run-full-check);color:#111827">Run All Facilities</span></div>
+              </div>
+            </div>
+          </section>
         </section>
 
         <section id="manual-page" data-page="/manual" hidden>
@@ -1109,21 +878,32 @@
               <p>The dashboard shows device health grouped by facility and category. Facility and category sections stay compact so large inventories remain easy to scan.</p>
               <ul>
                 <li>Use facility buttons to focus one site, then run only that facility when hundreds of devices are configured.</li>
-                <li>Use <strong>Run All Facilities</strong> to execute all configured ping and TCP checks immediately.</li>
-                <li>Use <strong>Full Check</strong> for configured ping and TCP checks, or <strong>Ping Only</strong> for a fast connectivity-only run.</li>
+                <li>Use <strong>Run All Facilities</strong> to execute all configured ping, TCP and HTTP/HTTPS checks immediately.</li>
+                <li>Use <strong>Full Check</strong> for configured ping, TCP and HTTP/HTTPS checks, or <strong>Ping Only</strong> for a fast connectivity-only run.</li>
                 <li>Use <strong>Run Failed</strong> when it appears to retry only devices currently marked as Degraded or Down.</li>
-                <li>Use <strong>Run</strong> beside a problem device's timestamp to repeat only that device when a failure may be temporary.</li>
+                <li>Use <strong>Run</strong> on any device row to check only that device, including healthy devices.</li>
                 <li>Use <strong>Auto Refresh</strong> to run a full check using the configured interval.</li>
-                <li>Use the search box to filter by name, IP, hostname, facility, or category.</li>
+                <li>Search configured devices before checking or after a partial run, by name, IP, hostname, facility, category or URL. Not checked is not an outage.</li>
+                <li><strong>Run Group</strong> checks the selected category within the selected facility, or across all sites with All Facilities. Search filters the view only.</li>
+                <li>The reset icon beside search clears dashboard filters without deleting results or history. Click a facility/category header band or its arrow to expand or collapse it.</li>
+                <li>Configure <strong>Command</strong> beside Website URL in the device form. Dashboard Command copies the literal text for the operator to review and paste; the app never executes it.</li>
                 <li>Use status filters to show all devices, online devices, offline devices, or problems.</li>
               </ul>
+            </section>
+
+            <section class="doc-panel">
+              <h3><i class="fa-solid fa-print me-2 text-primary"></i>Workstation Peripherals</h3>
+              <p>Use Peripherals to maintain printer/scanner manufacturer and model records for the active support group. In Configuration, choose Workstation as the device type and record printers and scanners separately as Not recorded, None or Assigned.</p>
+              <p>Assignments can include multiple models, USB/network/other connections, asset IDs and notes. Remove assignments before deleting a model. Catalog and assignments travel together when copying or exporting a profile.</p>
+              <p>This is recorded inventory, not automatic USB discovery or peripheral health. Add a network printer as a separate monitored device when ping/TCP checks are needed.</p>
+              <p>Workstations provides read-only search, facility/model and pending-inventory filters. None counts as recorded; Not recorded remains pending. Select a model name in Peripherals to find its workstations. Filter links and paging survive reload; matching unit counts are separate from workstation counts.</p>
             </section>
 
             <section class="doc-panel">
               <h3><i class="fa-solid fa-heart-pulse me-2 text-success"></i>Status Rules</h3>
               <p>Each device receives one final status after its checks complete.</p>
               <ul>
-                <li><strong>Healthy:</strong> every configured ping and TCP check succeeds.</li>
+                <li><strong>Healthy:</strong> every configured ping, TCP and HTTP check succeeds.</li>
                 <li><strong>Degraded:</strong> at least one check succeeds, but one or more checks fail.</li>
                 <li><strong>Down:</strong> no configured checks succeed.</li>
                 <li>In <strong>Ping Only</strong> mode, TCP ports are skipped for that execution and shown as skipped instead of failed.</li>
@@ -1136,14 +916,17 @@
               <p>The Configuration page edits the active region JSON used by the backend.</p>
               <ul>
                 <li>Use <strong>Support Groups</strong> to switch between independent JSON profiles such as Support Team A, Support Team B, or Demo.</li>
+                <li>Search/filter the region-grouped list and use its row menu to activate, copy, rename, delete or open a profile's configuration. Selection alone does not activate it.</li>
                 <li>Dashboard and Configuration always use the active support group profile.</li>
                 <li>Devices are grouped by facility and category; both levels are collapsible by default.</li>
                 <li>Filter configured devices by name, address, hostname, facility, or category.</li>
                 <li>Add, copy, or edit name, facility, address, hostname, website URL, category, enabled state, and checks from a modal editor.</li>
+                <li>Manage custom classifications in <strong>Device Types</strong>. Protected system types keep existing behavior; types assigned to devices cannot be deleted. <a href="/docs/DEVICE_TYPES.md">Device type guide</a>.</li>
                 <li>Use <strong>Bulk Edit</strong> for spreadsheet-style updates to common fields, with one save button per row.</li>
                 <li>Set <strong>Auto refresh</strong> to control how often Auto Refresh runs a full check.</li>
                 <li>Use <strong>Ping this device by hostname</strong> when that device's IP changes but its DNS name stays stable.</li>
                 <li>Use <strong>Themes</strong> to create, rename, activate, delete, and color reusable GUI templates.</li>
+                <li>Theme naming operations save immediately; color edits remain in preview until <strong>Save Colors</strong>. Unsaved colors require confirmation before being discarded. <a href="/docs/ADMINISTRATION.md">Administration guide</a>.</li>
                 <li>Use <strong>Export JSON</strong> and <strong>Import JSON</strong> to back up or restore the full configuration.</li>
                 <li>Click <strong>Save Settings</strong> to persist settings and create <code>config.backup.json</code>.</li>
               </ul>
@@ -1154,10 +937,12 @@
               <p>The portable build keeps runtime JSON profiles beside <code>NetWatch-Lite.exe</code>, so operators can manage independent support group inventories.</p>
               <ul>
                 <li>If support group profiles are missing, NetWatch Lite creates a <strong>Support Team A</strong> profile and a protected <strong>Demo</strong> profile.</li>
-                <li><strong>Reload JSON</strong> reloads the file without restarting the app.</li>
+                <li><strong>Reload</strong> reloads the active inventory without restarting the app.</li>
                 <li><strong>Export JSON</strong> downloads the active support group configuration; <strong>Import JSON</strong> validates a selected file before replacing the active support group configuration.</li>
                 <li>Invalid JSON is reported in the UI/API so it can be corrected.</li>
+                <li>Reports separates Summary, Runs and Devices with shared historical filters, recorded-check details and private CSV/JSON downloads. Healthy evaluations is a sample ratio, not continuous uptime. <a href="/docs/REPORTS.md">Reports guide</a>.</li>
                 <li>TCP checks verify whether a socket connection can be opened.</li>
+                <li>HTTP/HTTPS checks send an anonymous GET with a per-attempt timeout, expected status and optional case-sensitive response text. Errors and duration appear in Dashboard and Reports. Redirects are not followed and TLS certificates must be valid. <a href="/docs/HTTP_CHECKS.md">HTTP check guide</a>.</li>
               </ul>
             </section>
 
@@ -1175,7 +960,7 @@
               <h3><i class="fa-solid fa-shield-halved me-2 text-success"></i>Security Model</h3>
               <p>NetWatch Lite is intended for trusted internal use. It does not currently include built-in authentication, user roles, or permission-based authorization.</p>
               <ul>
-                <li>Runtime JSON files are local and ignored by Git.</li>
+                <li>Runtime storage, backups and exports are local and ignored by Git.</li>
                 <li>Portable releases should include only the safe sample JSON, not active operational profiles.</li>
                 <li>Import JSON validates file type, size, JSON structure, and monitor configuration before replacing active data.</li>
                 <li>Configuration saves are validated by the backend and create local backups.</li>
@@ -1183,6 +968,75 @@
               </ul>
             </section>
           </div>
+        </section>
+
+        <section id="workstations-page" data-page="/workstations" hidden>
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div><h2 class="h4 mb-1">Workstations</h2><div class="text-secondary small" id="workstations-profile-label"></div></div>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="reset-workstation-filters" title="Reset filters" aria-label="Reset workstation filters" disabled><i class="fa-solid fa-filter-circle-xmark"></i></button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="reload-workstations" title="Reload workstations" aria-label="Reload workstations"><i class="fa-solid fa-rotate"></i></button>
+            </div>
+          </div>
+          <div id="workstations-alert" role="alert" class="text-danger mb-2"></div>
+          <dl class="workstations-totals d-flex flex-wrap gap-4 mb-3">
+            <div><dt class="text-secondary small fw-normal">Workstations</dt><dd class="h5 mb-0" id="workstations-total">-</dd></div>
+            <div><dt class="text-secondary small fw-normal">Pending inventory</dt><dd class="h5 mb-0" id="workstations-pending">-</dd></div>
+            <div><dt class="text-secondary small fw-normal">Fully recorded</dt><dd class="h5 mb-0" id="workstations-recorded">-</dd></div>
+          </dl>
+          <div class="row g-2 align-items-end mb-3">
+            <div class="col-12 col-md-6 col-xl-4"><label class="form-label" for="workstation-search">Search</label><input type="search" class="form-control" id="workstation-search" placeholder="Workstation, model, asset ID or address" disabled></div>
+            <div class="col-12 col-sm-6 col-xl-2"><label class="form-label" for="workstation-facility-filter">Facility</label><select class="form-select" id="workstation-facility-filter" disabled><option value="">All facilities</option></select></div>
+            <div class="col-12 col-sm-6 col-xl-3"><label class="form-label" for="workstation-inventory-filter">Inventory</label><select class="form-select" id="workstation-inventory-filter" disabled><option value="all">All workstations</option><option value="pending">Any not recorded</option><option value="printers">Printers not recorded</option><option value="scanners">Scanners not recorded</option><option value="recorded">Fully recorded</option></select></div>
+            <div class="col-12 col-md-6 col-xl-3"><label class="form-label" for="workstation-model-filter">Peripheral model</label><select class="form-select" id="workstation-model-filter" disabled><option value="">All models</option></select></div>
+          </div>
+          <div id="workstations-match-summary" class="small text-secondary mb-2" role="status" aria-live="polite"></div>
+          <table class="table table-hover align-top workstations-table" role="table" aria-label="Workstation peripheral inventory">
+            <colgroup><col style="width:36%"><col style="width:32%"><col style="width:32%"></colgroup>
+            <thead><tr><th scope="col">Workstation</th><th scope="col">Printers</th><th scope="col">Scanners</th></tr></thead>
+            <tbody id="workstations-body"></tbody>
+          </table>
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+            <span class="small text-secondary" id="workstations-page-summary"></span>
+            <div class="d-flex align-items-center gap-2">
+              <label class="small text-secondary" for="workstations-page-size">Rows</label><select class="form-select form-select-sm" id="workstations-page-size" disabled><option value="10">10</option><option value="25" selected>25</option><option value="50">50</option><option value="100">100</option></select>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="workstations-prev" title="Previous page" aria-label="Previous workstations page" disabled><i class="fa-solid fa-chevron-left"></i></button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="workstations-next" title="Next page" aria-label="Next workstations page" disabled><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+        </section>
+
+        <section id="device-types-page" class="management-page" data-page="/device-types" hidden>
+          <div class="management-heading">
+            <div class="min-w-0"><h2 class="h4 mb-1">Device Types</h2><div class="small text-secondary text-break" id="device-types-profile"></div></div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline-secondary btn-sm" type="button" id="reload-device-types" title="Reload device types" aria-label="Reload device types"><i class="fa-solid fa-rotate"></i></button>
+              <button class="btn btn-primary btn-sm" type="button" id="add-device-type" disabled><i class="fa-solid fa-plus me-1"></i>Add Type</button>
+            </div>
+          </div>
+          <div class="small text-danger mb-2" id="device-types-alert" role="alert"></div>
+          <div class="row g-2 align-items-end mb-3">
+            <div class="col-12 col-sm-8"><label class="form-label" for="device-types-search">Search</label><input class="form-control" type="search" id="device-types-search" placeholder="Name or ID" disabled></div>
+            <div class="col-12 col-sm-4"><label class="form-label" for="device-types-filter">Status</label><select class="form-select" id="device-types-filter" disabled><option value="">All types</option><option value="custom">Custom</option><option value="protected">Protected</option><option value="used">In use</option><option value="unused">Unused</option></select></div>
+          </div>
+          <div class="table-responsive"><table class="table table-hover align-middle device-types-table"><thead><tr><th>Name</th><th>Devices</th><th>Status</th><th class="text-end">Actions</th></tr></thead><tbody id="device-types-body"></tbody></table></div>
+          <div class="small text-secondary" id="device-types-count" role="status"></div>
+        </section>
+
+        <section id="peripherals-page" class="management-page" data-page="/peripherals" hidden>
+          <div class="management-heading">
+            <div><h2 class="h4 mb-1">Peripheral Catalog</h2><div class="text-secondary small" id="peripheral-profile-label"></div></div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline-secondary btn-sm" type="button" id="reload-peripherals" title="Reload catalog" aria-label="Reload catalog"><i class="fa-solid fa-rotate"></i></button>
+              <button class="btn btn-primary btn-sm" type="button" id="add-peripheral-model"><i class="fa-solid fa-plus me-1"></i>Add Model</button>
+            </div>
+          </div>
+          <div id="peripheral-catalog-alert" role="status"></div>
+          <div class="row g-2 align-items-end mb-3">
+            <div class="col-12 col-sm-4"><label class="form-label" for="peripheral-kind-filter">Type</label><select class="form-select" id="peripheral-kind-filter"><option value="">All peripherals</option><option value="printer">Printers</option><option value="scanner">Scanners</option></select></div>
+            <div class="col-12 col-sm-8"><label class="form-label" for="peripheral-catalog-search">Search</label><input class="form-control" type="search" id="peripheral-catalog-search" placeholder="Manufacturer or model"></div>
+          </div>
+          <div class="table-responsive"><table class="table table-hover align-middle management-catalog-table"><thead><tr><th>Type</th><th>Manufacturer</th><th>Model</th><th>Assignments</th><th class="text-end">Actions</th></tr></thead><tbody id="peripheral-catalog-body"></tbody></table></div>
         </section>
 
         <section id="about-page" data-page="/about" hidden>
@@ -1226,6 +1080,43 @@
     </div>
   </div>
 
+  <div class="modal fade" id="device-type-modal" tabindex="-1" aria-labelledby="device-type-modal-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><form class="modal-content" id="device-type-form">
+      <div class="modal-header"><h2 class="modal-title fs-5" id="device-type-modal-title">Add Device Type</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body">
+        <div class="small text-danger mb-2" id="device-type-form-alert" role="alert"></div>
+        <input type="hidden" id="device-type-edit-id">
+        <label class="form-label" for="device-type-name">Name</label><input class="form-control" id="device-type-name" maxlength="100" autocomplete="off" required>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" id="reload-type-editor" hidden><i class="fa-solid fa-rotate me-1"></i>Reload catalog</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary" id="save-device-type">Save Type</button>
+      </div>
+    </form></div>
+  </div>
+
+  <div class="modal fade" id="peripheral-model-modal" tabindex="-1" aria-labelledby="peripheral-model-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><form class="modal-content" id="peripheral-model-form">
+      <div class="modal-header"><h2 class="modal-title fs-5" id="peripheral-model-title">Add Model</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body">
+        <div id="peripheral-model-alert" role="alert"></div>
+        <input type="hidden" id="peripheral-model-id">
+        <label class="form-label" for="peripheral-model-kind">Type</label><select class="form-select mb-3" id="peripheral-model-kind"><option value="printer">Printer</option><option value="scanner">Scanner</option></select>
+        <label class="form-label" for="peripheral-manufacturer">Manufacturer</label><input class="form-control mb-3" id="peripheral-manufacturer" maxlength="100" required>
+        <label class="form-label" for="peripheral-model-name">Model</label><input class="form-control" id="peripheral-model-name" maxlength="150" required>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary" id="save-peripheral-model">Save Model</button></div>
+    </form></div>
+  </div>
+
+  <div class="modal fade" id="management-confirm-modal" tabindex="-1" aria-labelledby="management-confirm-title" aria-describedby="management-confirm-message" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+      <div class="modal-header"><h2 class="modal-title fs-5" id="management-confirm-title">Confirm action</h2><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body"><p class="mb-0" id="management-confirm-message"></p></div>
+      <div class="modal-footer"><button class="btn btn-outline-secondary" id="management-cancel" type="button" data-bs-dismiss="modal">Cancel</button><button class="btn btn-danger" id="management-confirm" type="button">Delete</button></div>
+    </div></div>
+  </div>
+
   <div class="modal fade" id="theme-form-modal" tabindex="-1" aria-labelledby="theme-form-title" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <form class="modal-content" id="theme-form">
@@ -1234,6 +1125,7 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
+          <div class="small text-danger mb-2" id="theme-form-alert" role="alert"></div>
           <label class="form-label" for="theme-name">Name</label>
           <input class="form-control" type="text" id="theme-name" autocomplete="off" required>
         </div>
@@ -1253,6 +1145,7 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
+          <div class="small text-danger mb-2" id="region-form-alert" role="alert"></div>
           <div class="mb-3">
             <label class="form-label" for="region-name">Support Group</label>
             <input class="form-control" type="text" id="region-name" autocomplete="off" placeholder="Support Team A" required>
@@ -1263,7 +1156,7 @@
           </div>
           <div class="form-check" id="region-copy-wrapper">
             <input class="form-check-input" type="checkbox" id="region-copy-active" checked>
-            <label class="form-check-label" for="region-copy-active">Copy devices from the active support group</label>
+            <label class="form-check-label" for="region-copy-active">Copy inventory and catalogs from <strong id="region-copy-source">the active support group</strong></label>
           </div>
         </div>
         <div class="modal-footer">
@@ -1284,29 +1177,53 @@
         <div class="modal-body">
           <input type="hidden" id="editing-device-index">
           <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-2"><label class="form-label mb-0" for="device-type">Device Type</label><a class="small" href="/device-types" data-route="/device-types" id="manage-device-types">Manage types</a></div>
+            <select class="form-select" id="device-type"><option value="unspecified">Not specified</option></select>
+          </div>
+          <div class="mb-3">
             <label class="form-label" for="device-name">Name</label>
             <input class="form-control" type="text" id="device-name" autocomplete="off" required>
           </div>
-          <div class="mb-3">
-            <label class="form-label" for="device-address">Address</label>
+          <div class="mb-3" id="device-monitoring-preset-wrap">
+            <label class="form-label" for="device-monitoring-preset">Monitoring preset</label>
+            <select class="form-select" id="device-monitoring-preset"><option value="network">Network device</option><option value="web">Web application</option></select>
+          </div>
+          <div class="mb-3" id="device-network-fields">
+            <label class="form-label" for="device-address">Network target (IP / hostname)</label>
             <input class="form-control" type="text" id="device-address" autocomplete="off" required>
           </div>
           <div class="mb-3">
             <label class="form-label" for="device-facility">Facility</label>
             <input class="form-control" type="text" id="device-facility" autocomplete="off" placeholder="Unassigned">
           </div>
+          <div class="mb-3" id="device-location-fields">
+            <label class="form-label" for="device-location">Location</label>
+            <input class="form-control" type="text" id="device-location" maxlength="200" autocomplete="off">
+          </div>
           <div class="mb-3">
+            <label class="form-label" for="device-notes">Notes</label>
+            <textarea class="form-control" id="device-notes" rows="3" maxlength="2000" autocomplete="off"></textarea>
+          </div>
+          <div class="mb-3" id="device-hostname-fields">
             <label class="form-label" for="device-hostname">Hostname</label>
             <input class="form-control" type="text" id="device-hostname" autocomplete="off" placeholder="Optional DNS name">
           </div>
-          <div class="form-check form-switch mb-3">
+          <div class="form-check form-switch mb-3" id="device-ping-fields">
             <input class="form-check-input" type="checkbox" role="switch" id="device-use-hostname-for-ping">
             <label class="form-check-label" for="device-use-hostname-for-ping">Ping this device by hostname</label>
           </div>
+          <fieldset class="mb-3" id="device-shortcuts">
+            <legend class="h6">Shortcuts</legend>
           <div class="mb-3">
-            <label class="form-label" for="device-website-url">Website URL</label>
+            <label class="form-label" for="device-website-url">Open website link (optional)</label>
             <input class="form-control" type="url" id="device-website-url" autocomplete="off" placeholder="Optional http:// or https:// URL">
           </div>
+          <div class="mb-3" id="device-command-fields">
+            <label class="form-label" for="device-command">Command</label>
+            <input class="form-control" type="text" id="device-command" maxlength="4096" autocomplete="off" spellcheck="false" aria-describedby="device-command-help">
+            <div class="form-text" id="device-command-help">Comando para copiar al portapapeles. No se ejecuta autom&aacute;ticamente.</div>
+          </div>
+          </fieldset>
           <div class="mb-3">
             <label class="form-label" for="device-category">Category</label>
             <input class="form-control" type="text" id="device-category" autocomplete="off" placeholder="Uncategorized">
@@ -1322,7 +1239,21 @@
               Add Check
             </button>
           </div>
+          <div class="small text-danger mb-2" id="device-check-alert" role="alert" hidden></div>
           <div class="checks-list" id="checks-list"></div>
+          <fieldset id="workstation-peripherals" class="mt-4" hidden disabled>
+            <legend class="h6">Workstation Peripherals</legend>
+            <div id="device-peripheral-alert" role="alert" class="text-danger small mb-2"></div>
+            <div class="d-flex justify-content-end mb-2"><a href="/peripherals" data-route="/peripherals">Manage catalog</a></div>
+            <div class="peripheral-group" data-peripheral-group="printers">
+              <label class="form-label" for="device-printer-status">Printers</label><select class="form-select" id="device-printer-status"><option value="unrecorded">Not recorded</option><option value="none">None</option><option value="assigned">Assigned</option></select>
+              <div data-peripheral-items></div><button type="button" class="btn btn-outline-primary btn-sm mt-2" data-add-peripheral="printers"><i class="fa-solid fa-plus me-1"></i>Add Printer</button>
+            </div>
+            <div class="peripheral-group mt-3" data-peripheral-group="scanners">
+              <label class="form-label" for="device-scanner-status">Scanners</label><select class="form-select" id="device-scanner-status"><option value="unrecorded">Not recorded</option><option value="none">None</option><option value="assigned">Assigned</option></select>
+              <div data-peripheral-items></div><button type="button" class="btn btn-outline-primary btn-sm mt-2" data-add-peripheral="scanners"><i class="fa-solid fa-plus me-1"></i>Add Scanner</button>
+            </div>
+          </fieldset>
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline-secondary" type="button" id="reset-device-form">Cancel</button>
@@ -1350,7 +1281,29 @@
     </div>
   </div>
 
+  <div class="modal fade" id="reports-detail-modal" tabindex="-1" aria-labelledby="reports-detail-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable reports-detail-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="reports-detail-title">Evaluation</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close evaluation"></button>
+        </div>
+        <div class="modal-body" id="reports-detail-body"></div>
+        <div class="modal-footer justify-content-between">
+          <button class="btn btn-outline-secondary btn-sm" type="button" id="reports-detail-run"><i class="fa-solid fa-list-check me-1" aria-hidden="true"></i>View execution</button>
+          <button class="btn btn-outline-primary btn-sm" type="button" id="reports-detail-device"><i class="fa-solid fa-clock-rotate-left me-1" aria-hidden="true"></i>Device history</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="/app.js?v=reports-20260627"></script>
+  <script src="/management.js?v=20261107"></script>
+  <script src="/peripherals.js?v=peripheral-link-20261109"></script>
+  <script src="/device-types.js?v=management-20261107"></script>
+  <script src="/workstations.js?v=peripheral-link-20261109"></script>
+  <script src="/reports-sql.js?v=url-crud-20261111-r2"></script>
+  <script src="/storage.js?v=sqlite2-20261110"></script>
+  <script src="/app.js?v=url-crud-20261111-r2"></script>
 </body>
 </html>

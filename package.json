@@ -1,0 +1,16 @@
+{
+  "name": "netwatch-lite-quality",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Browser regression tooling for NetWatch Lite",
+  "scripts": {
+    "pretest:e2e": "dotnet publish NetWatch.csproj --configuration Release --no-restore --output tests/.app",
+    "test:e2e": "playwright test",
+    "test:e2e:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "bootstrap": "5.3.3",
+    "@fortawesome/fontawesome-free": "6.5.2"
+  }
+}

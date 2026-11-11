@@ -1,0 +1,40 @@
+name: Security
+
+on:
+  pull_request:
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v4
+
+  vulnerable-packages:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore
+        run: dotnet restore netwatch.sln
+      - name: List vulnerable packages
+        shell: pwsh
+        run: |
+          $result = dotnet list netwatch.sln package --vulnerable --include-transitive
+          $result | Write-Output
+          if ($result -match 'has the following vulnerable packages') {
+            throw 'Vulnerable NuGet packages were detected.'
+          }

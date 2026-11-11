@@ -35,6 +35,7 @@ const runFailedCheckButton = document.querySelector("#run-failed-check");
 const runFailedCheckSpinner = document.querySelector("#run-failed-check-spinner");
 const runFailedCheckIcon = document.querySelector("#run-failed-check-icon");
 const searchInput = document.querySelector("#device-search");
+const clearDashboardFiltersButton = document.querySelector('#clear-dashboard-filters');
 const filterInputs = document.querySelectorAll("input[name='status-filter']");
 const monitorProgress = document.querySelector("#monitor-progress");
 const monitorProgressSpinner = document.querySelector("#monitor-progress-spinner");
@@ -87,6 +88,14 @@ const reportsRunsPageSizeSelect = document.querySelector("#reports-runs-page-siz
 const reportsRunsPrevPageButton = document.querySelector("#reports-runs-prev-page");
 const reportsRunsNextPageButton = document.querySelector("#reports-runs-next-page");
 const reportsRunsPageSummary = document.querySelector("#reports-runs-page-summary");
+const reportsProfileFilter = document.querySelector('#reports-profile-filter');
+const reportsPeriodFilter = document.querySelector('#reports-period-filter');
+const reportsDeviceCount = document.querySelector('#reports-device-count');
+const reportsExportMenu = document.querySelector('#reports-export-menu');
+const reportsCsvButton = document.querySelector('#export-reports-csv');
+const reportsDetailElement = document.querySelector('#reports-detail-modal');
+const reportsDetailModal = typeof bootstrap !== 'undefined' ? new bootstrap.Modal(reportsDetailElement) : null;
+const reportsMobileQuery = window.matchMedia('(max-width: 767px)');
 const integrationsAlert = document.querySelector("#integrations-alert");
 const reloadIntegrationsButton = document.querySelector("#reload-integrations");
 const saveIntegrationsButton = document.querySelector("#save-integrations");
@@ -150,9 +159,13 @@ const deviceFacilityInput = document.querySelector("#device-facility");
 const deviceHostnameInput = document.querySelector("#device-hostname");
 const deviceUseHostnameForPingInput = document.querySelector("#device-use-hostname-for-ping");
 const deviceWebsiteUrlInput = document.querySelector("#device-website-url");
+const deviceCommandInput = document.querySelector("#device-command");
+const deviceLocationInput = document.querySelector("#device-location");
+const deviceNotesInput = document.querySelector("#device-notes");
 const deviceCategoryInput = document.querySelector("#device-category");
 const deviceEnabledInput = document.querySelector("#device-enabled");
 const checksList = document.querySelector("#checks-list");
+let httpCheckHelpSequence = 0;
 const addCheckButton = document.querySelector("#add-check");
 const resetDeviceFormButton = document.querySelector("#reset-device-form");
 const submitDeviceButton = document.querySelector("#submit-device");
@@ -163,16 +176,8 @@ const deleteDeviceModal = typeof bootstrap !== "undefined" && deleteDeviceModalE
 const deleteDeviceName = document.querySelector("#delete-device-name");
 const confirmDeleteDeviceButton = document.querySelector("#confirm-delete-device");
 const regionAlert = document.querySelector("#region-alert");
-const regionSelect = document.querySelector("#region-select");
-const regionDetails = document.querySelector("#region-details");
 const regionsBody = document.querySelector("#regions-body");
 const newRegionButton = document.querySelector("#new-region");
-const copyRegionButton = document.querySelector("#copy-region");
-const renameRegionButton = document.querySelector("#rename-region");
-const activateRegionButton = document.querySelector("#activate-region");
-const activateRegionSpinner = document.querySelector("#activate-region-spinner");
-const activateRegionIcon = document.querySelector("#activate-region-icon");
-const deleteRegionButton = document.querySelector("#delete-region");
 const regionFormModalElement = document.querySelector("#region-form-modal");
 const regionFormModal = typeof bootstrap !== "undefined" && regionFormModalElement
   ? new bootstrap.Modal(regionFormModalElement)
@@ -185,7 +190,6 @@ const regionCopyWrapper = document.querySelector("#region-copy-wrapper");
 const regionCopyActiveInput = document.querySelector("#region-copy-active");
 const submitRegionButton = document.querySelector("#submit-region");
 const themeAlert = document.querySelector("#theme-alert");
-const themeSelect = document.querySelector("#theme-select");
 const themeNameInput = document.querySelector("#theme-name");
 const themeFormModalElement = document.querySelector("#theme-form-modal");
 const themeFormModal = typeof bootstrap !== "undefined" && themeFormModalElement
@@ -196,14 +200,10 @@ const themeFormTitle = document.querySelector("#theme-form-title");
 const submitThemeButton = document.querySelector("#submit-theme");
 const themeColorInputs = document.querySelectorAll("[data-theme-color]");
 const newThemeButton = document.querySelector("#new-theme");
-const copyThemeButton = document.querySelector("#copy-theme");
-const renameThemeButton = document.querySelector("#rename-theme");
 const resetThemesButton = document.querySelector("#reset-themes");
 const saveThemesButton = document.querySelector("#save-themes");
 const saveThemesSpinner = document.querySelector("#save-themes-spinner");
 const saveThemesIcon = document.querySelector("#save-themes-icon");
-const activateThemeButton = document.querySelector("#activate-theme");
-const deleteThemeButton = document.querySelector("#delete-theme");
 const themePreview = document.querySelector("#theme-preview");
 
 let refreshTimer;
@@ -225,13 +225,18 @@ let activeRunKeepsDashboardStable = false;
 let activeRunPreservesDashboard = false;
 let currentRoute = normalizeRoute(location.pathname);
 let hasLoadedDashboardGroups = false;
+let dashboardInventoryAvailable = false;
 let dashboardConfigStale = false;
 let activeConfigSearch = "";
+let savedDeviceReveal = null;
+let pendingDashboardReveal = null;
 let activeConfigView = "normal";
 let activeBulkFacility = "";
 let activeBulkCategory = "";
 let reportsState = { schemaVersion: 1, runs: [] };
 let reportsRows = [];
+let reportsSqlEnabled = false;
+let reportsSqlState = null;
 let reportsFilters = createDefaultReportsFilters();
 let reportsSort = { key: "completedAt", direction: "desc" };
 let reportsCurrentPage = 1;
@@ -245,9 +250,18 @@ let reportsCategoryPageSize = 10;
 let reportsRunSort = { key: "completedAt", direction: "desc" };
 let reportsRunPage = 1;
 let reportsRunPageSize = 10;
+let reportsAvailable = false;
+let reportsBusy = false;
+let reportsLoadVersion = 0;
+let reportsActiveView = 'summary';
+let reportsSummaryGroup = 'facility';
+let reportsSelectedRow = null;
+let reportsDetailTrigger = null;
+let reportsConfirmingDelete = false;
 let integrationsState = createDefaultIntegrationsState();
 let selectedBulkIndexes = new Set();
 const collapsedBulkFacilityNames = new Set();
+let configSearchBulkCollapseSnapshot = null;
 const alertAutoDismissMs = 10000;
 const alertDismissTimers = new Map();
 const defaultAutoFullCheckIntervalSeconds = 60;
@@ -521,7 +535,7 @@ function renderScopedMonitorPayload(payload, { facility = "", category = "" } = 
   renderFilteredCategories();
   updateRunFailedButton();
   executionMode.textContent = getDashboardExecutionText(payload.checkMode);
-  lastCheck.textContent = `Last ${facility || category} execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
+  lastCheck.textContent = `Last ${[facility, category].filter(Boolean).join(' / ')} execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
   updateProgressPanel(scopedResults.length, scopedResults.length, "Completed", false);
   activeRunKeepsDashboardStable = false;
 }
@@ -747,7 +761,7 @@ function renderSummary(summary) {
   metricOnline.textContent = formatNumber(summary.onlineDevices);
   metricOffline.textContent = formatNumber(summary.offlineDevices);
   metricDegraded.textContent = formatNumber(summary.degradedDevices);
-  metricAvailability.textContent = `${formatPercent(summary.availabilityPercentage)}%`;
+  metricAvailability.textContent = summary.availabilityPercentage == null ? '-' : `${formatPercent(summary.availabilityPercentage)}%`;
 }
 
 function createSummaryFromCategories(categories) {
@@ -756,7 +770,9 @@ function createSummaryFromCategories(categories) {
 }
 
 function createSummaryFromResults(results) {
-  return createProgressSummary(results, results.length);
+  const checked = results.filter(result => result.status !== 'Pending');
+  return { ...createProgressSummary(results, results.length),
+    availabilityPercentage: checked.length ? createProgressSummary(checked).availabilityPercentage : null };
 }
 
 function createProgressSummary(devices, totalDevices = devices.length) {
@@ -780,9 +796,14 @@ function createProgressSummary(devices, totalDevices = devices.length) {
 }
 
 function renderFilteredCategories() {
-  renderSummary(createSummaryFromResults(getVisibleResults()));
   renderFacilityTabs();
+  updateDashboardFilterReset();
   const visibleResults = getVisibleResults();
+  renderSummary(createSummaryFromResults(visibleResults));
+  if (!dashboardInventoryAvailable) {
+    resultsBody.innerHTML = '<div class="text-center text-secondary py-4">Inventory unavailable.</div>';
+    return;
+  }
 
   if (activeFacility) {
     renderCategories(filterCategories(groupResultsByCategory(visibleResults)), activeFacility);
@@ -794,6 +815,10 @@ function renderFilteredCategories() {
 
 function createDefaultReportsFilters() {
   return {
+    profile: '',
+    period: 'all',
+    runKey: '',
+    deviceKey: '',
     search: "",
     status: "",
     mode: "",
@@ -824,584 +849,693 @@ function createDefaultIntegrationsState() {
 }
 
 async function loadReports({ showBusy = true, showErrors = true } = {}) {
-  if (showBusy) {
-    reportsTableBody.innerHTML = `<tr><td colspan="10" class="text-center text-secondary py-4">Loading report history...</td></tr>`;
-  }
-
+  const providerVersion = ++reportsLoadVersion;
+  let storage;
   try {
-    const response = await fetch("/api/history");
-    const payload = await readJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(payload.error || payload.detail || `Unable to load report history (${response.status}).`);
-    }
-
-    reportsState = payload;
-    reportsRows = flattenHistoryRows(payload.runs ?? []);
-    populateReportFilterOptions();
-    renderReports();
-    clearReportsAlert();
+    const storageResponse = await fetch('/api/storage');
+    if (!storageResponse.ok) throw new Error('Unable to determine storage provider.');
+    storage = await storageResponse.json();
   } catch (error) {
-    if (showErrors) {
-      showReportsAlert("danger", error.message || "Unable to load report history.");
-      reportsTableBody.innerHTML = `<tr><td colspan="10" class="text-center text-danger py-4">Unable to load report history.</td></tr>`;
-    }
-    console.error(error);
+    if (providerVersion === reportsLoadVersion) { reportsAvailable = false; reportsBusy = false; showReportsAlert('danger',error.message); renderReports(true); }
+    return;
   }
+  if (providerVersion !== reportsLoadVersion || currentRoute !== '/reports') return;
+  reportsSqlEnabled = storage.provider === 'sqlite' && storage.schemaVersion >= 2;
+  if (reportsSqlEnabled) return window.netwatchSqlReports.load();
+  reportsSqlState = null;
+  const version = ++reportsLoadVersion;
+  reportsBusy = true;
+  reportsAvailable = false;
+  reportsRows = [];
+  reportsState = { schemaVersion: 1, runs: [] };
+  clearReportsAlert();
+  closeReportDetail(true);
+  renderReports();
+  try {
+    const response = await fetch('/api/history');
+    const payload = await readJsonResponse(response);
+    if (version !== reportsLoadVersion) return;
+    if (!response.ok) throw new Error(payload.error || payload.detail || 'Unable to load report history.');
+    validateReportHistory(payload);
+    reportsState = payload;
+    reportsRows = flattenHistoryRows(payload.runs);
+    reportsAvailable = true;
+    populateReportFilterOptions();
+  } catch (error) {
+    if (version !== reportsLoadVersion) return;
+    if (showErrors) showReportsAlert('danger', error.message || 'Unable to load report history.');
+  } finally {
+    if (version === reportsLoadVersion) {
+      reportsBusy = false;
+      renderReports();
+    }
+  }
+}
+
+function validateReportHistory(payload) {
+  if (!Array.isArray(payload?.runs) || payload.runs.some(run => {
+    if (!run || typeof run.runId !== 'string' || !run.runId) return true;
+    return (run.results != null && !Array.isArray(run.results))
+      || (run.results ?? []).some(result => !result || typeof result !== 'object' || Array.isArray(result));
+  })) throw new Error('History response is invalid. Refresh to retry.');
+}
+
+function reportNumber(value) {
+  if (!['number', 'string'].includes(typeof value) || (typeof value === 'string' && !value.trim())) return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
+function reportDate(value) {
+  const time = reportTime(value);
+  return time === null ? 'Not recorded' : formatDate(new Date(time).toISOString());
+}
+
+function reportTime(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : null;
+}
+
+function reportProfileKey(value) {
+  return JSON.stringify([value.region || '', value.supportGroup || ''].map(part => String(part).trim().toLowerCase()));
+}
+
+function reportProfileLabel(value) {
+  return `${value.supportGroup || 'Unrecorded group'} / ${value.region || 'Unrecorded region'}`;
+}
+
+function reportDeviceKey(row) {
+  return JSON.stringify([row.region, row.supportGroup, row.facility, row.category, row.deviceName, row.ip]
+    .map(part => String(part || '').trim().toLowerCase()));
+}
+
+function reportRunProfile(run) {
+  const first = (run.results ?? [])[0];
+  return { region: run.scope?.region || first?.region || '', supportGroup: run.scope?.supportGroup || first?.supportGroup || '' };
+}
+
+function reportRunKey(run, index) {
+  return JSON.stringify([run.runId, run.startedAt || null, run.completedAt || null, run._ordinal ?? index]);
 }
 
 function flattenHistoryRows(runs) {
-  return runs.flatMap((run, runIndex) => (run.results ?? []).map((result, resultIndex) => ({
-    rowId: `${run.runId}-${resultIndex}`,
-    runIndex,
-    runId: run.runId,
-    completedAt: run.completedAt,
-    startedAt: run.startedAt,
-    durationMs: Number(run.durationMs) || 0,
-    checkMode: run.checkMode || "Full",
-    executionStatus: run.executionStatus || "Completed",
-    deviceName: result.name || "Unnamed",
-    ip: result.ip || "",
-    hostname: result.hostname || "",
-    facility: result.facility || "Unassigned",
-    category: result.category || "Unassigned",
-    region: result.region || run.scope?.region || "",
-    supportGroup: result.supportGroup || run.scope?.supportGroup || "",
-    status: result.status || "Unknown",
-    latencyMs: Number(result.latencyMs) || 0,
-    isOnline: Boolean(result.isOnline),
-    checks: result.checks ?? []
-  })));
+  return runs.flatMap((run, runIndex) => (run.results ?? []).map((result, resultIndex) => {
+    const checks = Array.isArray(result.checks) ? result.checks : [];
+    const ping = checks.find(check => check?.type === 'ping' && check.isAvailable === true);
+    const latency = reportNumber(ping?.latencyMs)
+      ?? (ping || !checks.length ? reportNumber(result.latencyMs) : null);
+    return {
+      rowId: `${runIndex}-${resultIndex}`, runIndex, runId: run.runId, runKey: reportRunKey(run, runIndex),
+      completedAt: run.completedAt, startedAt: run.startedAt, checkedAt: result.lastCheck || run.completedAt,
+      durationMs: reportNumber(run.durationMs), checkMode: run.checkMode || 'Full',
+      executionStatus: run.executionStatus || 'Not recorded',
+      deviceName: result.name || 'Unnamed', ip: result.ip || '', hostname: result.hostname || '',
+      facility: result.facility || 'Unassigned', category: result.category || 'Unassigned',
+      region: result.region || run.scope?.region || '', supportGroup: result.supportGroup || run.scope?.supportGroup || '',
+      status: result.status || 'Unknown', latencyMs: latency, isOnline: result.isOnline === true,
+      checks: checks.filter(check => check && typeof check === 'object' && !Array.isArray(check))
+    };
+  }));
 }
 
 function populateReportFilterOptions() {
-  syncSelectOptions(reportsFacilityFilter, reportsRows.map(row => row.facility), "All facilities", reportsFilters.facility);
-  const categoryRows = reportsFilters.facility
-    ? reportsRows.filter(row => row.facility === reportsFilters.facility)
-    : reportsRows;
-  syncSelectOptions(reportsCategoryFilter, categoryRows.map(row => row.category), "All categories", reportsFilters.category);
+  if (reportsSqlEnabled) return window.netwatchSqlReports.options();
+  const profiles = new Map();
+  for (const value of [...reportsRows, ...reportsState.runs.filter(run => !(run.results ?? []).length).map(reportRunProfile)]) {
+    profiles.set(reportProfileKey(value), reportProfileLabel(value));
+  }
+  syncSelectOptions(reportsProfileFilter, [...profiles].map(([value, label]) => ({ value, label })), 'All support groups', 'profile');
+  const scoped = reportsRows.filter(row => !reportsFilters.profile || reportProfileKey(row) === reportsFilters.profile);
+  syncSelectOptions(reportsFacilityFilter, scoped.map(row => row.facility), 'All facilities', 'facility');
+  syncSelectOptions(reportsCategoryFilter, scoped.filter(row => !reportsFilters.facility || row.facility === reportsFilters.facility)
+    .map(row => row.category), 'All categories', 'category');
 }
 
-function syncSelectOptions(select, values, defaultLabel, selectedValue) {
-  if (!select) {
-    return;
-  }
-
-  const uniqueValues = [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  select.innerHTML = [
-    `<option value="">${escapeHtml(defaultLabel)}</option>`,
-    ...uniqueValues.map(value => `<option value="${escapeAttribute(value)}">${escapeHtml(value)}</option>`)
-  ].join("");
-  select.value = uniqueValues.includes(selectedValue) ? selectedValue : "";
-  reportsFilters[select === reportsFacilityFilter ? "facility" : "category"] = select.value;
+function syncSelectOptions(select, values, defaultLabel, key) {
+  const previousLabel = select.selectedOptions[0]?.textContent;
+  const options = new Map(values.map(value => typeof value === 'object' ? [value.value, value.label] : [value, value]));
+  const selected = reportsFilters[key];
+  select.innerHTML = `<option value="">${escapeHtml(defaultLabel)}</option>` + [...options]
+    .sort((a, b) => String(a[1]).localeCompare(String(b[1])))
+    .map(([value, label]) => `<option value="${escapeAttribute(value)}">${escapeHtml(label)}</option>`).join('');
+  if (selected && !options.has(selected)) select.add(new Option(previousLabel?.startsWith('Unavailable:') ? previousLabel : `Unavailable: ${previousLabel || selected}`, selected));
+  select.value = selected;
 }
 
-function renderReports() {
-  const filteredRows = getFilteredReportRows();
-  const sortedRows = sortReportRows(filteredRows);
-  const totalPages = getReportsTotalPages(sortedRows.length);
+function localReportDate(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
 
-  if (reportsCurrentPage > totalPages) {
-    reportsCurrentPage = totalPages;
+function applyReportPeriod() {
+  const period = reportsFilters.period;
+  if (period !== 'custom') {
+    reportsFilters.fromDate = '';
+    reportsFilters.toDate = '';
+    if (period !== 'all') {
+      const end = new Date();
+      const start = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+      start.setDate(start.getDate() - ((Number(period) || 1) - 1));
+      reportsFilters.fromDate = localReportDate(start);
+      reportsFilters.toDate = localReportDate(end);
+    }
   }
+  reportsPeriodFilter.value = period;
+  reportsFromDateInput.value = reportsFilters.fromDate;
+  reportsToDateInput.value = reportsFilters.toDate;
+  document.querySelector('#reports-custom-dates').hidden = period !== 'custom';
+}
 
-  if (reportsCurrentPage < 1) {
-    reportsCurrentPage = 1;
-  }
+function invalidReportRange() {
+  return Boolean(reportsFilters.fromDate && reportsFilters.toDate && reportsFilters.fromDate > reportsFilters.toDate);
+}
 
-  renderReportsSummary(filteredRows);
-  renderReportsExecutive(filteredRows);
-  renderReportsTable(sortedRows);
+function matchesReportTime(value) {
+  const time = reportTime(value);
+  const from = reportsFilters.fromDate ? new Date(`${reportsFilters.fromDate}T00:00:00`).getTime() : null;
+  const to = reportsFilters.toDate ? new Date(`${reportsFilters.toDate}T23:59:59.999`).getTime() : null;
+  return (from === null && to === null) || (time !== null && (from === null || time >= from) && (to === null || time <= to));
 }
 
 function getFilteredReportRows() {
+  if (!reportsAvailable || reportsBusy || invalidReportRange()) return [];
+  if (reportsSqlEnabled) return reportsRows;
   const search = reportsFilters.search.trim().toLowerCase();
-  const fromTime = reportsFilters.fromDate ? new Date(`${reportsFilters.fromDate}T00:00:00`).getTime() : null;
-  const toTime = reportsFilters.toDate ? new Date(`${reportsFilters.toDate}T23:59:59.999`).getTime() : null;
-
   return reportsRows.filter(row => {
-    const completedTime = new Date(row.completedAt).getTime();
-    const matchesSearchValue = !search
-      || row.deviceName.toLowerCase().includes(search)
-      || row.ip.toLowerCase().includes(search)
-      || row.hostname.toLowerCase().includes(search)
-      || row.facility.toLowerCase().includes(search)
-      || row.category.toLowerCase().includes(search)
-      || row.region.toLowerCase().includes(search)
-      || row.supportGroup.toLowerCase().includes(search);
-
-    return matchesSearchValue
-      && (!reportsFilters.status || row.status === reportsFilters.status)
-      && (!reportsFilters.mode || row.checkMode === reportsFilters.mode)
+    const matchesSearch = !search || [row.deviceName, row.ip, row.hostname, row.facility, row.category, row.region,
+      row.supportGroup, row.runId, ...row.checks.map(check => check.url || '')]
+      .some(value => String(value).toLowerCase().includes(search));
+    const knownStatus = ['Healthy', 'Degraded', 'Down'].includes(row.status);
+    return matchesSearch && matchesReportTime(row.completedAt)
+      && (!reportsFilters.profile || reportProfileKey(row) === reportsFilters.profile)
       && (!reportsFilters.facility || row.facility === reportsFilters.facility)
       && (!reportsFilters.category || row.category === reportsFilters.category)
-      && (fromTime === null || completedTime >= fromTime)
-      && (toTime === null || completedTime <= toTime);
+      && (!reportsFilters.mode || row.checkMode === reportsFilters.mode)
+      && (!reportsFilters.runKey || row.runKey === reportsFilters.runKey)
+      && (!reportsFilters.deviceKey || reportDeviceKey(row) === reportsFilters.deviceKey)
+      && (!reportsFilters.status || (reportsFilters.status === 'Problems' ? isProblemReportRow(row)
+        : reportsFilters.status === 'Unknown' ? !knownStatus : row.status === reportsFilters.status));
   });
 }
 
-function sortReportRows(rows) {
-  const direction = reportsSort.direction === "asc" ? 1 : -1;
-  const key = reportsSort.key;
-
-  return [...rows].sort((left, right) => {
-    const leftValue = getReportSortValue(left, key);
-    const rightValue = getReportSortValue(right, key);
-
-    if (typeof leftValue === "number" && typeof rightValue === "number") {
-      return (leftValue - rightValue) * direction;
-    }
-
-    return String(leftValue).localeCompare(String(rightValue)) * direction;
-  });
+function getFilteredReportRuns(rows) {
+  if (!reportsAvailable || reportsBusy || invalidReportRange()) return [];
+  const matchingIndices = new Set(rows.map(row => row.runIndex));
+  return reportsState.runs.filter((run, index) => matchingIndices.has(index) || (
+    !(run.results ?? []).length && matchesReportTime(run.completedAt)
+    && (!reportsFilters.mode || (run.checkMode || 'Full') === reportsFilters.mode)
+    && (!reportsFilters.profile || reportProfileKey(reportRunProfile(run)) === reportsFilters.profile)
+    && (!reportsFilters.runKey || reportRunKey(run, index) === reportsFilters.runKey)
+    && !reportsFilters.search.trim() && !reportsFilters.status && !reportsFilters.facility
+    && !reportsFilters.category && !reportsFilters.deviceKey));
 }
 
-function getReportSortValue(row, key) {
-  if (key === "completedAt") {
-    return new Date(row.completedAt).getTime();
-  }
-
-  if (key === "latencyMs" || key === "durationMs") {
-    return Number(row[key]) || 0;
-  }
-
-  return row[key] ?? "";
-}
-
-function renderReportsSummary(rows) {
-  const runIds = new Set(rows.map(row => row.runId));
-  const healthyCount = rows.filter(row => row.status === "Healthy").length;
-  const problemCount = rows.filter(row => row.status === "Degraded" || row.status === "Down").length;
-  const averageAvailability = averageAvailabilityFromRows(rows);
-
-  reportsRunCount.textContent = formatNumber(runIds.size);
-  reportsRowCount.textContent = formatNumber(rows.length);
-  reportsHealthyCount.textContent = formatNumber(healthyCount);
-  reportsProblemCount.textContent = formatNumber(problemCount);
-  reportsAvgAvailability.textContent = `${formatPercent(averageAvailability)}%`;
-  reportsTableSummary.textContent = `${formatNumber(rows.length)} row${rows.length === 1 ? "" : "s"} from ${formatNumber(runIds.size)} run${runIds.size === 1 ? "" : "s"}`;
-}
-
-function renderReportsExecutive(rows) {
+function renderReports(fromSql = false) {
+  if (reportsSqlEnabled && !fromSql) { window.netwatchSqlReports.render(); return; }
+  applyReportPeriod();
+  const rows = getFilteredReportRows();
+  renderReportsSummary(rows);
   renderFacilityPerformance(rows);
   renderCategoryPerformance(rows);
   renderRecentRunsExecutive(rows);
+  renderReportsTable(sortReportRows(rows));
+  renderReportContext(rows);
+  setReportView(reportsActiveView);
+  setReportSummaryGroup(reportsSummaryGroup);
+}
+
+function renderReportsSummary(rows) {
+  if (reportsSqlEnabled && reportsSqlState) return window.netwatchSqlReports.metrics();
+  const available = reportsAvailable && !reportsBusy && !invalidReportRange();
+  const healthy = rows.filter(row => row.status === 'Healthy').length;
+  const measured = rows.filter(row => ['Healthy', 'Degraded', 'Down'].includes(row.status)).length;
+  reportsRunCount.textContent = available ? formatNumber(getFilteredReportRuns(rows).length) : '-';
+  reportsDeviceCount.textContent = available ? formatNumber(new Set(rows.map(reportDeviceKey)).size) : '-';
+  reportsRowCount.textContent = available ? formatNumber(rows.length) : '-';
+  reportsProblemCount.textContent = available ? formatNumber(rows.filter(isProblemReportRow).length) : '-';
+  reportsAvgAvailability.textContent = available ? reportPercent(averageAvailabilityFromRows(rows)) : '-';
+  reportsAvgAvailability.title = 'Healthy / known-status evaluations; not time-based uptime';
+  reportsHealthyCount.textContent = available && measured ? `${formatNumber(healthy)} / ${formatNumber(measured)}` : '';
+  reportsTableSummary.textContent = `${formatNumber(rows.length)} evaluations`;
+}
+
+function renderReportContext(rows) {
+  const available = reportsAvailable && !reportsBusy;
+  const valid = !invalidReportRange();
+  const hasData = reportsSqlEnabled ? Number(reportsSqlState?.devices.coverage.runs || 0) > 0 : reportsState.runs.length > 0;
+  document.querySelector('#reports-range-error').textContent = valid ? '' : 'From must be on or before To.';
+  reportsPage.querySelectorAll('.reports-filterbar input, .reports-filterbar select, #reports-custom-dates input')
+    .forEach(control => { control.disabled = !available; });
+  reportsExportMenu.disabled = !available || !valid || !(reportsSqlEnabled ? reportsSqlState?.devices.metrics.evaluations : rows.length);
+  exportReportsButton.disabled = reportsExportMenu.disabled;
+  reportsCsvButton.disabled = reportsExportMenu.disabled;
+  refreshReportsButton.disabled = reportsBusy;
+  reportsPage.querySelectorAll('.table-sort-button, .reports-page-size, .reports-mobile-sort select').forEach(control => { control.disabled = !available || !valid; });
+  reportsPage.querySelectorAll('.table-sort-button').forEach(control => { control.tabIndex = reportsMobileQuery.matches ? -1 : 0; });
+  const dates = reportsSqlEnabled ? [reportsSqlState?.devices.coverage.earliest,reportsSqlState?.devices.coverage.latest].filter(time => time != null)
+    : reportsState.runs.map(run => reportTime(run.completedAt)).filter(time => time !== null).sort((a, b) => a - b);
+  document.querySelector('#reports-coverage').textContent = reportsBusy ? 'Updating history...'
+    : !reportsAvailable ? 'History unavailable' : !hasData ? 'No recorded executions'
+      : dates.length ? `Recorded: ${reportDate(dates[0])} - ${reportDate(dates.at(-1))}` : 'Dates not recorded';
+  const state = document.querySelector('#reports-state');
+  state.textContent = reportsBusy ? 'Loading history...' : !reportsAvailable ? 'Unable to load history. Refresh to retry.'
+    : !valid ? 'Invalid date range.' : !hasData ? 'No monitoring executions recorded.'
+      : !(reportsSqlEnabled ? reportsSqlState?.devices.metrics.runs : rows.length || getFilteredReportRuns(rows).length) ? 'No results match the selected filters.' : '';
+  if (available && !hasData) {
+    const link = document.createElement('a');
+    link.href = '/';
+    link.className = 'ms-2';
+    link.textContent = 'Dashboard';
+    state.append(link);
+  }
+  const chips = [];
+  const add = (key, label) => { if (reportsFilters[key]) chips.push({ key, label }); };
+  add('search', `Search: ${reportsFilters.search}`);
+  if (reportsFilters.profile) add('profile', `Group: ${reportsProfileFilter.selectedOptions[0]?.textContent || 'Unavailable'}`);
+  add('facility', `Facility: ${reportsFilters.facility}`);
+  add('category', `Category: ${reportsFilters.category}`);
+  add('status', `Result: ${reportsFilters.status}`);
+  add('mode', `Mode: ${getCheckModeLabel(reportsFilters.mode)}`);
+  if (reportsFilters.period !== 'all') chips.push({ key: 'period', label: reportsFilters.period === 'custom'
+    ? `Period: ${reportsFilters.fromDate || 'Any'} - ${reportsFilters.toDate || 'Any'}`
+    : `Period: ${reportsPeriodFilter.selectedOptions[0].textContent}` });
+  if (reportsFilters.runKey) add('runKey', `Execution: ${reportDate(reportsState.runs.find((run, index) => reportRunKey(run, index) === reportsFilters.runKey)?.completedAt)}`);
+  if (reportsFilters.deviceKey) add('deviceKey', `Device: ${reportsRows.find(row => reportDeviceKey(row) === reportsFilters.deviceKey)?.deviceName || 'Unavailable'}`);
+  document.querySelector('#reports-active-filters').innerHTML = chips.map(chip =>
+    `<button type="button" class="report-filter-chip" data-report-remove-filter="${chip.key}" title="Remove ${escapeAttribute(chip.label)}" ${!available ? 'disabled' : ''}><span>${escapeHtml(chip.label)}</span><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>`).join('');
+  resetReportFiltersButton.disabled = !available || chips.length === 0;
+}
+
+function setReportView(view, focus = false) {
+  reportsActiveView = ['summary', 'runs', 'devices'].includes(view) ? view : 'summary';
+  reportsPage.querySelectorAll('[data-report-view]').forEach(tab => {
+    const selected = tab.dataset.reportView === reportsActiveView;
+    tab.setAttribute('aria-selected', String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+    document.querySelector(`#reports-${tab.dataset.reportView}-view`).hidden = !selected;
+    if (selected && focus) tab.focus();
+  });
+}
+
+function setReportSummaryGroup(group) {
+  reportsSummaryGroup = group === 'category' ? 'category' : 'facility';
+  for (const key of ['facility', 'category']) {
+    document.querySelector(`#reports-${key}-panel`).hidden = key !== reportsSummaryGroup;
+    const button = reportsPage.querySelector(`[data-report-group="${key}"]`);
+    button.classList.toggle('active', key === reportsSummaryGroup);
+    button.setAttribute('aria-pressed', String(key === reportsSummaryGroup));
+  }
+  renderReportSortControls();
+}
+
+function renderReportSortControls() {
+  const groupState = reportsSummaryGroup === 'facility' ? reportsFacilitySort : reportsCategorySort;
+  const fill = (id, columns, state) => {
+    const select = document.querySelector(id);
+    select.innerHTML = columns.flatMap(([key, label, type]) => ['asc', 'desc'].map(direction => {
+      const order = type === 'date' ? direction === 'asc' ? 'oldest first' : 'newest first'
+        : type === 'number' ? direction === 'asc' ? 'low to high' : 'high to low' : direction === 'asc' ? 'A-Z' : 'Z-A';
+      return `<option value="${key}:${direction}">${label}: ${order}</option>`;
+    })).join('');
+    select.value = `${state.key}:${state.direction}`;
+  };
+  fill('#reports-summary-sort', [[reportsSummaryGroup, reportsSummaryGroup === 'facility' ? 'Facility' : 'Category'],
+    ['rowCount', 'Evaluations', 'number'], ['availability', 'Healthy %', 'number'], ['problemCount', 'Problems', 'number'],
+    ['averageLatency', 'Avg ping', 'number'], ...(reportsSummaryGroup === 'category' ? [['facilityCount', 'Facilities', 'number']] : [])], groupState);
+  fill('#reports-run-sort', [['completedAt', 'Completed', 'date'], ['scopeLabel', 'Scope'],
+    ['rowCount', 'Evaluations', 'number'], ['availability', 'Healthy %', 'number']], reportsRunSort);
+  fill('#reports-device-sort', [['completedAt', 'Recorded', 'date'], ['deviceName', 'Device'], ['facility', 'Facility'],
+    ['status', 'Result'], ['checkMode', 'Mode']], reportsSort);
+}
+
+function reportPercent(value) {
+  return value === null ? '-' : `${formatPercent(value)}%`;
+}
+
+function reportMilliseconds(value) {
+  return value === null ? '-' : `${formatNumber(Math.round(value))} ms`;
 }
 
 function renderFacilityPerformance(rows) {
   const facilities = sortReportSummaryRows(createFacilityPerformanceRows(rows), reportsFacilitySort);
   reportsFacilityPage = clampReportsPage(reportsFacilityPage, facilities.length, reportsFacilityPageSize);
-  updateReportSortButtons("[data-report-facility-sort]", reportsFacilitySort, "reportFacilitySort");
-  updateSummaryPagination(
-    reportsFacilityPageSummary,
-    reportsFacilityPrevPageButton,
-    reportsFacilityNextPageButton,
-    reportsFacilityPage,
-    reportsFacilityPageSize,
-    facilities.length,
-    "facilities"
-  );
-  reportsFacilityPerformanceSummary.textContent = `${formatNumber(facilities.length)} facilit${facilities.length === 1 ? "y" : "ies"}`;
-
-  if (facilities.length === 0) {
-    reportsFacilityExecutiveBody.innerHTML = `<tr><td colspan="5" class="text-center text-secondary py-3">No facility data matches the current filters.</td></tr>`;
-    return;
-  }
-
-  reportsFacilityExecutiveBody.innerHTML = getPageRows(facilities, reportsFacilityPage, reportsFacilityPageSize).map(facility => `
-    <tr>
-      <td>${escapeHtml(facility.facility)}</td>
-      <td class="text-end">${formatNumber(facility.rowCount)}</td>
-      <td class="text-end">${formatPercent(facility.availability)}%</td>
-      <td class="text-end">${formatNumber(facility.problemCount)}</td>
-      <td class="text-end">${formatNumber(Math.round(facility.averageLatency))} ms</td>
-    </tr>`).join("");
+  updateReportSortButtons('[data-report-facility-sort]', reportsFacilitySort, 'reportFacilitySort');
+  updateSummaryPagination(reportsFacilityPageSummary, reportsFacilityPrevPageButton, reportsFacilityNextPageButton,
+    reportsFacilityPage, reportsFacilityPageSize, reportsSqlState?.facility.total ?? facilities.length, 'facility groups');
+  reportsFacilityPerformanceSummary.textContent = `${formatNumber(reportsSqlState?.facility.total ?? facilities.length)} facility groups`;
+  reportsFacilityExecutiveBody.innerHTML = facilities.length ? getPageRows(facilities, reportsFacilityPage, reportsFacilityPageSize).map(item => `
+    <tr><td><button type="button" class="report-link fw-semibold" data-report-facility="${escapeAttribute(item.facility)}" data-report-profile="${escapeAttribute(item.profile)}">${escapeHtml(item.facility)}</button><div class="small text-secondary">${escapeHtml(item.profileLabel)}</div></td>
+    <td class="text-end" data-label="Evaluations">${formatNumber(item.rowCount)}</td><td class="text-end" data-label="Healthy %">${reportPercent(item.availability)}</td>
+    <td class="text-end" data-label="Problems">${formatNumber(item.problemCount)}</td><td class="text-end" data-label="Avg ping">${reportMilliseconds(item.averageLatency)}</td></tr>`).join('')
+    : '<tr><td colspan="5" class="text-secondary py-4">No facility results.</td></tr>';
 }
 
 function renderCategoryPerformance(rows) {
   const categories = sortReportSummaryRows(createCategoryPerformanceRows(rows), reportsCategorySort);
   reportsCategoryPage = clampReportsPage(reportsCategoryPage, categories.length, reportsCategoryPageSize);
-  updateReportSortButtons("[data-report-category-sort]", reportsCategorySort, "reportCategorySort");
-  updateSummaryPagination(
-    reportsCategoryPageSummary,
-    reportsCategoryPrevPageButton,
-    reportsCategoryNextPageButton,
-    reportsCategoryPage,
-    reportsCategoryPageSize,
-    categories.length,
-    "categories"
-  );
-  reportsCategoryPerformanceSummary.textContent = `${formatNumber(categories.length)} categor${categories.length === 1 ? "y" : "ies"}`;
-
-  if (categories.length === 0) {
-    reportsCategoryExecutiveBody.innerHTML = `<tr><td colspan="6" class="text-center text-secondary py-3">No category data matches the current filters.</td></tr>`;
-    return;
-  }
-
-  reportsCategoryExecutiveBody.innerHTML = getPageRows(categories, reportsCategoryPage, reportsCategoryPageSize).map(category => `
-    <tr>
-      <td>${escapeHtml(category.category)}</td>
-      <td class="text-end">${formatNumber(category.facilityCount)}</td>
-      <td class="text-end">${formatNumber(category.rowCount)}</td>
-      <td class="text-end">${formatPercent(category.availability)}%</td>
-      <td class="text-end">${formatNumber(category.problemCount)}</td>
-      <td class="text-end">${formatNumber(Math.round(category.averageLatency))} ms</td>
-    </tr>`).join("");
+  updateReportSortButtons('[data-report-category-sort]', reportsCategorySort, 'reportCategorySort');
+  updateSummaryPagination(reportsCategoryPageSummary, reportsCategoryPrevPageButton, reportsCategoryNextPageButton,
+    reportsCategoryPage, reportsCategoryPageSize, reportsSqlState?.category.total ?? categories.length, 'category groups');
+  reportsCategoryPerformanceSummary.textContent = `${formatNumber(reportsSqlState?.category.total ?? categories.length)} category groups`;
+  reportsCategoryExecutiveBody.innerHTML = categories.length ? getPageRows(categories, reportsCategoryPage, reportsCategoryPageSize).map(item => `
+    <tr><td><button type="button" class="report-link fw-semibold" data-report-category="${escapeAttribute(item.category)}" data-report-profile="${escapeAttribute(item.profile)}">${escapeHtml(item.category)}</button><div class="small text-secondary">${escapeHtml(item.profileLabel)}</div></td>
+    <td class="text-end" data-label="Facilities">${formatNumber(item.facilityCount)}</td><td class="text-end" data-label="Evaluations">${formatNumber(item.rowCount)}</td>
+    <td class="text-end" data-label="Healthy %">${reportPercent(item.availability)}</td><td class="text-end" data-label="Problems">${formatNumber(item.problemCount)}</td><td class="text-end" data-label="Avg ping">${reportMilliseconds(item.averageLatency)}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="text-secondary py-4">No category results.</td></tr>';
 }
 
 function renderRecentRunsExecutive(rows) {
   const runs = sortReportSummaryRows(createRecentRunRows(rows), reportsRunSort);
   reportsRunPage = clampReportsPage(reportsRunPage, runs.length, reportsRunPageSize);
-  updateReportSortButtons("[data-report-run-sort]", reportsRunSort, "reportRunSort");
-  updateSummaryPagination(
-    reportsRunsPageSummary,
-    reportsRunsPrevPageButton,
-    reportsRunsNextPageButton,
-    reportsRunPage,
-    reportsRunPageSize,
-    runs.length,
-    "runs"
-  );
-  reportsRunsSummary.textContent = `${formatNumber(runs.length)} run${runs.length === 1 ? "" : "s"}`;
-
-  if (runs.length === 0) {
-    reportsRecentRunsBody.innerHTML = `<tr><td colspan="8" class="text-center text-secondary py-3">No runs match the current filters.</td></tr>`;
-    return;
-  }
-
-  reportsRecentRunsBody.innerHTML = getPageRows(runs, reportsRunPage, reportsRunPageSize).map(run => `
-      <tr>
-        <td>
-          <div>${escapeHtml(formatDate(run.completedAt))}</div>
-          <div class="small text-secondary">${escapeHtml(run.executionStatus)}</div>
-        </td>
-        <td>${escapeHtml(getCheckModeLabel(run.checkMode || "Full"))}</td>
-        <td>${escapeHtml(run.scopeLabel)}</td>
-        <td class="text-end">${formatNumber(run.rowCount)}</td>
-        <td class="text-end">${formatPercent(run.availability)}%</td>
-        <td class="text-end">${formatNumber(run.problemCount)}</td>
-        <td class="text-end">${formatNumber(run.durationMs)} ms</td>
-        <td class="text-end">
-          <button class="btn btn-outline-danger btn-sm" type="button" data-delete-report-run="${escapeAttribute(run.runId)}" title="Delete this execution">
-            <i class="fa-solid fa-trash-can"></i>
-          </button>
-        </td>
-      </tr>`).join("");
+  updateReportSortButtons('[data-report-run-sort]', reportsRunSort, 'reportRunSort');
+  updateSummaryPagination(reportsRunsPageSummary, reportsRunsPrevPageButton, reportsRunsNextPageButton,
+    reportsRunPage, reportsRunPageSize, reportsSqlState?.runs.total ?? runs.length, 'executions');
+  reportsRunsSummary.textContent = `${formatNumber(reportsSqlState?.runs.total ?? runs.length)} executions`;
+  disposeManagementMenus(reportsRecentRunsBody);
+  reportsRecentRunsBody.innerHTML = runs.length ? getPageRows(runs, reportsRunPage, reportsRunPageSize).map(run => `
+    <tr data-report-run="${escapeAttribute(run.runId)}">
+      <td data-label="Completed">${escapeHtml(reportDate(run.completedAt))}<div class="small text-secondary">${escapeHtml(getCheckModeLabel(run.checkMode))} / ${escapeHtml(run.executionStatus)}</div></td>
+      <td data-label="Support group">${escapeHtml(run.profileLabel)}</td><td data-label="Original scope">${escapeHtml(run.scopeLabel)}<div class="small text-secondary">Run: ${reportMilliseconds(run.durationMs)}</div></td>
+      <td class="text-end" data-label="Matching / recorded" title="Matching / recorded evaluations">${formatNumber(run.rowCount)} / ${formatNumber(run.totalCount)}</td><td class="text-end" data-label="Healthy %">${reportPercent(run.availability)}</td>
+      <td class="text-end"><div class="reports-row-actions">
+        <button class="btn btn-outline-primary btn-sm" type="button" data-report-open-run="${escapeAttribute(run.runKey)}" title="View matching evaluations" aria-label="View execution ${escapeAttribute(reportDate(run.completedAt))}" ${!run.rowCount ? 'disabled' : ''}><i class="fa-solid fa-list" aria-hidden="true"></i></button>
+        <div class="dropdown reports-run-menu">
+          <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="dropdown" data-bs-config='{"popperConfig":{"strategy":"fixed"}}' title="Execution actions" aria-label="Actions for execution ${escapeAttribute(reportDate(run.completedAt))}" aria-expanded="false"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>
+          <ul class="dropdown-menu dropdown-menu-end"><li><button class="dropdown-item text-danger" type="button" data-delete-report-run="${escapeAttribute(run.runId)}" ${run.ambiguousId ? 'disabled title="Duplicate legacy ID; deletion unavailable"' : ''}><i class="fa-solid fa-trash-can me-2" aria-hidden="true"></i>Delete execution</button></li></ul>
+        </div></div></td></tr>`).join('')
+    : '<tr><td colspan="6" class="text-secondary py-4">No executions match these filters.</td></tr>';
 }
 
 function createFacilityPerformanceRows(rows) {
-  return Array.from(groupRowsBy(rows, row => row.facility).entries()).map(([facility, facilityRows]) => {
-    const healthyCount = facilityRows.filter(row => row.status === "Healthy").length;
-    const problemCount = facilityRows.filter(isProblemReportRow).length;
-    const averageLatency = average(facilityRows.map(row => row.latencyMs));
-
-    return {
-      facility,
-      rowCount: facilityRows.length,
-      availability: facilityRows.length === 0 ? 0 : healthyCount / facilityRows.length * 100,
-      problemCount,
-      averageLatency
-    };
-  });
+  if (reportsSqlEnabled) return window.netwatchSqlReports.groups('facility');
+  return [...groupRowsBy(rows, row => JSON.stringify([reportProfileKey(row), row.facility])).values()].map(group => ({
+    facility: group[0].facility, profile: reportProfileKey(group[0]), profileLabel: reportProfileLabel(group[0]),
+    rowCount: group.length, availability: averageAvailabilityFromRows(group),
+    problemCount: group.filter(isProblemReportRow).length, averageLatency: average(group.map(row => row.latencyMs))
+  }));
 }
 
 function createCategoryPerformanceRows(rows) {
-  return Array.from(groupRowsBy(rows, row => row.category).entries()).map(([category, categoryRows]) => {
-    const healthyCount = categoryRows.filter(row => row.status === "Healthy").length;
-    const problemCount = categoryRows.filter(isProblemReportRow).length;
-    const averageLatency = average(categoryRows.map(row => row.latencyMs));
-    const facilityCount = new Set(categoryRows.map(row => row.facility)).size;
+  if (reportsSqlEnabled) return window.netwatchSqlReports.groups('category');
+  return [...groupRowsBy(rows, row => JSON.stringify([reportProfileKey(row), row.category])).values()].map(group => ({
+    category: group[0].category, profile: reportProfileKey(group[0]), profileLabel: reportProfileLabel(group[0]),
+    rowCount: group.length, facilityCount: new Set(group.map(row => row.facility)).size,
+    availability: averageAvailabilityFromRows(group), problemCount: group.filter(isProblemReportRow).length,
+    averageLatency: average(group.map(row => row.latencyMs))
+  }));
+}
 
+function createRecentRunRows(rows) {
+  if (reportsSqlEnabled) return window.netwatchSqlReports.runs();
+  const grouped = groupRowsBy(rows, row => row.runIndex);
+  const ids = groupRowsBy(reportsState.runs, run => run.runId);
+  return getFilteredReportRuns(rows).map(run => {
+    const index = reportsState.runs.indexOf(run);
+    const matching = grouped.get(index) || [];
     return {
-      category,
-      facilityCount,
-      rowCount: categoryRows.length,
-      availability: categoryRows.length === 0 ? 0 : healthyCount / categoryRows.length * 100,
-      problemCount,
-      averageLatency
+      runKey: reportRunKey(run, index), ambiguousId: ids.get(run.runId).length > 1,
+      runId: run.runId, completedAt: run.completedAt, checkMode: run.checkMode || 'Full',
+      executionStatus: run.executionStatus || 'Not recorded', scopeLabel: getRunScopeLabel(run.scope),
+      profileLabel: reportProfileLabel(reportRunProfile(run)), rowCount: matching.length,
+      totalCount: (run.results ?? []).length, availability: averageAvailabilityFromRows(matching),
+      problemCount: matching.filter(isProblemReportRow).length, durationMs: reportNumber(run.durationMs)
     };
   });
 }
 
-function createRecentRunRows(rows) {
-  const rowsByRunId = groupRowsBy(rows, row => row.runId);
-
-  return (reportsState.runs ?? [])
-    .filter(run => rowsByRunId.has(run.runId))
-    .map(run => {
-      const runRows = rowsByRunId.get(run.runId) ?? [];
-
-      return {
-        runId: run.runId,
-        completedAt: run.completedAt,
-        checkMode: run.checkMode || "Full",
-        executionStatus: run.executionStatus || "Completed",
-        scopeLabel: getRunScopeLabel(run.scope),
-        rowCount: runRows.length,
-        availability: averageAvailabilityFromRows(runRows),
-        problemCount: runRows.filter(isProblemReportRow).length,
-        durationMs: Number(run.durationMs) || 0
-      };
-    });
-}
-
 function getRunScopeLabel(scope) {
-  if (!scope) {
-    return "All facilities";
-  }
-
-  if (scope.deviceName || scope.deviceIp) {
-    return `Device: ${scope.deviceName || scope.deviceIp}`;
-  }
-
-  if (scope.category) {
-    return scope.facility ? `${scope.facility} / ${scope.category}` : `Category: ${scope.category}`;
-  }
-
-  if (scope.facility) {
-    return `Facility: ${scope.facility}`;
-  }
-
-  if (scope.region) {
-    return `Region: ${scope.region}`;
-  }
-
-  return "All facilities";
+  if (!scope) return 'Not recorded';
+  if (scope.deviceName) return `Device: ${scope.deviceName}`;
+  if (scope.deviceIps?.length) return `Selected devices: ${scope.deviceIps.length}`;
+  if (scope.category) return scope.facility ? `${scope.facility} / ${scope.category}` : `Category: ${scope.category}`;
+  if (scope.facility) return `Facility: ${scope.facility}`;
+  return 'All facilities';
 }
 
 function sortReportSummaryRows(rows, sortState) {
-  const direction = sortState.direction === "asc" ? 1 : -1;
-  const key = sortState.key;
-
+  if (reportsSqlEnabled) return rows;
+  const direction = sortState.direction === 'asc' ? 1 : -1;
   return [...rows].sort((left, right) => {
-    const leftValue = getReportSummarySortValue(left, key);
-    const rightValue = getReportSummarySortValue(right, key);
-
-    if (typeof leftValue === "number" && typeof rightValue === "number") {
-      return (leftValue - rightValue) * direction;
-    }
-
-    return String(leftValue).localeCompare(String(rightValue)) * direction;
+    const a = left[sortState.key], b = right[sortState.key];
+    if (a == null) return b == null ? 0 : 1;
+    if (b == null) return -1;
+    if (typeof a === 'number' && typeof b === 'number') return (a - b) * direction;
+    return (sortState.key === 'completedAt' ? new Date(a).getTime() - new Date(b).getTime()
+      : String(a).localeCompare(String(b))) * direction;
   });
 }
 
-function getReportSummarySortValue(row, key) {
-  if (key === "completedAt") {
-    return new Date(row.completedAt).getTime();
-  }
-
-  if (["rowCount", "availability", "problemCount", "averageLatency", "facilityCount", "durationMs"].includes(key)) {
-    return Number(row[key]) || 0;
-  }
-
-  return row[key] ?? "";
+function sortReportRows(rows) {
+  return sortReportSummaryRows(rows, reportsSort);
 }
 
-function getPageRows(rows, page, pageSize) {
-  const startIndex = (page - 1) * pageSize;
-  return rows.slice(startIndex, startIndex + pageSize);
+function getPageRows(rows, page, size) {
+  if (reportsSqlEnabled) return rows;
+  return rows.slice((page - 1) * size, page * size);
 }
 
-function clampReportsPage(page, rowCount, pageSize) {
-  const totalPages = Math.max(1, Math.ceil(rowCount / pageSize));
-  return Math.min(Math.max(1, page), totalPages);
+function clampReportsPage(page, count, size) {
+  if (reportsSqlEnabled) return page;
+  return Math.min(Math.max(1, page), Math.max(1, Math.ceil(count / size)));
 }
 
-function updateSummaryPagination(summaryElement, previousButton, nextButton, page, pageSize, rowCount, label) {
-  const totalPages = Math.max(1, Math.ceil(rowCount / pageSize));
-  const startRow = rowCount === 0 ? 0 : (page - 1) * pageSize + 1;
-  const endRow = Math.min(rowCount, page * pageSize);
-
-  summaryElement.textContent = rowCount === 0
-    ? `No ${label} to display`
-    : `Showing ${formatNumber(startRow)}-${formatNumber(endRow)} of ${formatNumber(rowCount)} ${label} · Page ${formatNumber(page)} of ${formatNumber(totalPages)}`;
-  previousButton.disabled = page <= 1;
-  nextButton.disabled = page >= totalPages || rowCount === 0;
+function updateSummaryPagination(summary, previous, next, page, size, count, label) {
+  const pages = Math.max(1, Math.ceil(count / size));
+  summary.textContent = count ? `${formatNumber((page - 1) * size + 1)}-${formatNumber(Math.min(page * size, count))} / ${formatNumber(count)} ${label}`
+    : `0 ${label}`;
+  previous.disabled = page <= 1 || reportsBusy || !reportsAvailable;
+  next.disabled = page >= pages || reportsBusy || !reportsAvailable;
 }
 
-function groupRowsBy(rows, keySelector) {
+function groupRowsBy(rows, selector) {
   const groups = new Map();
-
   for (const row of rows) {
-    const key = keySelector(row) || "Unassigned";
-
-    if (!groups.has(key)) {
-      groups.set(key, []);
-    }
-
+    const key = selector(row);
+    if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(row);
   }
-
   return groups;
 }
 
 function isProblemReportRow(row) {
-  return row.status === "Degraded" || row.status === "Down";
+  return row.status === 'Degraded' || row.status === 'Down';
 }
 
 function average(values) {
-  const numericValues = values.map(Number).filter(value => Number.isFinite(value));
-
-  return numericValues.length === 0
-    ? 0
-    : numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length;
+  const numbers = values.filter(value => value !== null && Number.isFinite(value));
+  return numbers.length ? numbers.reduce((sum, value) => sum + value, 0) / numbers.length : null;
 }
 
 function averageAvailabilityFromRows(rows) {
-  if (rows.length === 0) {
-    return 0;
-  }
-
-  const healthyCount = rows.filter(row => row.status === "Healthy").length;
-  return healthyCount / rows.length * 100;
+  const measured = rows.filter(row => ['Healthy', 'Degraded', 'Down'].includes(row.status));
+  return measured.length ? measured.filter(row => row.status === 'Healthy').length / measured.length * 100 : null;
 }
 
 function renderReportsTable(rows) {
-  updateReportSortButtons("[data-report-sort]", reportsSort, "reportSort");
-
-  if (rows.length === 0) {
-    reportsTableBody.innerHTML = `<tr><td colspan="10" class="text-center text-secondary py-4">No history rows match the current filters.</td></tr>`;
-    updateReportsPagination(0);
-    return;
-  }
-
-  const pageRows = getReportsPageRows(rows);
-  const pageStartIndex = (reportsCurrentPage - 1) * reportsPageSize;
-
-  reportsTableBody.innerHTML = pageRows.map((row, index) => `
-    <tr>
-      <td class="text-end text-secondary">${pageStartIndex + index + 1}</td>
-      <td>${escapeHtml(formatDate(row.completedAt))}</td>
-      <td>
-        <div class="fw-semibold">${escapeHtml(row.deviceName)}</div>
-        <div class="small text-secondary">${escapeHtml(row.hostname || row.runId)}</div>
-      </td>
-      <td><code>${escapeHtml(row.ip)}</code></td>
-      <td>${escapeHtml(row.facility)}</td>
-      <td>${escapeHtml(row.category)}</td>
-      <td>${renderReportStatusBadge(row.status)}</td>
-      <td>${formatNumber(row.latencyMs)} ms</td>
-      <td>${escapeHtml(getCheckModeLabel(row.checkMode))}</td>
-      <td>${formatNumber(row.durationMs)} ms</td>
-    </tr>`).join("");
-  updateReportsPagination(rows.length);
-}
-
-function getReportsPageRows(rows) {
-  const startIndex = (reportsCurrentPage - 1) * reportsPageSize;
-  return rows.slice(startIndex, startIndex + reportsPageSize);
-}
-
-function getReportsTotalPages(rowCount) {
-  return Math.max(1, Math.ceil(rowCount / reportsPageSize));
-}
-
-function updateReportsPagination(rowCount) {
-  const totalPages = getReportsTotalPages(rowCount);
-  const startRow = rowCount === 0 ? 0 : (reportsCurrentPage - 1) * reportsPageSize + 1;
-  const endRow = Math.min(rowCount, reportsCurrentPage * reportsPageSize);
-
-  reportsPageSummary.textContent = rowCount === 0
-    ? "No rows to display"
-    : `Showing ${formatNumber(startRow)}-${formatNumber(endRow)} of ${formatNumber(rowCount)} rows · Page ${formatNumber(reportsCurrentPage)} of ${formatNumber(totalPages)}`;
-  reportsPrevPageButton.disabled = reportsCurrentPage <= 1;
-  reportsNextPageButton.disabled = reportsCurrentPage >= totalPages || rowCount === 0;
+  reportsCurrentPage = clampReportsPage(reportsCurrentPage, rows.length, reportsPageSize);
+  updateReportSortButtons('[data-report-sort]', reportsSort, 'reportSort');
+  reportsTableBody.innerHTML = rows.length ? getPageRows(rows, reportsCurrentPage, reportsPageSize).map(row => `
+    <tr data-report-evaluation="${escapeAttribute(row.rowId)}">
+      <td><button class="report-link fw-semibold" type="button" data-report-detail="${escapeAttribute(row.rowId)}">${escapeHtml(row.deviceName)}</button><div class="small text-secondary">${escapeHtml(row.hostname || row.ip || 'Address not recorded')}</div>${row.hostname && row.ip ? `<div class="small text-secondary">${escapeHtml(row.ip)}</div>` : ''}</td>
+      <td data-label="Facility">${escapeHtml(row.facility)}<div class="small text-secondary">${escapeHtml(row.category)}</div><div class="small text-secondary">${escapeHtml(reportProfileLabel(row))}</div></td>
+      <td data-label="Recorded">${escapeHtml(reportDate(row.completedAt))}</td><td data-label="Result">${renderReportStatusBadge(row.status)}</td><td data-label="Mode">${escapeHtml(getCheckModeLabel(row.checkMode))}</td>
+      <td class="text-end"><button class="btn btn-outline-secondary icon-button btn-sm" type="button" data-report-detail="${escapeAttribute(row.rowId)}" title="View evaluation" aria-label="View evaluation for ${escapeAttribute(row.deviceName)}"><i class="fa-solid fa-eye" aria-hidden="true"></i></button></td>
+    </tr>`).join('') : '<tr><td colspan="6" class="text-secondary py-4">No device evaluations.</td></tr>';
+  updateSummaryPagination(reportsPageSummary, reportsPrevPageButton, reportsNextPageButton,
+    reportsCurrentPage, reportsPageSize, reportsSqlState?.devices.total ?? rows.length, 'evaluations');
 }
 
 function renderReportStatusBadge(status) {
-  const badgeClass = status === "Healthy"
-    ? "text-bg-success"
-    : status === "Degraded" ? "text-bg-warning" : "text-bg-danger";
-
-  return `<span class="badge ${badgeClass}">${escapeHtml(status)}</span>`;
+  const styles = { Healthy: ['success', 'circle-check'], Degraded: ['warning', 'triangle-exclamation'], Down: ['danger', 'circle-xmark'] };
+  const known = Object.hasOwn(styles, status);
+  const [color, icon] = known ? styles[status] : ['secondary', 'circle-question'];
+  return `<span class="badge text-bg-${color}"><i class="fa-solid fa-${icon} me-1" aria-hidden="true"></i>${escapeHtml(known ? status : 'Not recorded')}</span>`;
 }
 
-function updateReportSortButtons(selector, sortState, datasetKey) {
+function updateReportSortButtons(selector, sortState, key) {
   document.querySelectorAll(selector).forEach(button => {
-    const isActive = button.dataset[datasetKey] === sortState.key;
-    const indicator = isActive ? (sortState.direction === "asc" ? " ↑" : " ↓") : "";
-    button.textContent = `${button.textContent.replace(/[ ↑↓]+$/u, "")}${indicator}`;
-    button.classList.toggle("active", isActive);
+    const selected = button.dataset[key] === sortState.key;
+    const label = button.textContent.replace(/[ ↑↓]+$/u, '');
+    button.textContent = label + (selected ? sortState.direction === 'asc' ? ' ↑' : ' ↓' : '');
+    button.classList.toggle('active', selected);
+    button.closest('th').setAttribute('aria-sort', selected ? sortState.direction === 'asc' ? 'ascending' : 'descending' : 'none');
   });
 }
 
-function resetReportsViewState() {
+function resetReportsViewState({ resetView = true } = {}) {
   reportsFilters = createDefaultReportsFilters();
-  reportsSort = { key: "completedAt", direction: "desc" };
-  reportsCurrentPage = 1;
-  reportsFacilitySort = { key: "problemCount", direction: "desc" };
-  reportsFacilityPage = 1;
-  reportsCategorySort = { key: "problemCount", direction: "desc" };
-  reportsCategoryPage = 1;
-  reportsRunSort = { key: "completedAt", direction: "desc" };
-  reportsRunPage = 1;
-
-  if (reportsSearchInput) reportsSearchInput.value = "";
-  if (reportsStatusFilter) reportsStatusFilter.value = "";
-  if (reportsModeFilter) reportsModeFilter.value = "";
-  if (reportsFacilityFilter) reportsFacilityFilter.value = "";
-  if (reportsCategoryFilter) reportsCategoryFilter.value = "";
-  if (reportsFromDateInput) reportsFromDateInput.value = "";
-  if (reportsToDateInput) reportsToDateInput.value = "";
-  if (reportsPageSizeSelect) reportsPageSizeSelect.value = String(reportsPageSize);
-  if (reportsFacilityPageSizeSelect) reportsFacilityPageSizeSelect.value = String(reportsFacilityPageSize);
-  if (reportsCategoryPageSizeSelect) reportsCategoryPageSizeSelect.value = String(reportsCategoryPageSize);
-  if (reportsRunsPageSizeSelect) reportsRunsPageSizeSelect.value = String(reportsRunPageSize);
-
+  reportsSort = { key: 'completedAt', direction: 'desc' };
+  reportsFacilitySort = { key: 'problemCount', direction: 'desc' };
+  reportsCategorySort = { key: 'problemCount', direction: 'desc' };
+  reportsRunSort = { key: 'completedAt', direction: 'desc' };
+  reportsCurrentPage = reportsFacilityPage = reportsCategoryPage = reportsRunPage = 1;
+  for (const control of [reportsSearchInput, reportsStatusFilter, reportsModeFilter, reportsProfileFilter,
+    reportsFacilityFilter, reportsCategoryFilter, reportsFromDateInput, reportsToDateInput]) control.value = '';
+  reportsPeriodFilter.value = 'all';
+  if (resetView) {
+    ++reportsLoadVersion;
+    reportsAvailable = false;
+    reportsRows = [];
+    reportsState = { schemaVersion: 1, runs: [] };
+    closeReportDetail(true);
+    setReportView('summary');
+    setReportSummaryGroup('facility');
+  }
   clearReportsAlert();
 }
 
-function exportFilteredReports() {
-  const rows = sortReportRows(getFilteredReportRows());
-  const json = `${JSON.stringify({ exportedAt: new Date().toISOString(), filters: reportsFilters, rows }, null, 2)}\n`;
-  const blob = new Blob([json], { type: "application/json" });
-  downloadJsonBlob(blob, `netwatch-lite-report-${new Date().toISOString().slice(0, 19).replaceAll(":", "")}.json`);
-  showReportsAlert("success", "Filtered report exported as JSON.");
-}
-
 function renderReportsFromFirstPage() {
-  reportsCurrentPage = 1;
-  reportsFacilityPage = 1;
-  reportsCategoryPage = 1;
-  reportsRunPage = 1;
+  reportsCurrentPage = reportsFacilityPage = reportsCategoryPage = reportsRunPage = 1;
   renderReports();
 }
 
-function getDefaultReportSummarySortDirection(key) {
-  return ["facility", "category", "checkMode", "scopeLabel"].includes(key) ? "asc" : "desc";
+function getNextReportSortState(state, key) {
+  return { key, direction: state.key === key ? state.direction === 'asc' ? 'desc' : 'asc'
+    : ['completedAt', 'rowCount', 'availability', 'problemCount', 'facilityCount', 'durationMs'].includes(key) ? 'desc' : 'asc' };
 }
 
-function getNextReportSortState(currentSort, key) {
-  return currentSort.key === key
-    ? { key, direction: currentSort.direction === "asc" ? "desc" : "asc" }
-    : { key, direction: getDefaultReportSummarySortDirection(key) };
+function removeReportFilter(key) {
+  if (!(key in reportsFilters)) return;
+  reportsFilters[key] = key === 'period' ? 'all' : '';
+  if (key === 'period') reportsFilters.fromDate = reportsFilters.toDate = '';
+  reportsSearchInput.value = reportsFilters.search;
+  reportsStatusFilter.value = reportsFilters.status;
+  reportsModeFilter.value = reportsFilters.mode;
+  populateReportFilterOptions();
+  renderReportsFromFirstPage();
+}
+
+function openReportScope(profile, facility, category) {
+  reportsFilters.profile = profile;
+  if (facility !== undefined) reportsFilters.facility = facility;
+  if (category !== undefined) reportsFilters.category = category;
+  reportsFilters.runKey = reportsFilters.deviceKey = '';
+  populateReportFilterOptions();
+  setReportView('devices', true);
+  renderReportsFromFirstPage();
+}
+
+function openReportRun(runKey) {
+  reportsFilters.runKey = runKey;
+  reportsFilters.deviceKey = '';
+  closeReportDetail();
+  setReportView('devices', true);
+  renderReportsFromFirstPage();
+}
+
+function openReportDetail(id, trigger) {
+  if (!reportsAvailable || reportsBusy || !reportsDetailModal) return;
+  const row = getFilteredReportRows().find(item => item.rowId === id);
+  if (!row) return;
+  reportsSelectedRow = row;
+  reportsDetailTrigger = trigger;
+  document.querySelector('#reports-detail-title').textContent = row.deviceName;
+  const run = reportsState.runs[row.runIndex];
+  const facts = [
+    ['Result', renderReportStatusBadge(row.status)], ['Recorded', escapeHtml(reportDate(row.checkedAt))],
+    ['Support group', escapeHtml(reportProfileLabel(row))], ['Facility', escapeHtml(row.facility)],
+    ['Category', escapeHtml(row.category)], ['Address', escapeHtml(row.ip || 'Not recorded')],
+    ['Hostname', escapeHtml(row.hostname || 'Not recorded')], ['Mode', escapeHtml(getCheckModeLabel(row.checkMode))],
+    ['Original scope', escapeHtml(getRunScopeLabel(run?.scope))], ['Run duration', reportMilliseconds(row.durationMs)],
+    ['Execution ID', escapeHtml(row.runId)]
+  ];
+  document.querySelector('#reports-detail-body').innerHTML = `<dl class="report-detail-meta">${facts.map(([name, value]) => `<dt>${name}</dt><dd>${value}</dd>`).join('')}</dl>
+    <h3 class="h6 mt-4">Recorded checks</h3><ul class="report-check-list">${row.checks.length ? row.checks.map(check => {
+      const known = typeof check.isAvailable === 'boolean';
+      const label = check.label || (check.type === 'tcp' ? `TCP ${check.port ?? ''}` : String(check.type || 'Check').toUpperCase());
+      return `<li><div class="report-check-heading"><strong>${escapeHtml(label)}</strong><span class="badge text-bg-${known ? check.isAvailable ? 'success' : 'danger' : 'secondary'}">${known ? check.isAvailable ? 'Passed' : 'Failed' : 'Not recorded'}</span></div>
+        ${check.url ? `<p>${escapeHtml(check.url)}</p>` : ''}
+        ${check.statusCode != null || check.expectedStatusCode != null ? `<p>HTTP ${escapeHtml(String(check.statusCode ?? 'Not received'))} / expected ${escapeHtml(String(check.expectedStatusCode ?? 'Not recorded'))}</p>` : ''}
+        ${check.message || check.status ? `<p>${escapeHtml(check.message || check.status)}</p>` : ''}
+        <p class="text-secondary">${check.type === 'ping' ? `Ping: ${reportMilliseconds(reportNumber(check.latencyMs))}` : check.type === 'http' ? `Duration: ${reportMilliseconds(reportNumber(check.durationMs))}` : check.port != null ? `Port: ${escapeHtml(String(check.port))}` : ''}</p></li>`;
+    }).join('') : '<li class="text-secondary">Checks not recorded.</li>'}</ul>`;
+  document.querySelector('#reports-detail-run').disabled = false;
+  document.querySelector('#reports-detail-device').disabled = false;
+  reportsDetailModal.show();
+}
+
+function closeReportDetail(clear = false) {
+  if (reportsDetailModal) hideManagementModal(reportsDetailElement);
+  reportsSelectedRow = null;
+  if (clear) {
+    document.querySelector('#reports-detail-body').replaceChildren();
+    document.querySelector('#reports-detail-title').textContent = 'Evaluation unavailable';
+    document.querySelector('#reports-detail-run').disabled = true;
+    document.querySelector('#reports-detail-device').disabled = true;
+  }
+}
+
+function csvReportCell(value) {
+  let text = value == null ? '' : String(value);
+  // Preserve separators/newlines and mitigate formula cells on initial spreadsheet import.
+  if (/^[\t\r\n]/u.test(text) || /^[\s\u0000-\u001f]*[=+\-@\uff1d\uff0b\uff0d\uff20]/u.test(text)) text = "'" + text;
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function exportFilteredReports(format = 'json', suppliedRows = null) {
+  if (reportsSqlEnabled && !suppliedRows) return window.netwatchSqlReports.export(format);
+  reportsFilters.search = reportsSearchInput.value;
+  applyReportPeriod();
+  const rows = suppliedRows || sortReportRows(getFilteredReportRows());
+  if (!rows.length || !reportsAvailable || reportsBusy || invalidReportRange()) return;
+  const exportedAt = new Date().toISOString();
+  const suffix = exportedAt.slice(0, 19).replaceAll(':', '');
+  if (format === 'csv') {
+    const columns = ['Recorded UTC', 'Device', 'IP', 'Hostname', 'Region', 'Support group', 'Facility', 'Category',
+      'Result', 'Mode', 'Run ID', 'Run duration ms', 'Ping latency ms', 'Checks JSON', 'Applied filters JSON'];
+    const records = rows.map(row => [
+      reportTime(row.completedAt) !== null ? new Date(row.completedAt).toISOString() : '',
+      row.deviceName, row.ip, row.hostname, row.region, row.supportGroup, row.facility, row.category, row.status,
+      row.checkMode, row.runId, row.durationMs, row.latencyMs, JSON.stringify(row.checks), JSON.stringify(reportsFilters)
+    ]);
+    const csv = '\ufeff' + [columns, ...records].map(record => record.map(csvReportCell).join(',')).join('\r\n') + '\r\n';
+    downloadJsonBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `netwatch-lite-report-${suffix}.csv`);
+  } else {
+    downloadJsonBlob(new Blob([JSON.stringify({ exportedAt, filters: reportsFilters, rows }, null, 2) + '\n'],
+      { type: 'application/json' }), `netwatch-lite-report-${suffix}.json`);
+  }
+  showReportsAlert('success', `Filtered report exported as ${format === 'csv' ? 'CSV' : 'JSON'}.`);
 }
 
 async function deleteReportRun(runId) {
-  if (!runId) {
-    return;
-  }
-
-  if (!confirm("Delete this monitoring execution from local history? This cannot be undone.")) {
-    return;
-  }
-
+  if (!reportsAvailable || reportsBusy || reportsConfirmingDelete || reportsState.runs.filter(run => run.runId === runId).length !== 1) return;
+  const version = reportsLoadVersion;
+  reportsConfirmingDelete = true;
+  let confirmed;
+  const closeIfStale = () => { if (version !== reportsLoadVersion || currentRoute !== '/reports') managementConfirmModal?.hide(); };
+  managementConfirmElement.addEventListener('shown.bs.modal', closeIfStale, { once: true });
   try {
-    const response = await fetch(`/api/history/runs/${encodeURIComponent(runId)}`, { method: "DELETE" });
+    confirmed = await confirmManagementAction({ title: 'Delete execution',
+      message: `Delete the execution recorded ${reportDate(reportsState.runs.find(run => run.runId === runId).completedAt)}? This cannot be undone.` });
+  } finally {
+    reportsConfirmingDelete = false;
+    managementConfirmElement.removeEventListener('shown.bs.modal', closeIfStale);
+  }
+  if (!confirmed || version !== reportsLoadVersion || !reportsAvailable || reportsBusy) return;
+  if (reportsSqlEnabled) window.netwatchSqlReports.cancelPending();
+  const mutationVersion = ++reportsLoadVersion;
+  reportsBusy = true;
+  closeReportDetail(true);
+  renderReports(true);
+  try {
+    const response = await fetch(`/api/history/runs/${encodeURIComponent(runId)}`, { method: 'DELETE' });
     const payload = await readJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(payload.error || payload.detail || `Unable to delete execution (${response.status}).`);
-    }
-
+    if (mutationVersion !== reportsLoadVersion) return;
+    if (!response.ok) throw new Error(payload.error || payload.detail || 'Unable to delete execution.');
+    validateReportHistory(payload);
     reportsState = payload;
-    reportsRows = flattenHistoryRows(payload.runs ?? []);
+    reportsRows = flattenHistoryRows(payload.runs);
+    if (reportsFilters.runKey && !payload.runs.some((run, index) => reportRunKey(run, index) === reportsFilters.runKey)) reportsFilters.runKey = '';
     populateReportFilterOptions();
-    renderReports();
-    showReportsAlert("success", "Monitoring execution deleted.");
+    showReportsAlert('success', 'Monitoring execution deleted.');
   } catch (error) {
-    showReportsAlert("danger", error.message || "Unable to delete monitoring execution.");
-    console.error(error);
+    if (mutationVersion === reportsLoadVersion) showReportsAlert('danger', error.message || 'Unable to delete monitoring execution.');
+  } finally {
+    if (mutationVersion === reportsLoadVersion) {
+      reportsBusy = false;
+      renderReports();
+      if (currentRoute === '/reports') document.querySelector(`#reports-tab-${reportsActiveView}`).focus();
+    }
   }
 }
 
@@ -1586,13 +1720,21 @@ function clearIntegrationsAlert() {
 }
 
 function getVisibleResults() {
+  const dashboardDevices = getDashboardDevices();
   if (!activeFacility) {
-    return latestResults;
+    return dashboardDevices;
   }
 
   const selectedFacility = activeFacility.toLowerCase();
-  return latestResults.filter(result =>
+  return dashboardDevices.filter(result =>
     String(result.facility ?? "Unassigned").toLowerCase() === selectedFacility);
+}
+
+function getDashboardDevices() {
+  if (!dashboardInventoryAvailable) return [];
+  const results = new Map(latestResults.map(result => [createDeviceKey(result), result]));
+  // Pending inventory is presentation only; latestResults/history contain measured results only.
+  return getConfiguredFacilityDevices().map(device => ({ ...device, ...results.get(createDeviceKey(device)) }));
 }
 
 function filterCategories(categories) {
@@ -1609,7 +1751,7 @@ function filterCategories(categories) {
         stateDevices: category.devices ?? [],
         totalDevices: devices.length,
         onlineDevices: devices.filter(device => device.isOnline).length,
-        offlineDevices: devices.filter(device => !device.isOnline).length
+        offlineDevices: devices.filter(device => device.status === 'Down').length
       };
     })
     .filter(category => category.devices.length > 0);
@@ -1625,11 +1767,14 @@ function matchesSearch(device, search) {
     || String(device.hostname ?? "").toLowerCase().includes(search)
     || String(device.facility ?? "").toLowerCase().includes(search)
     || String(device.category ?? "").toLowerCase().includes(search)
-    || String(device.websiteUrl ?? "").toLowerCase().includes(search);
+    || String(device.websiteUrl ?? "").toLowerCase().includes(search)
+    || String(device.notes ?? "").toLowerCase().includes(search)
+    || String(device.location ?? "").toLowerCase().includes(search)
+    || (device.checks ?? []).some(check => String(check.url ?? '').toLowerCase().includes(search));
 }
 
 function renderFacilityTabs() {
-  const facilitySource = latestResults.length > 0 ? latestResults : getConfiguredFacilityDevices();
+  const facilitySource = getDashboardDevices();
   const facilitySummaries = getFacilitySummaries(facilitySource);
 
   if (!facilitySummaries.some(facility => facility.name === activeFacility)) {
@@ -1640,7 +1785,7 @@ function renderFacilityTabs() {
   activeFacilityLabel.textContent = activeFacility
     ? `Showing ${activeFacility}`
     : "Showing all facilities";
-  runFacilityCheckButton.disabled = false;
+  runFacilityCheckButton.disabled = !dashboardInventoryAvailable;
   runFacilityCheckButton.title = activeFacility
     ? `Run checks for ${activeFacility}`
     : "Run checks for all facilities";
@@ -1654,6 +1799,7 @@ function renderFacilityTabs() {
       label: "All Facilities",
       totalDevices: facilitySource.length,
       onlineDevices: facilitySource.filter(device => device.isOnline).length,
+      pendingDevices: facilitySource.filter(device => device.status === 'Pending').length,
       problemDevices: facilitySource.filter(device => device.status === "Degraded" || device.status === "Down").length
     }, !hasActiveFacility),
     ...facilitySummaries.map(facility => renderFacilityButton(facility, facility.name === activeFacility))
@@ -1667,7 +1813,9 @@ function getConfiguredFacilityDevices() {
       ...device,
       facility: device.facility || "Unassigned",
       isOnline: false,
-      status: "Pending"
+      status: "Pending",
+      lastCheck: null,
+      requestedPorts: (device.checks ?? []).filter(check => check.type === 'tcp').map(check => check.port)
     }));
 }
 
@@ -1691,12 +1839,13 @@ function getFacilitySummaries(results) {
       label: name,
       totalDevices: devices.length,
       onlineDevices: devices.filter(device => device.isOnline).length,
+      pendingDevices: devices.filter(device => device.status === 'Pending').length,
       problemDevices: devices.filter(device => device.status === "Degraded" || device.status === "Down").length
     }));
 }
 
 function renderFacilityButton(facility, isActive) {
-  const problemClass = facility.problemDevices > 0 ? "facility-tab-problem" : "facility-tab-healthy";
+  const problemClass = facility.problemDevices > 0 ? 'facility-tab-problem' : facility.pendingDevices > 0 ? 'facility-tab-pending' : 'facility-tab-healthy';
   const activeClass = isActive ? "active" : "";
   const value = facility.name || "";
 
@@ -1707,7 +1856,7 @@ function renderFacilityButton(facility, isActive) {
       data-facility-filter="${escapeHtml(value)}">
       <span class="facility-tab-name">${escapeHtml(facility.label)}</span>
       <span class="facility-tab-meta">${facility.totalDevices} devices</span>
-      <span class="facility-tab-status">${facility.onlineDevices} online / ${facility.problemDevices} issues</span>
+      <span class="facility-tab-status">${facility.onlineDevices} online / ${facility.problemDevices} issues${facility.pendingDevices ? ` / ${facility.pendingDevices} not checked` : ''}</span>
     </button>`;
 }
 
@@ -1717,7 +1866,7 @@ function matchesFilter(device, filter) {
   }
 
   if (filter === "offline") {
-    return !device.isOnline;
+    return device.status === 'Down';
   }
 
   if (filter === "problems") {
@@ -1749,7 +1898,10 @@ function renderFacilities(facilities) {
 function renderFacilitySection(facility, facilityIndex) {
   const totalDevices = facility.categories.reduce((total, category) => total + (category.totalDevices ?? 0), 0);
   const onlineDevices = facility.categories.reduce((total, category) => total + (category.onlineDevices ?? 0), 0);
-  const offlineDevices = totalDevices - onlineDevices;
+  const allDevices = facility.categories.flatMap(category => category.devices ?? []);
+  const offlineDevices = allDevices.filter(device => device.status === 'Down').length;
+  const pendingDevices = allDevices.filter(device => device.status === 'Pending').length;
+  const hasPendingState = facility.categories.some(category => (category.stateDevices ?? category.devices ?? []).some(device => device.status === 'Pending'));
   const problemDevices = facility.categories
     .flatMap(category => category.stateDevices ?? category.devices ?? [])
     .filter(device => device.status === "Degraded" || device.status === "Down")
@@ -1761,17 +1913,17 @@ function renderFacilitySection(facility, facilityIndex) {
   const isHealthyFacility = problemDevices === 0;
   const facilityKey = facility.name || "Unassigned";
   const facilityId = `facility-${facilityIndex}-${slugify(facilityKey)}`;
-  const isExpanded = expandedFacilityNames.has(facilityKey);
+  const isExpanded = expandedFacilityNames.has(facilityKey) || Boolean(activeSearch.trim());
   const expandedClass = isExpanded ? "facility-section-expanded" : "";
   const statusClass = isRunningFacility
     ? "text-bg-secondary"
-    : isHealthyFacility ? "text-bg-success" : "text-bg-warning";
+    : hasPendingState && isHealthyFacility ? 'text-bg-secondary' : isHealthyFacility ? "text-bg-success" : "text-bg-warning";
   const statusText = isRunningFacility
     ? "Checking"
-    : isHealthyFacility ? "Healthy" : `${problemDevices} issues`;
+    : hasPendingState && isHealthyFacility ? 'Not checked' : isHealthyFacility ? "Healthy" : `${problemDevices} issues`;
   const statusIcon = isRunningFacility
     ? "fa-spinner fa-spin"
-    : isHealthyFacility ? "fa-circle-check" : "fa-triangle-exclamation";
+    : hasPendingState && isHealthyFacility ? 'fa-clock' : isHealthyFacility ? "fa-circle-check" : "fa-triangle-exclamation";
 
   return `
     <section class="facility-section ${expandedClass} mb-2">
@@ -1783,6 +1935,8 @@ function renderFacilitySection(facility, facilityIndex) {
             data-bs-toggle="collapse"
             data-bs-target="#${facilityId}"
             aria-expanded="${isExpanded}"
+            aria-label="Toggle ${escapeAttribute(facility.name)}"
+            title="Expand or collapse ${escapeAttribute(facility.name)}"
             aria-controls="${facilityId}">
             <i class="fa-solid fa-chevron-down"></i>
           </button>
@@ -1795,7 +1949,7 @@ function renderFacilitySection(facility, facilityIndex) {
           <span class="badge ${statusClass}">
             <i class="fa-solid ${statusIcon} me-1"></i>${statusText}
           </span>
-          <span class="facility-counts">${onlineDevices} online / ${offlineDevices} offline</span>
+          <span class="facility-counts">${onlineDevices} online / ${offlineDevices} offline${pendingDevices ? ` / ${pendingDevices} not checked` : ''}</span>
           <button
             class="btn btn-sm btn-outline-primary facility-run-button"
             type="button"
@@ -1835,34 +1989,34 @@ function renderCategory(category, index, facilityName = "") {
   const offlineDevices = category.offlineDevices ?? totalDevices - onlineDevices;
   const stateDevices = category.stateDevices ?? devices;
   const stateTotalDevices = stateDevices.length;
+  const pendingDevices = stateDevices.filter(device => device.status === 'Pending').length;
+  const visiblePendingDevices = devices.filter(device => device.status === 'Pending').length;
   const healthyDevices = stateDevices.filter(device => device.status === "Healthy").length;
   const problemDevices = stateDevices.filter(device => device.status === "Degraded" || device.status === "Down").length;
   const downDevices = stateDevices.filter(device => device.status === "Down").length;
-  const categoryPercent = stateTotalDevices === 0 ? 100 : Math.round((healthyDevices / stateTotalDevices) * 100);
+  const checkedDevices = stateTotalDevices - pendingDevices;
+  const categoryPercent = checkedDevices ? `${Math.round(healthyDevices / checkedDevices * 100)}%` : '-';
   const isHealthyCategory = stateTotalDevices > 0 && problemDevices === 0 && healthyDevices === stateTotalDevices;
   const isDegradedCategory = problemDevices > 0 && downDevices === 0;
   const categoryFacility = facilityName || activeFacility || "";
-  const isRunningCategory = activeRunCategory
-    && activeRunCategory.toLowerCase() === String(category.name ?? "").toLowerCase()
+  const isRunningCategory = activeMonitorStream && !activeRunDeviceName && activeRunFailedIps.size === 0
+    && (!activeRunCategory || activeRunCategory.toLowerCase() === String(category.name ?? "").toLowerCase())
     && (!activeRunFacility || !categoryFacility || activeRunFacility.toLowerCase() === categoryFacility.toLowerCase());
   const stateClass = isRunningCategory
     ? "category-section-running"
-    : hasCompletedFullCheck
-    ? isHealthyCategory ? "category-section-healthy" : isDegradedCategory ? "category-section-degraded" : "category-section-problem"
-    : "category-section-running";
+    : pendingDevices && !problemDevices ? 'category-section-pending'
+    : isHealthyCategory ? "category-section-healthy" : isDegradedCategory ? "category-section-degraded" : "category-section-problem";
   const stateIcon = isRunningCategory
     ? "fa-spinner fa-spin"
-    : hasCompletedFullCheck
-    ? isHealthyCategory ? "fa-circle-check" : isDegradedCategory ? "fa-triangle-exclamation" : "fa-circle-xmark"
-    : "fa-spinner fa-spin";
+    : pendingDevices && !problemDevices ? 'fa-clock'
+    : isHealthyCategory ? "fa-circle-check" : isDegradedCategory ? "fa-triangle-exclamation" : "fa-circle-xmark";
   const stateLabel = isRunningCategory
     ? "Checking"
-    : hasCompletedFullCheck
-    ? isHealthyCategory ? "Healthy" : "Needs attention"
-    : "Checking";
+    : pendingDevices && !problemDevices ? 'Not checked'
+    : isHealthyCategory ? "Healthy" : "Needs attention";
   const categoryKey = createCategoryKey(categoryFacility, category.name);
   const categoryId = `category-${index}-${slugify(categoryFacility)}-${slugify(category.name)}`;
-  const isExpanded = expandedCategoryNames.has(categoryKey);
+  const isExpanded = expandedCategoryNames.has(categoryKey) || Boolean(activeSearch.trim());
   const expandedClass = isExpanded ? "category-section-expanded" : "";
 
   return `
@@ -1875,21 +2029,23 @@ function renderCategory(category, index, facilityName = "") {
             data-bs-toggle="collapse"
             data-bs-target="#${categoryId}"
             aria-expanded="${isExpanded}"
+            aria-label="Toggle ${escapeAttribute(category.name)}"
+            title="Expand or collapse ${escapeAttribute(category.name)}"
             aria-controls="${categoryId}">
             <i class="fa-solid fa-chevron-down"></i>
           </button>
           <div>
             <h2 class="h5 mb-0">${escapeHtml(category.name)}</h2>
-            <span class="category-subtitle small">${totalDevices} devices monitored</span>
+            <span class="category-subtitle small">${totalDevices} devices</span>
           </div>
         </div>
         <div class="category-summary d-flex align-items-center justify-content-end gap-2 flex-wrap flex-sm-nowrap ms-auto">
-          <span class="category-percent">${categoryPercent}%</span>
+          <span class="category-percent">${categoryPercent}</span>
           <span class="category-state">
             <i class="fa-solid ${stateIcon} me-1"></i>${stateLabel}
           </span>
           <span class="category-counts">
-            ${onlineDevices} online / ${offlineDevices} offline
+            ${onlineDevices} online / ${offlineDevices} offline${visiblePendingDevices ? ` / ${visiblePendingDevices} not checked` : ''}
           </span>
           <button
             class="btn btn-sm btn-light category-run-button"
@@ -1912,7 +2068,7 @@ function renderCategory(category, index, facilityName = "") {
                 <th scope="col">Address</th>
                 <th scope="col">Status</th>
                 <th scope="col">Ping status</th>
-                <th scope="col">Ports status</th>
+                <th scope="col">TCP / HTTP</th>
                 <th scope="col" class="text-end">Checked</th>
               </tr>
             </thead>
@@ -1926,15 +2082,15 @@ function renderCategory(category, index, facilityName = "") {
 }
 
 function renderRow(result) {
+  const isPending = result.status === 'Pending';
   const pingCheck = getPingCheck(result);
   const hasPingCheck = Boolean(pingCheck);
   const isPingAvailable = Boolean(pingCheck?.isAvailable);
-  const hasProblem = result.status === "Degraded" || result.status === "Down";
   const isRunningDevice = isActiveRunDevice(result);
   const isRunningFailedDevice = activeRunFailedIps.has(result.ip);
-  const statusClass = isPingAvailable ? "text-bg-success" : "text-bg-danger";
-  const statusIcon = isPingAvailable ? "fa-check" : "fa-xmark";
-  const statusText = isPingAvailable
+  const statusClass = isPending || !hasPingCheck ? "text-bg-secondary" : isPingAvailable ? "text-bg-success" : "text-bg-danger";
+  const statusIcon = isPending ? 'fa-clock' : !hasPingCheck ? "fa-minus" : isPingAvailable ? "fa-check" : "fa-xmark";
+  const statusText = isPending && hasPingCheck ? 'Not checked' : isPingAvailable
     ? `Ping OK (${Number(pingCheck.latencyMs) || 0} ms)`
     : hasPingCheck ? formatPingFailureText(pingCheck) : "No ping check";
   const pingTitle = hasPingCheck
@@ -1942,11 +2098,14 @@ function renderRow(result) {
     : "No ping check is configured for this device.";
 
   return `
-    <tr>
+    <tr data-dashboard-device="${escapeAttribute(result.name)}">
       <td class="fw-semibold">
         <div>${escapeHtml(result.name)}</div>
+        ${renderDeviceLocation(result)}
+        ${renderDeviceNotes(result)}
+        ${renderWorkstationInventory(configState.devices.find(device => createDeviceKey(device) === createDeviceKey(result)))}
         ${!activeFacility ? `<div class="text-secondary small">${escapeHtml(result.facility || "Unassigned")} · ${escapeHtml(result.category || "Uncategorized")}</div>` : ""}
-        ${renderWebsiteLink(result.websiteUrl)}
+        <div class="device-shortcuts">${renderWebsiteLink(result.websiteUrl)}${renderCommandButton(result.command)}</div>
       </td>
       <td>
         <code>${escapeHtml(result.ip)}</code>
@@ -1958,13 +2117,11 @@ function renderRow(result) {
           <i class="fa-solid ${statusIcon} me-1"></i>${statusText}
         </span>
       </td>
-      <td>${renderPorts(result)}</td>
+      <td>${renderPorts(result)}${renderDeviceHttpChecks(result)}</td>
       <td class="text-end">
         <div class="device-check-actions">
-          <span class="text-secondary small">${formatDate(result.lastCheck)}</span>
-          ${hasProblem || isRunningDevice || isRunningFailedDevice
-            ? renderDeviceRunButton(result, isRunningDevice || isRunningFailedDevice)
-            : ""}
+          <span class="text-secondary small">${isPending ? 'Not checked' : formatDate(result.lastCheck)}</span>
+          ${renderDeviceRunButton(result, isRunningDevice || isRunningFailedDevice)}
         </div>
       </td>
     </tr>`;
@@ -1976,7 +2133,7 @@ function renderDeviceRunButton(result, isRunning = false) {
       class="btn ${isRunning ? "btn-primary" : "btn-outline-primary"} btn-sm device-run-button"
       type="button"
       title="${isRunning ? "This device is being checked" : "Run only this device"}"
-      ${isRunning ? "disabled" : ""}
+      ${isRunning || activeMonitorStream ? "disabled" : ""}
       data-run-device-name="${escapeHtml(result.name)}"
       data-run-device-ip="${escapeHtml(result.ip)}"
       data-run-device-facility="${escapeHtml(result.facility || "")}"
@@ -2004,6 +2161,16 @@ function formatPingFailureText(pingCheck) {
   return "Ping failed";
 }
 
+function renderDeviceLocation(device) {
+  if (!device?.location) return '';
+  return `<div class="device-location small fw-normal text-secondary"><i class="fa-solid fa-location-dot" aria-hidden="true"></i><span><span class="visually-hidden">Location: </span><span class="device-location-text">${escapeHtml(device.location)}</span></span></div>`;
+}
+
+function renderDeviceNotes(device) {
+  if (!device?.notes) return '';
+  return `<details class="device-notes small fw-normal text-secondary"><summary aria-label="Notes for ${escapeAttribute(device.name)}"><i class="fa-regular fa-note-sticky me-1" aria-hidden="true"></i>Notes</summary><div class="device-notes-text">${escapeHtml(device.notes)}</div></details>`;
+}
+
 function renderWebsiteLink(websiteUrl) {
   if (!isHttpUrl(websiteUrl)) {
     return "";
@@ -2015,6 +2182,49 @@ function renderWebsiteLink(websiteUrl) {
     </a>`;
 }
 
+function renderCommandButton(command) {
+  if (!command) return '';
+  return `<button class="btn btn-link btn-sm p-0 device-command-button" type="button" data-copy-command="${escapeAttribute(command)}" title="Copy command" aria-label="Copy command"><i class="fa-solid fa-terminal" aria-hidden="true"></i><span aria-live="polite">Command</span></button>`;
+}
+
+async function copyDeviceCommand(button) {
+  if (button.disabled) return;
+  const previousFocus = document.activeElement;
+  button.disabled = true;
+  const label = button.querySelector('span');
+  let copied = false;
+  try {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard API unavailable.');
+      await navigator.clipboard.writeText(button.dataset.copyCommand);
+      copied = true;
+    } catch {
+      const text = document.createElement('textarea');
+      text.value = button.dataset.copyCommand;
+      text.readOnly = true;
+      text.style.position = 'fixed';
+      text.style.left = '-9999px';
+      document.body.append(text);
+      try {
+        text.focus({ preventScroll: true });
+        text.select();
+        copied = document.execCommand('copy');
+      } finally {
+        text.remove();
+      }
+    }
+  } catch { copied = false; }
+  label.textContent = copied ? 'Copied' : 'Copy failed';
+  button.title = copied ? 'Command copied' : 'Clipboard unavailable';
+  button.disabled = false;
+  if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+  setTimeout(() => {
+    if (!button.isConnected) return;
+    label.textContent = 'Command';
+    button.title = 'Copy command';
+  }, 2000);
+}
+
 function getPingCheck(result) {
   return (result.checks ?? []).find(check =>
     String(check.type ?? "").toLowerCase() === "ping");
@@ -2023,6 +2233,7 @@ function getPingCheck(result) {
 function renderDeviceStatus(status) {
   const normalizedStatus = status || "Down";
   const statusMap = {
+    Pending: { className: 'text-bg-secondary', icon: 'fa-clock', label: 'Not checked' },
     Healthy: {
       className: "text-bg-success",
       icon: "fa-check",
@@ -2066,7 +2277,7 @@ function groupResultsByCategory(results) {
       name,
       totalDevices: devices.length,
       onlineDevices: devices.filter(device => device.isOnline).length,
-      offlineDevices: devices.filter(device => !device.isOnline).length,
+      offlineDevices: devices.filter(device => device.status === 'Down').length,
       devices: devices.sort(compareDevices)
     }));
 }
@@ -2098,8 +2309,11 @@ function renderPorts(result) {
   const isPingOnlyResult = isPingOnlyMode(result.checkMode);
 
   if (requestedPorts.length === 0) {
+    if ((result.checks ?? []).some(check => check.type === "http")) return "";
     return `<span class="text-secondary">No ports configured</span>`;
   }
+
+  if (result.status === 'Pending') return '<span class="badge text-bg-secondary port-pill">TCP not checked</span>';
 
   if (isPingOnlyResult) {
     return `
@@ -2134,6 +2348,30 @@ function renderPorts(result) {
   }).join("");
 }
 
+function renderDeviceHttpChecks(result) {
+  if (result.status === 'Pending') {
+    return (result.checks ?? []).filter(check => check.type === 'http').map(check =>
+      `<div class="http-check-result mt-1"><span class="badge text-bg-secondary">HTTP not checked</span><div class="small text-secondary text-break">${escapeHtml(check.url || '')}</div></div>`).join('');
+  }
+  if (isPingOnlyMode(result.checkMode)) {
+    const device = configState.devices.find(item => createDeviceKey(item) === createDeviceKey(result));
+    return device?.checks?.some(check => check.type === "http")
+      ? '<div class="small text-secondary mt-1">HTTP skipped - Ping Only</div>' : "";
+  }
+  return renderHttpChecks(result.checks);
+}
+
+function renderHttpChecks(checks = []) {
+  return checks.filter(check => check.type === "http").map(check => `
+    <div class="http-check-result mt-1">
+      <span class="badge ${check.isAvailable ? "text-bg-success" : "text-bg-danger"}">
+        <i class="fa-solid ${check.isAvailable ? "fa-check" : "fa-xmark"} me-1"></i>HTTP ${escapeHtml(check.statusCode ?? check.status ?? "Failed")} &middot; ${Number(check.durationMs) || 0} ms
+      </span>
+      <div class="small text-secondary text-break">${escapeHtml(check.url || "")}</div>
+      ${!check.isAvailable ? `<div class="small text-danger">${escapeHtml(check.message || check.status || "HTTP check failed.")}</div>` : ""}
+    </div>`).join("");
+}
+
 function getWebPortUrl(address, port) {
   if (!address || port !== 80 && port !== 443) {
     return null;
@@ -2154,9 +2392,10 @@ async function reloadJson() {
       throw new Error(payload.error || payload.detail || `Reload failed with ${response.status}`);
     }
 
+    await loadRegions({ showErrors: true });
     await loadConfig({ clearAlert: false, showBusy: false });
     markDashboardConfigurationStale();
-    showConfigAlert("success", `Reloaded active support group JSON from disk. ${formatNumber(payload.count)} devices loaded.`);
+    showConfigAlert("success", `Reloaded active support group inventory. ${formatNumber(payload.count)} devices loaded.`);
   } catch (error) {
     showConfigAlert("danger", `JSON reload failed: ${error.message}`);
     console.error(error);
@@ -2253,6 +2492,7 @@ async function importConfigFile(file) {
 
     const response = await fetch("/api/config/import", {
       method: "POST",
+      headers: { 'X-NetWatch-Profile': regionState.activeProfileId || '' },
       body: formData
     });
     const payload = await readJsonResponse(response);
@@ -2358,7 +2598,7 @@ async function runDeviceCheck(device) {
   setOtherDashboardRunButtonsDisabled(true, device);
 
   try {
-    await loadResults({ facility: device.facility || "", device });
+    await loadResults({ facility: device.facility || "", category: device.category || '', device });
   } finally {
     activeRunDeviceName = "";
     activeRunDeviceIp = "";
@@ -2467,29 +2707,30 @@ async function refreshConfigurationForRun() {
   }
 
   applyConfigPayload(configPayload);
-  renderGroupCheckOptions(configState.devices);
+  renderGroupCheckOptions(configState.devices, { preserveSelection: true });
   renderFacilityTabs();
   hasLoadedDashboardGroups = true;
   dashboardConfigStale = false;
 }
 
-async function saveConfig(successMessage = "Settings saved to the active support group JSON. The previous file was backed up.") {
+async function saveConfig(successMessage = "Settings saved to the active support group. The previous version was backed up.") {
   const resolvedSuccessMessage = typeof successMessage === "string"
     ? successMessage
-    : "Settings saved to the active support group JSON. The previous file was backed up.";
+    : "Settings saved to the active support group. The previous version was backed up.";
 
   setConfigBusy(true);
   clearConfigAlert();
 
   try {
     if (!syncConfigSettingsFromUi()) {
-      return;
+      return false;
     }
 
     const response = await fetch("/api/config", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        'X-NetWatch-Profile': regionState.activeProfileId || ''
       },
       body: JSON.stringify(configState)
     });
@@ -2497,7 +2738,7 @@ async function saveConfig(successMessage = "Settings saved to the active support
     const payload = await readJsonResponse(response);
 
     if (!response.ok) {
-      throw new Error(payload.error || `Request failed with ${response.status}`);
+      throw new Error(payload.error || payload.detail || payload.title || `Request failed with ${response.status}`);
     }
 
     applyConfigPayload(payload.configuration);
@@ -2509,9 +2750,13 @@ async function saveConfig(successMessage = "Settings saved to the active support
       scheduleRefresh();
     }
     showConfigAlert("success", resolvedSuccessMessage);
+    return true;
   } catch (error) {
-    showConfigAlert("danger", error.message || "Unable to save configuration.");
+    const message = error.message || 'Unable to save configuration.';
+    showConfigAlert('danger', message);
+    if (deviceFormModalElement.classList.contains('show')) showDeviceCheckAlert(message);
     console.error(error);
+    return false;
   } finally {
     setConfigBusy(false);
   }
@@ -2533,13 +2778,16 @@ function markDashboardConfigurationStale() {
     renderFacilityTabs();
     renderSummary(createProgressSummary([], 0));
     renderFilteredCategories();
-    lastCheck.textContent = "Configuration changed. Run All Facilities to refresh with the latest active support group JSON.";
+    lastCheck.textContent = 'Configuration updated. No checks yet.';
   }
 }
 
 function applyConfigPayload(payload) {
   configState = payload;
   configState.devices ??= [];
+  dashboardInventoryAvailable = true;
+  configState.peripheralCatalog ??= [];
+  configState.deviceTypes ??= initialDeviceTypes.map(type => ({ ...type }));
   configState.settings ??= {
     intervalSeconds: defaultAutoFullCheckIntervalSeconds,
     timeoutMs: 1000,
@@ -2616,6 +2864,12 @@ async function refreshDashboardFromActiveRegion() {
 }
 
 async function loadDashboardGroups({ resetResults = false } = {}) {
+  dashboardInventoryAvailable = false;
+  runFacilityCheckButton.disabled = true;
+  runGroupCheckButton.disabled = true;
+  renderGroupCheckOptions([]);
+  facilityTabs.innerHTML = '';
+  resultsBody.innerHTML = '<div class="text-center text-secondary py-4">Loading inventory...</div>';
   try {
     const response = await fetch("/api/config");
     const payload = await readJsonResponse(response);
@@ -2625,8 +2879,8 @@ async function loadDashboardGroups({ resetResults = false } = {}) {
     }
 
     applyConfigPayload(payload);
-    renderGroupCheckOptions(payload.devices);
     renderFacilityTabs();
+    renderGroupCheckOptions(payload.devices);
     hasLoadedDashboardGroups = true;
     dashboardConfigStale = false;
 
@@ -2639,19 +2893,24 @@ async function loadDashboardGroups({ resetResults = false } = {}) {
       expandedCategoryNames.clear();
       updateRunFailedButton();
       renderSummary(createProgressSummary([], 0));
-      renderFilteredCategories();
-      resultsBody.innerHTML = `
-        <div class="text-center text-secondary py-4">Run a check to load monitoring results for the active support group.</div>`;
-      lastCheck.textContent = "Dashboard refreshed with the active support group JSON. Run All Facilities to load monitoring results.";
+      lastCheck.textContent = 'No checks yet.';
     }
+    revealSavedDashboardDevice();
+    renderFilteredCategories();
   } catch (error) {
+    dashboardInventoryAvailable = false;
+    hasLoadedDashboardGroups = false;
+    latestResults = [];
+    renderGroupCheckOptions([]);
+    renderFilteredCategories();
     console.error(error);
     runGroupCheckButton.disabled = true;
     lastCheck.textContent = error.message || "Unable to load dashboard groups.";
   }
 }
 
-function renderGroupCheckOptions(devices) {
+function renderGroupCheckOptions(devices, { preserveSelection = false } = {}) {
+  const selectedCategory = groupCheckSelect.value;
   const scopedDevices = activeFacility
     ? (devices ?? []).filter(device => (device.facility || "Unassigned") === activeFacility)
     : devices ?? [];
@@ -2664,7 +2923,23 @@ function renderGroupCheckOptions(devices) {
   groupCheckSelect.innerHTML = `
     <option value="">Select group</option>
     ${categories.map(category => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`).join("")}`;
-  runGroupCheckButton.disabled = true;
+  if (preserveSelection && categories.includes(selectedCategory)) groupCheckSelect.value = selectedCategory;
+  runGroupCheckButton.disabled = !groupCheckSelect.value;
+}
+
+function updateDashboardFilterReset() {
+  clearDashboardFiltersButton.disabled = !activeFacility && !activeSearch.trim() && activeFilter === 'all' && !groupCheckSelect.value;
+}
+
+function clearDashboardFilters() {
+  activeFacility = '';
+  activeSearch = '';
+  activeFilter = 'all';
+  searchInput.value = '';
+  filterInputs.forEach(input => { input.checked = input.value === 'all'; });
+  renderGroupCheckOptions(dashboardInventoryAvailable ? configState.devices : []);
+  renderFilteredCategories();
+  updateRunFailedButton();
 }
 
 function selectFacility(facilityName) {
@@ -2691,6 +2966,7 @@ function renderConfigDevices() {
   configDevicesBody.innerHTML = groupConfigDevicesByFacility(devices)
     .map((facility, facilityIndex) => {
       const facilityId = `config-facility-${facilityIndex}-${slugify(facility.name)}`;
+      const facilityRevealed = hasSearch || facility.devices.some(({ device }) => isSavedDeviceRevealed(device));
 
       return `
       <tr class="config-facility-row">
@@ -2698,32 +2974,37 @@ function renderConfigDevices() {
           <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
             <div class="d-flex align-items-center gap-2">
               <button
-                class="btn btn-sm btn-outline-light category-toggle"
+                class="btn btn-sm btn-outline-secondary category-toggle"
                 type="button"
+                title="Expand or collapse facility"
+                aria-label="Toggle ${escapeAttribute(facility.name)}"
                 data-config-facility-toggle="${facilityId}"
-                aria-expanded="false"
+                aria-expanded="${facilityRevealed}"
                 aria-controls="${facilityId}">
                 <i class="fa-solid fa-chevron-down"></i>
               </button>
               <span class="fw-semibold"><i class="fa-solid fa-location-dot me-2"></i>${escapeHtml(facility.name)}</span>
             </div>
-            <span class="badge text-bg-dark">${facility.devices.length} devices</span>
+            <span class="badge text-bg-secondary">${facility.devices.length} devices</span>
           </div>
         </td>
       </tr>
       ${facility.categories.map((category, categoryIndex) => {
         const categoryId = `${facilityId}-category-${categoryIndex}-${slugify(category.name)}`;
+        const categoryRevealed = hasSearch || category.devices.some(({ device }) => isSavedDeviceRevealed(device));
 
         return `
-          <tr class="config-category-row" data-config-facility-row="${facilityId}" hidden>
+          <tr class="config-category-row" data-config-facility-row="${facilityId}" ${facilityRevealed ? '' : 'hidden'}>
             <td colspan="7">
               <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 ps-3">
                 <div class="d-flex align-items-center gap-2">
                   <button
                     class="btn btn-sm btn-outline-secondary category-toggle"
                     type="button"
+                    title="Expand or collapse category"
+                    aria-label="Toggle ${escapeAttribute(category.name)}"
                     data-config-category-toggle="${categoryId}"
-                    aria-expanded="false"
+                    aria-expanded="${categoryRevealed}"
                     aria-controls="${categoryId}">
                     <i class="fa-solid fa-chevron-down"></i>
                   </button>
@@ -2733,7 +3014,7 @@ function renderConfigDevices() {
               </div>
             </td>
           </tr>
-          ${category.devices.map(({ device, index }) => renderConfigDeviceRow(device, index, categoryId)).join("")}`;
+          ${category.devices.map(({ device, index }) => renderConfigDeviceRow(device, index, categoryId, categoryRevealed)).join("")}`;
       }).join("")}`;
     })
     .join("");
@@ -2864,7 +3145,7 @@ function renderBulkEditFacilityGroup(group) {
           <i class="fa-solid fa-chevron-${isCollapsed ? "right" : "down"}"></i>
         </button>
         <span class="fw-semibold"><i class="fa-solid fa-location-dot me-2"></i>${escapeHtml(group.name)}</span>
-        <span class="badge text-bg-dark ms-2">${group.devices.length} devices</span>
+        <span class="badge text-bg-secondary ms-2">${group.devices.length} devices</span>
         <span class="small ms-2">${group.categories.length} categories</span>
       </td>
     </tr>
@@ -3166,7 +3447,8 @@ async function saveBulkRow(row) {
     const response = await fetch(`/api/config/devices/${index}`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        'X-NetWatch-Profile': regionState.activeProfileId || ''
       },
       body: JSON.stringify(device)
     });
@@ -3246,7 +3528,10 @@ function filterConfigDevices(devices) {
       || String(device.hostname ?? "").toLowerCase().includes(search)
       || String(device.facility ?? "").toLowerCase().includes(search)
       || String(device.category ?? "").toLowerCase().includes(search)
-      || String(device.websiteUrl ?? "").toLowerCase().includes(search));
+      || String(device.websiteUrl ?? "").toLowerCase().includes(search)
+      || String(device.notes ?? "").toLowerCase().includes(search)
+      || String(device.location ?? "").toLowerCase().includes(search)
+      || (device.checks ?? []).some(check => String(check.url ?? '').toLowerCase().includes(search)));
 }
 
 /**
@@ -3325,13 +3610,16 @@ function compareDevices(left, right) {
  * @param {string} groupId Stable group key used to find rows for the category.
  * @returns {string} Table row markup.
  */
-function renderConfigDeviceRow(device, index, groupId) {
+function renderConfigDeviceRow(device, index, groupId, revealed = false) {
   const pingModeLabel = device.useHostnameForPing ? "Hostname" : "Address";
 
   return `
-    <tr class="config-device-row" data-config-category-row="${groupId}" hidden>
+    <tr class="config-device-row" data-config-category-row="${groupId}" ${revealed ? '' : 'hidden'}>
       <td>
         <div class="fw-semibold">${escapeHtml(device.name)}</div>
+        ${renderDeviceLocation(device)}
+        ${renderDeviceNotes(device)}
+        ${renderWorkstationInventory(device)}
         <div class="text-secondary small">${device.enabled === false ? "Disabled" : "Enabled"}</div>
       </td>
       <td>${escapeHtml(device.facility || "Unassigned")}</td>
@@ -3340,15 +3628,17 @@ function renderConfigDeviceRow(device, index, groupId) {
       <td><span class="badge text-bg-${device.useHostnameForPing ? "primary" : "secondary"}">${pingModeLabel}</span></td>
       <td>${device.checks?.length ?? 0}</td>
       <td class="text-end">
-        <button class="btn btn-outline-primary btn-sm me-1" type="button" data-edit-device="${index}">
-          <i class="fa-solid fa-pen-to-square me-1"></i>Edit
-        </button>
-        <button class="btn btn-outline-secondary btn-sm me-1" type="button" data-copy-device="${index}">
-          <i class="fa-solid fa-copy me-1"></i>Copy
-        </button>
-        <button class="btn btn-outline-danger btn-sm" type="button" data-delete-device="${index}">
-          <i class="fa-solid fa-trash me-1"></i>Delete
-        </button>
+        <div class="config-device-actions" role="group" aria-label="Device actions for ${escapeAttribute(device.name)}">
+          <button class="btn btn-outline-primary btn-sm" type="button" data-edit-device="${index}" title="Edit device" aria-label="Edit ${escapeAttribute(device.name)}">
+            <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" type="button" data-copy-device="${index}" title="Copy device" aria-label="Copy ${escapeAttribute(device.name)}">
+            <i class="fa-solid fa-copy" aria-hidden="true"></i>
+          </button>
+          <button class="btn btn-outline-danger btn-sm" type="button" data-delete-device="${index}" title="Delete device" aria-label="Delete ${escapeAttribute(device.name)}">
+            <i class="fa-solid fa-trash" aria-hidden="true"></i>
+          </button>
+        </div>
       </td>
     </tr>`;
 }
@@ -3445,12 +3735,17 @@ function copyDevice(index) {
 }
 
 function populateDeviceForm(device) {
+  showDeviceCheckAlert("");
+  populatePeripheralForm(device);
   deviceNameInput.value = device.name ?? "";
   deviceAddressInput.value = device.ip ?? "";
   deviceFacilityInput.value = device.facility ?? "";
   deviceHostnameInput.value = device.hostname ?? "";
   deviceUseHostnameForPingInput.checked = Boolean(device.useHostnameForPing);
   deviceWebsiteUrlInput.value = device.websiteUrl ?? "";
+  deviceCommandInput.value = device.command ?? '';
+  deviceLocationInput.value = device.location ?? '';
+  deviceNotesInput.value = device.notes ?? '';
   deviceCategoryInput.value = device.category ?? "";
   deviceEnabledInput.checked = device.enabled ?? true;
   checksList.innerHTML = "";
@@ -3462,6 +3757,7 @@ function populateDeviceForm(device) {
   if (checksList.children.length === 0) {
     addCheckRow({ type: "ping" });
   }
+  document.querySelector('#device-monitoring-preset-wrap').hidden = true;
 }
 
 function createCopyDeviceName(name) {
@@ -3479,16 +3775,71 @@ async function submitDevice(event) {
     return;
   }
 
+  const previous = structuredClone(configState);
+  let saved;
   if (indexValue === "") {
     configState.devices.push(device);
-    await saveConfig("Device added and saved to the active support group JSON.");
+    saved = await saveConfig("Device added and saved to the active support group.");
   } else {
     configState.devices[Number(indexValue)] = device;
-    await saveConfig("Device updated and saved to the active support group JSON.");
+    saved = await saveConfig("Device updated and saved to the active support group.");
+  }
+  if (!saved) {
+    configState = previous;
+    return;
+  }
+  revealSavedDevice(indexValue === '' ? configState.devices.length - 1 : Number(indexValue));
+}
+
+function isSavedDeviceRevealed(device) {
+  return savedDeviceReveal?.profileId === regionState.activeProfileId
+    && savedDeviceReveal.key === createDeviceKey(device);
+}
+
+function revealSavedDevice(index) {
+  const device = configState.devices[index];
+  if (!device) return;
+  savedDeviceReveal = { profileId: regionState.activeProfileId, key: createDeviceKey(device) };
+  pendingDashboardReveal = { ...savedDeviceReveal };
+  if (!filterConfigDevices(configState.devices).some(entry => entry.index === index)) {
+    activeConfigSearch = '';
+    configDeviceSearchInput.value = '';
+    configSearchBulkCollapseSnapshot = null;
+  }
+  const facility = device.facility || 'Unassigned';
+  if (activeBulkFacility && activeBulkFacility !== facility) activeBulkFacility = '';
+  if (activeBulkCategory && activeBulkCategory !== (device.category || 'Uncategorized')) activeBulkCategory = '';
+  collapsedBulkFacilityNames.delete(facility);
+  renderConfigDevices();
+  renderBulkEditDevices();
+  if (device.enabled === false) {
+    showConfigAlert('success', 'Device saved. It is disabled and will not appear on Dashboard until enabled.');
   }
 }
 
+function revealSavedDashboardDevice() {
+  const target = pendingDashboardReveal;
+  pendingDashboardReveal = null;
+  if (target?.profileId !== regionState.activeProfileId) return;
+  const device = getDashboardDevices().find(entry => createDeviceKey(entry) === target.key);
+  if (!device) return;
+  if (activeFacility && activeFacility !== device.facility) activeFacility = '';
+  if (!matchesSearch(device, activeSearch.trim().toLowerCase())) {
+    activeSearch = '';
+    searchInput.value = '';
+  }
+  if (!matchesFilter(device, activeFilter)) {
+    activeFilter = 'all';
+    filterInputs.forEach(input => { input.checked = input.value === 'all'; });
+  }
+  expandedFacilityNames.add(device.facility || 'Unassigned');
+  expandedCategoryNames.add(createCategoryKey(device.facility, device.category));
+  renderGroupCheckOptions(configState.devices, { preserveSelection: true });
+}
+
 function readDeviceForm() {
+  const peripheralFields = readPeripheralDeviceFields();
+  if (!peripheralFields) return null;
   const checks = readCheckRows();
 
   if (checks === null) {
@@ -3496,27 +3847,54 @@ function readDeviceForm() {
   }
 
   if (checks.length === 0) {
-    showConfigAlert("warning", "Add at least one check before saving the device.");
+    showDeviceCheckAlert("Add at least one check before saving the device.");
     return null;
   }
 
   const websiteUrl = deviceWebsiteUrlInput.value.trim();
+  const command = deviceCommandInput.value.trim();
+  if (deviceAddressInput.required && /^https?:\/\//i.test(deviceAddressInput.value.trim())) {
+    showDeviceCheckAlert('Network target must be an IP address or hostname, not a website URL.');
+    deviceAddressInput.focus();
+    return null;
+  }
+  const deviceLocation = deviceLocationInput.value;
+  if (deviceLocation.length > 200 || /[\x00-\x1f\x7f-\x9f\u2028\u2029]/.test(deviceLocation)) {
+    showDeviceCheckAlert('Location must be a single line of at most 200 characters without control characters.');
+    deviceLocationInput.focus();
+    return null;
+  }
+  const notes = deviceNotesInput.value;
+  if (notes.length > 2000 || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(notes)) {
+    showDeviceCheckAlert('Notes must be at most 2000 characters; only line breaks and tabs are allowed as control characters.');
+    deviceNotesInput.focus();
+    return null;
+  }
+  if (command.length > 4096 || /[\x00-\x1f\x7f-\x9f\u2028\u2029]/.test(command)) {
+    showDeviceCheckAlert('Command must be a single line of at most 4096 characters without control characters.');
+    deviceCommandInput.focus();
+    return null;
+  }
 
   if (websiteUrl && !isHttpUrl(websiteUrl)) {
-    showConfigAlert("warning", "Website URL must start with http:// or https://.");
+    showDeviceCheckAlert("Website URL must start with http:// or https://.");
     deviceWebsiteUrlInput.focus();
     return null;
   }
 
   return {
     name: deviceNameInput.value.trim(),
-    ip: deviceAddressInput.value.trim(),
+    ...peripheralFields,
+    ip: deviceAddressInput.value.trim() || (checks.every(check => check.type === "http") ? new URL(checks[0].url).hostname.replace(/^\[|\]$/g, "") : ""),
     region: getActiveRegion()?.region || getActiveRegion()?.name || "Unassigned",
     supportGroup: getActiveRegion()?.name || "Unassigned",
     facility: deviceFacilityInput.value.trim() || "Unassigned",
     hostname: deviceHostnameInput.value.trim() || null,
     useHostnameForPing: deviceUseHostnameForPingInput.checked,
     websiteUrl: websiteUrl || null,
+    command: command || null,
+    location: deviceLocation.trim() || null,
+    notes: notes.trim() || null,
     category: deviceCategoryInput.value.trim() || "Uncategorized",
     enabled: deviceEnabledInput.checked,
     checks
@@ -3524,6 +3902,7 @@ function readDeviceForm() {
 }
 
 function readCheckRows() {
+  showDeviceCheckAlert("");
   const checks = [];
 
   for (const row of checksList.querySelectorAll(".check-row")) {
@@ -3535,8 +3914,30 @@ function readCheckRows() {
       continue;
     }
 
+    if (type === "http") {
+      const urlInput = row.querySelector("[data-check-url]");
+      const url = urlInput.value.trim();
+      let parsed;
+      try { parsed = new URL(url); } catch { /* Report the same URL validation below. */ }
+      if (!isHttpUrl(url) || !parsed || parsed.username || parsed.password || parsed.hash || url.length > 2048 || /[\x00-\x1f\x7f]/.test(url)) {
+        showDeviceCheckAlert("HTTP checks require an HTTP/HTTPS URL without credentials or fragments (max 2048 characters).");
+        urlInput.focus();
+        return null;
+      }
+      const timeoutMs = readIntegerSetting(row.querySelector("[data-check-timeout]"), "HTTP timeout", 100, 60000, showDeviceCheckAlert);
+      const expectedStatusCode = readIntegerSetting(row.querySelector("[data-check-status]"), "Expected HTTP status", 200, 599, showDeviceCheckAlert);
+      if (timeoutMs === null || expectedStatusCode === null) return null;
+      const expectedText = row.querySelector("[data-check-text]").value;
+      if (expectedText.length > 4096) {
+        showDeviceCheckAlert("Expected HTTP text must not exceed 4096 characters.");
+        return null;
+      }
+      checks.push({ type: "http", url, timeoutMs, expectedStatusCode, expectedText: expectedText || null });
+      continue;
+    }
+
     if (!Number.isInteger(portValue) || portValue < 1 || portValue > 65535) {
-      showConfigAlert("warning", "TCP checks require a port between 1 and 65535.");
+      showDeviceCheckAlert("TCP checks require a port between 1 and 65535.");
       return null;
     }
 
@@ -3549,9 +3950,17 @@ function readCheckRows() {
   return checks;
 }
 
+function showDeviceCheckAlert(message) {
+  const alert = document.querySelector("#device-check-alert");
+  alert.textContent = message;
+  alert.hidden = !message;
+}
+
 function resetDeviceForm() {
+  showDeviceCheckAlert("");
   editingDeviceIndex.value = "";
   deviceForm.reset();
+  populatePeripheralForm({});
   deviceEnabledInput.checked = true;
   deviceUseHostnameForPingInput.checked = false;
   deviceFacilityInput.value = "";
@@ -3559,6 +3968,8 @@ function resetDeviceForm() {
   submitDeviceButton.textContent = "Add Device";
   checksList.innerHTML = "";
   addCheckRow({ type: "ping" });
+  document.querySelector('#device-monitoring-preset-wrap').hidden = false;
+  document.querySelector('#device-monitoring-preset').value = 'network';
   hideDeviceForm();
 }
 
@@ -3570,7 +3981,7 @@ function showDeviceForm() {
 
 function hideDeviceForm() {
   if (deviceFormModal) {
-    deviceFormModal.hide();
+    hideManagementModal(deviceFormModalElement);
   }
 }
 
@@ -3611,14 +4022,14 @@ function readPositiveIntegerSetting(input, label) {
   return readIntegerSetting(input, label, 1);
 }
 
-function readIntegerSetting(input, label, min, max = null) {
+function readIntegerSetting(input, label, min, max = null, showError = message => showConfigAlert("warning", message)) {
   const value = Number(input.value);
 
   if (!Number.isInteger(value) || value < min || (max !== null && value > max)) {
     const rangeText = max === null
       ? `greater than or equal to ${min}`
       : `between ${min} and ${max}`;
-    showConfigAlert("warning", `${label} must be a whole number ${rangeText}.`);
+    showError(`${label} must be a whole number ${rangeText}.`);
     input.focus();
     return null;
   }
@@ -3628,30 +4039,49 @@ function readIntegerSetting(input, label, min, max = null) {
 
 function addCheckRow(check = { type: "ping" }) {
   const row = document.createElement("div");
+  const helpKey = `http-check-${++httpCheckHelpSequence}`;
   row.className = "check-row";
   row.innerHTML = `
-    <select class="form-select form-select-sm" data-check-type>
+    <select class="form-select form-select-sm" data-check-type aria-label="Check type">
       <option value="ping">Ping</option>
       <option value="tcp">TCP</option>
+      <option value="http">HTTP / HTTPS</option>
     </select>
-    <input class="form-control form-control-sm" type="number" min="1" max="65535" placeholder="Port" data-check-port>
-    <button class="btn btn-outline-danger btn-sm icon-button" type="button" data-remove-check aria-label="Remove check">
+    <input class="form-control form-control-sm" type="number" min="1" max="65535" placeholder="Port" data-check-port aria-label="TCP port">
+    <button class="btn btn-outline-danger btn-sm icon-button" type="button" data-remove-check aria-label="Remove check" title="Remove check">
       <i class="fa-solid fa-xmark"></i>
-    </button>`;
+    </button>
+    <fieldset class="http-check-fields" data-http-fields hidden disabled>
+      <label class="http-check-wide"><span class="form-label">URL to monitor</span><input class="form-control form-control-sm" type="url" maxlength="2048" placeholder="https://app.example.com/health" data-check-url required></label>
+      <div><label class="form-label" for="${helpKey}-timeout">Timeout (ms)</label><input class="form-control form-control-sm" type="number" min="100" max="60000" step="1" id="${helpKey}-timeout" data-check-timeout aria-describedby="${helpKey}-timeout-help" required><div class="form-text" id="${helpKey}-timeout-help" data-http-timeout-help>Espera m&aacute;xima por intento HTTP (10000 ms = 10 s), no cantidad de pings. Reintentos: Settings &gt; Retries (0 = un intento; 2 = hasta tres si falla).</div></div>
+      <label><span class="form-label">Expected status</span><input class="form-control form-control-sm" type="number" min="200" max="599" step="1" data-check-status required></label>
+      <div class="http-check-wide"><label class="form-label" for="${helpKey}-text">Expected text (optional)</label><textarea class="form-control form-control-sm" rows="2" maxlength="4096" id="${helpKey}-text" data-check-text aria-describedby="${helpKey}-text-help"></textarea><div class="form-text" id="${helpKey}-text-help" data-http-text-help>Opcional: texto literal de la respuesta (ej. READY), sensible a may&uacute;sculas. Vac&iacute;o: solo el c&oacute;digo esperado. No ejecuta JavaScript ni usa tu sesi&oacute;n del navegador.</div></div>
+    </fieldset>`;
 
   const typeSelect = row.querySelector("[data-check-type]");
   const portInput = row.querySelector("[data-check-port]");
 
-  typeSelect.value = check.type === "tcp" ? "tcp" : "ping";
+  typeSelect.value = ["tcp", "http"].includes(String(check.type).toLowerCase()) ? String(check.type).toLowerCase() : "ping";
+  typeSelect.dataset.previousType = typeSelect.value;
   portInput.value = check.port ?? "";
-  updateCheckPortState(row);
+  row.querySelector("[data-check-url]").value = check.url ?? "";
+  row.querySelector("[data-check-timeout]").value = check.timeoutMs ?? 10000;
+  row.querySelector("[data-check-status]").value = check.expectedStatusCode ?? 200;
+  row.querySelector("[data-check-text]").value = check.expectedText ?? "";
   checksList.append(row);
+  updateCheckPortState(row);
 }
 
 function updateCheckPortState(row) {
   const typeSelect = row.querySelector("[data-check-type]");
   const portInput = row.querySelector("[data-check-port]");
   const isTcp = typeSelect.value === "tcp";
+  const isHttp = typeSelect.value === "http";
+  row.classList.toggle("is-http", isHttp);
+  const httpFields = row.querySelector("[data-http-fields]");
+  httpFields.hidden = !isHttp;
+  httpFields.disabled = !isHttp;
+  portInput.hidden = isHttp;
 
   portInput.disabled = !isTcp;
   portInput.required = isTcp;
@@ -3659,6 +4089,20 @@ function updateCheckPortState(row) {
   if (!isTcp) {
     portInput.value = "";
   }
+  updateDeviceAddressRequirement();
+}
+
+function updateDeviceAddressRequirement() {
+  const types = [...checksList.querySelectorAll("[data-check-type]")];
+  const network = !types.length || types.some(input => input.value !== "http");
+  const ping = types.some(input => input.value === 'ping');
+  deviceAddressInput.required = network;
+  deviceAddressInput.placeholder = deviceAddressInput.required ? "" : "Optional - uses the first URL host";
+  document.querySelector('#device-network-fields').hidden = !network;
+  document.querySelector('#device-hostname-fields').hidden = !network;
+  document.querySelector('#device-ping-fields').hidden = !ping;
+  document.querySelector('#device-location-fields').hidden = !network;
+  document.querySelector('#device-command-fields').hidden = !network;
 }
 
 function requestDeleteDevice(index) {
@@ -3680,12 +4124,17 @@ async function confirmDeleteDevice() {
     return;
   }
 
+  const previous = structuredClone(configState);
   configState.devices.splice(pendingDeleteIndex, 1);
   pendingDeleteIndex = null;
   if (deleteDeviceModal) {
-    deleteDeviceModal.hide();
+    hideManagementModal(deleteDeviceModalElement);
   }
-  await saveConfig("Device deleted and saved to the active support group JSON.");
+  if (!await saveConfig("Device deleted and saved to the active support group.")) {
+    configState = previous;
+    renderConfigDevices();
+    renderBulkEditDevices();
+  }
 }
 
 function setConfigBusy(isBusy, { showSaveSpinner = true } = {}) {
@@ -3706,9 +4155,13 @@ function setConfigBusy(isBusy, { showSaveSpinner = true } = {}) {
   maxParallelChecksInput.disabled = isBusy;
   retryCountInput.disabled = isBusy;
   retryDelayMsInput.disabled = isBusy;
-  deviceForm.querySelectorAll("input, select, button").forEach(element => {
+  deviceForm.querySelectorAll("input, select, textarea, button").forEach(element => {
     element.disabled = isBusy;
   });
+  if (!isBusy) {
+    syncPeripheralFormAvailability();
+    checksList.querySelectorAll('.check-row').forEach(updateCheckPortState);
+  }
   saveConfigSpinner.classList.toggle("d-none", !isBusy || !showSaveSpinner);
   saveConfigIcon.classList.toggle("d-none", isBusy && showSaveSpinner);
 }
@@ -3735,390 +4188,6 @@ function createDefaultRegionState() {
   };
 }
 
-async function loadRegions({ showBusy = false, showErrors = false } = {}) {
-  setRegionBusy(showBusy);
-
-  try {
-    const response = await fetch("/api/regions");
-    const payload = await readJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(payload.error || payload.detail || `Unable to load support groups. HTTP ${response.status}`);
-    }
-
-    applyRegionState(payload);
-  } catch (error) {
-    applyRegionState(createDefaultRegionState());
-    if (showErrors) {
-      showRegionAlert("danger", error.message || "Unable to load support groups.");
-    }
-    console.error(error);
-  } finally {
-    setRegionBusy(false);
-  }
-}
-
-function applyRegionState(payload, preferredEditingId = "") {
-  regionState = payload ?? createDefaultRegionState();
-  regionState.profiles ??= [];
-
-  if (regionState.profiles.length === 0) {
-    regionState = createDefaultRegionState();
-  }
-
-  regionState.activeProfileId ||= regionState.profiles[0]?.id || "sg1";
-
-  if (preferredEditingId && regionState.profiles.some(profile => profile.id === preferredEditingId)) {
-    editingRegionId = preferredEditingId;
-  } else if (!regionState.profiles.some(profile => profile.id === editingRegionId)) {
-    editingRegionId = regionState.activeProfileId;
-  }
-
-  renderRegionSelect();
-  renderRegionsTable();
-  renderDashboardRegionTitle();
-}
-
-function renderDashboardRegionTitle() {
-  const profile = getActiveRegion();
-
-  if (dashboardRegionTitle) {
-    dashboardRegionTitle.textContent = profile?.region || "Sample Region";
-  }
-
-  if (dashboardSupportGroupLabel) {
-    dashboardSupportGroupLabel.textContent = profile?.name || "No SG";
-  }
-}
-
-function renderRegionSelect() {
-  if (!regionSelect) {
-    return;
-  }
-
-  regionSelect.innerHTML = regionState.profiles
-    .map(profile => `
-      <option value="${escapeHtml(profile.id)}" ${profile.id === editingRegionId ? "selected" : ""}>
-        ${escapeHtml(profile.name)}${profile.id === regionState.activeProfileId ? " (active)" : ""}
-      </option>`)
-    .join("");
-
-  renderRegionDetails();
-}
-
-function renderRegionsTable() {
-  if (!regionsBody) {
-    return;
-  }
-
-  if (regionState.profiles.length === 0) {
-    regionsBody.innerHTML = `
-      <tr>
-        <td colspan="3" class="text-center text-secondary py-4">No support group profiles configured.</td>
-      </tr>`;
-    return;
-  }
-
-  regionsBody.innerHTML = regionState.profiles
-    .map(profile => `
-      <tr class="${profile.id === editingRegionId ? "table-active" : ""}" data-region-row="${escapeHtml(profile.id)}" role="button" tabindex="0">
-        <td>
-          <div class="fw-semibold">${escapeHtml(profile.name)}</div>
-        </td>
-        <td>${escapeHtml(profile.region || profile.name)}</td>
-        <td>
-          ${profile.id === regionState.activeProfileId ? '<span class="badge text-bg-success">Active</span>' : '<span class="badge text-bg-secondary">Available</span>'}
-          ${profile.builtIn ? '<span class="badge text-bg-info ms-1">Built-in</span>' : ""}
-        </td>
-      </tr>`)
-    .join("");
-}
-
-function selectRegion(profileId) {
-  if (!regionState.profiles.some(profile => profile.id === profileId)) {
-    return;
-  }
-
-  editingRegionId = profileId;
-  renderRegionSelect();
-  renderRegionsTable();
-  clearRegionAlert();
-}
-
-function renderRegionDetails() {
-  const profile = getEditingRegion();
-
-  if (!profile) {
-    regionDetails.textContent = "Select a support group profile.";
-    activateRegionButton.disabled = true;
-    copyRegionButton.disabled = true;
-    renameRegionButton.disabled = true;
-    deleteRegionButton.disabled = true;
-    return;
-  }
-
-  regionDetails.innerHTML = `
-    <div><strong>${escapeHtml(profile.name)}</strong></div>
-    <div>Region: ${escapeHtml(profile.region || "Sample Region")}</div>`;
-  activateRegionButton.disabled = profile.id === regionState.activeProfileId;
-  copyRegionButton.disabled = false;
-  renameRegionButton.disabled = false;
-  deleteRegionButton.disabled = Boolean(profile.builtIn) || regionState.profiles.length <= 1;
-}
-
-function getActiveRegion() {
-  return regionState.profiles.find(profile => profile.id === regionState.activeProfileId)
-    ?? regionState.profiles[0];
-}
-
-function getEditingRegion() {
-  return regionState.profiles.find(profile => profile.id === editingRegionId)
-    ?? getActiveRegion();
-}
-
-function startNewRegion() {
-  pendingRegionAction = "new";
-  regionFormTitle.textContent = "New Support Group";
-  submitRegionButton.textContent = "Create Support Group";
-  regionNameInput.value = "";
-  regionValueInput.value = getActiveRegion()?.region || "Sample Region";
-  regionCopyWrapper.hidden = false;
-  regionCopyActiveInput.checked = true;
-  showRegionForm();
-}
-
-function startRenameRegion() {
-  const profile = getEditingRegion();
-
-  if (!profile) {
-    return;
-  }
-
-  pendingRegionAction = "rename";
-  regionFormTitle.textContent = "Rename Support Group";
-  submitRegionButton.textContent = "Rename Support Group";
-  regionNameInput.value = profile.name;
-  regionValueInput.value = profile.region || profile.name;
-  regionCopyWrapper.hidden = true;
-  showRegionForm();
-}
-
-async function submitRegionForm(event) {
-  event.preventDefault();
-
-  const name = regionNameInput.value.trim();
-  const region = regionValueInput.value.trim() || name;
-
-  if (!name) {
-    showRegionAlert("warning", "Support group name is required.");
-    regionNameInput.focus();
-    return;
-  }
-
-  if (pendingRegionAction === "rename") {
-    await renameRegion(name, region);
-  } else {
-    await createRegion(name, region, regionCopyActiveInput.checked);
-  }
-}
-
-async function createRegion(name, region, copyFromActive) {
-  setRegionBusy(true);
-  clearRegionAlert();
-
-  try {
-    const response = await fetch("/api/regions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, region, copyFromActive })
-    });
-    const payload = await readJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(payload.error || payload.detail || `Support group create failed with ${response.status}`);
-    }
-
-    applyRegionState(payload.configuration, payload.configuration?.activeProfileId);
-    await reloadAfterRegionChange();
-    hideRegionForm();
-    showRegionAlert("success", `Support group '${name}' created and activated.`);
-  } catch (error) {
-    showRegionAlert("danger", error.message || "Unable to create support group.");
-    console.error(error);
-  } finally {
-    setRegionBusy(false);
-  }
-}
-
-async function renameRegion(name, region) {
-  const profile = getEditingRegion();
-
-  if (!profile) {
-    return;
-  }
-
-  setRegionBusy(true);
-  clearRegionAlert();
-
-  try {
-    const response = await fetch(`/api/regions/${encodeURIComponent(profile.id)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, region })
-    });
-    const payload = await readJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(payload.error || payload.detail || `Support group rename failed with ${response.status}`);
-    }
-
-    applyRegionState(payload.configuration, profile.id);
-    hideRegionForm();
-    showRegionAlert("success", `Support group '${name}' updated.`);
-  } catch (error) {
-    showRegionAlert("danger", error.message || "Unable to rename support group.");
-    console.error(error);
-  } finally {
-    setRegionBusy(false);
-  }
-}
-
-async function activateRegion() {
-  const profile = getEditingRegion();
-
-  if (!profile || profile.id === regionState.activeProfileId) {
-    return;
-  }
-
-  setRegionBusy(true);
-  clearRegionAlert();
-
-  try {
-    const response = await fetch(`/api/regions/${encodeURIComponent(profile.id)}/activate`, { method: "POST" });
-    const payload = await readJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(payload.error || payload.detail || `Support group activation failed with ${response.status}`);
-    }
-
-    applyRegionState(payload.configuration, payload.configuration?.activeProfileId);
-    await reloadAfterRegionChange();
-    showRegionAlert("success", `Active support group changed to '${profile.name}'.`);
-  } catch (error) {
-    showRegionAlert("danger", error.message || "Unable to activate support group.");
-    console.error(error);
-  } finally {
-    setRegionBusy(false);
-  }
-}
-
-async function copyRegion() {
-  const profile = getEditingRegion();
-
-  if (!profile) {
-    return;
-  }
-
-  setRegionBusy(true);
-  clearRegionAlert();
-
-  try {
-    const response = await fetch(`/api/regions/${encodeURIComponent(profile.id)}/duplicate`, { method: "POST" });
-    const payload = await readJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(payload.error || payload.detail || `Support group copy failed with ${response.status}`);
-    }
-
-    applyRegionState(payload.configuration, payload.configuration?.activeProfileId);
-    await reloadAfterRegionChange();
-    showRegionAlert("success", `Support group '${profile.name}' copied and activated.`);
-  } catch (error) {
-    showRegionAlert("danger", error.message || "Unable to copy support group.");
-    console.error(error);
-  } finally {
-    setRegionBusy(false);
-  }
-}
-
-async function deleteRegion() {
-  const profile = getEditingRegion();
-
-  if (!profile || profile.builtIn) {
-    return;
-  }
-
-  if (!window.confirm(`Delete only the selected support group '${profile.name}'? Its JSON file will be archived locally and other support groups will be kept.`)) {
-    return;
-  }
-
-  setRegionBusy(true);
-  clearRegionAlert();
-
-  try {
-    const response = await fetch(`/api/regions/${encodeURIComponent(profile.id)}`, { method: "DELETE" });
-    const payload = await readJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(payload.error || payload.detail || `Support group delete failed with ${response.status}`);
-    }
-
-    applyRegionState(payload.configuration, payload.configuration?.activeProfileId);
-    await reloadAfterRegionChange();
-    showRegionAlert("success", `Support group '${profile.name}' deleted.`);
-  } catch (error) {
-    showRegionAlert("danger", error.message || "Unable to delete support group.");
-    console.error(error);
-  } finally {
-    setRegionBusy(false);
-  }
-}
-
-async function reloadAfterRegionChange() {
-  hasLoadedDashboardGroups = false;
-  activeFacility = "";
-  groupCheckSelect.value = "";
-  await loadConfig({ clearAlert: false, showBusy: false });
-  markDashboardConfigurationStale();
-}
-
-function setRegionBusy(isBusy) {
-  if (!regionSelect) {
-    return;
-  }
-
-  regionSelect.disabled = isBusy;
-  newRegionButton.disabled = isBusy;
-  copyRegionButton.disabled = isBusy || !getEditingRegion();
-  renameRegionButton.disabled = isBusy || !getEditingRegion();
-  activateRegionButton.disabled = isBusy || getEditingRegion()?.id === regionState.activeProfileId;
-  deleteRegionButton.disabled = isBusy || Boolean(getEditingRegion()?.builtIn) || regionState.profiles.length <= 1;
-  regionForm?.querySelectorAll("input, button").forEach(element => {
-    element.disabled = isBusy;
-  });
-  activateRegionSpinner.classList.toggle("d-none", !isBusy);
-  activateRegionIcon.classList.toggle("d-none", isBusy);
-}
-
-function showRegionForm() {
-  if (regionFormModal) {
-    regionFormModal.show();
-  }
-}
-
-function hideRegionForm() {
-  if (regionFormModal) {
-    regionFormModal.hide();
-  }
-}
-
-function showRegionAlert(type, message) {
-  showPageAlert(regionAlert, type, message);
-}
-
-function clearRegionAlert() {
-  clearPageAlert(regionAlert);
-}
 
 function createEmptyConfiguration() {
   return {
@@ -4129,7 +4198,8 @@ function createEmptyConfiguration() {
       retryCount: 0,
       retryDelayMs: 250
     },
-    devices: []
+    devices: [],
+    peripheralCatalog: []
   };
 }
 
@@ -4157,10 +4227,10 @@ function createDefaultThemeState() {
           categoryDegraded: "#f59e0b",
           categoryProblem: "#be302b",
           categoryRunning: "#465464",
-          configFacilityHeader: "#111827",
-          configFacilityText: "#e5e7eb",
-          configCategoryHeader: "#eef2f7",
-          configCategoryText: "#334155",
+          configFacilityHeader: "#f1f3f5",
+          configFacilityText: "#212529",
+          configCategoryHeader: "#f8f9fa",
+          configCategoryText: "#495057",
           autoRefreshOn: "#198754",
           autoRefreshOff: "#dc3545",
           runFullCheck: "#ffc107"
@@ -4199,387 +4269,30 @@ function createDefaultThemeState() {
   };
 }
 
-async function loadThemes({ showBusy = false, showErrors = false } = {}) {
-  setThemeBusy(showBusy);
 
-  try {
-    const response = await fetch("/api/themes");
-    const payload = await readJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(payload.error || payload.detail || `Unable to load themes. HTTP ${response.status}`);
-    }
-
-    applyThemeState(payload);
-  } catch (error) {
-    applyThemeState(createDefaultThemeState());
-    if (showErrors) {
-      showThemeAlert("danger", error.message || "Unable to load themes.");
-    }
-    console.error(error);
-  } finally {
-    setThemeBusy(false);
-  }
-}
-
-async function saveThemes(successMessage = "Themes saved to themes.json.") {
-  if (!syncThemeEditorToState()) {
-    return;
-  }
-
-  setThemeBusy(true);
-  clearThemeAlert();
-
-  try {
-    const response = await fetch("/api/themes", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(themeState)
-    });
-    const payload = await readJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(payload.error || payload.detail || `Theme save failed with ${response.status}`);
-    }
-
-    applyThemeState(payload.configuration);
-    showThemeAlert("success", successMessage);
-  } catch (error) {
-    showThemeAlert("danger", error.message || "Unable to save themes.");
-    console.error(error);
-  } finally {
-    setThemeBusy(false);
-  }
-}
-
-async function resetThemes() {
-  if (!window.confirm("Reset ALL themes to NetWatch Default? This deletes every custom theme in themes.json.")) {
-    return;
-  }
-
-  setThemeBusy(true);
-  clearThemeAlert();
-
-  try {
-    const response = await fetch("/api/themes/reset", { method: "POST" });
-    const payload = await readJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(payload.error || payload.detail || `Theme reset failed with ${response.status}`);
-    }
-
-    applyThemeState(payload.configuration);
-    showThemeAlert("success", "Themes reset to NetWatch Default.");
-  } catch (error) {
-    showThemeAlert("danger", error.message || "Unable to reset themes.");
-    console.error(error);
-  } finally {
-    setThemeBusy(false);
-  }
-}
-
-function applyThemeState(payload) {
-  themeState = payload ?? createDefaultThemeState();
-  themeState.themes ??= [];
-  themeState.activeThemeId ||= "default";
-
-  if (themeState.themes.length === 0) {
-    themeState = createDefaultThemeState();
-  }
-
-  if (!themeState.themes.some(theme => theme.id === themeState.activeThemeId)) {
-    themeState.activeThemeId = themeState.themes[0].id;
-  }
-
-  if (!themeState.themes.some(theme => theme.id === editingThemeId)) {
-    editingThemeId = themeState.activeThemeId;
-  }
-
-  renderThemeSelect();
-  renderThemeEditor();
-  applyActiveTheme();
-}
-
-function renderThemeSelect() {
-  themeSelect.innerHTML = themeState.themes
-    .map(theme => `
-      <option value="${escapeHtml(theme.id)}" ${theme.id === editingThemeId ? "selected" : ""}>
-        ${escapeHtml(theme.name)}${theme.id === themeState.activeThemeId ? " (active)" : ""}
-      </option>`)
-    .join("");
-}
-
-function renderThemeEditor() {
-  const theme = getEditingTheme();
-
-  if (!theme) {
-    return;
-  }
-
-  deleteThemeButton.disabled = Boolean(theme.builtIn);
-  renameThemeButton.disabled = Boolean(theme.builtIn);
-  activateThemeButton.disabled = theme.id === themeState.activeThemeId;
-
-  for (const input of themeColorInputs) {
-    const key = input.dataset.themeColor;
-    input.value = theme.colors?.[key] || createDefaultThemeState().themes[0].colors[key] || "#000000";
-    input.disabled = Boolean(theme.builtIn);
-  }
-}
-
-function syncThemeEditorToState() {
-  const theme = getEditingTheme();
-
-  if (!theme) {
-    showThemeAlert("warning", "Select a theme first.");
-    return false;
-  }
-
-  theme.colors ??= {};
-
-  for (const input of themeColorInputs) {
-    theme.colors[input.dataset.themeColor] = input.value;
-  }
-
-  applyThemePreview(theme);
-  return true;
-}
-
-function applyActiveTheme() {
-  const activeTheme = themeState.themes.find(theme => theme.id === themeState.activeThemeId)
-    ?? themeState.themes[0];
-
-  applyThemeColors(activeTheme);
-  applyThemePreview(getEditingTheme() ?? activeTheme);
-}
-
-function applyThemeColors(theme) {
-  const defaultColors = createDefaultThemeState().themes[0].colors;
-  const colors = theme?.colors ?? defaultColors;
-
-  for (const [key, cssVariable] of Object.entries(themeCssVariables)) {
-    document.documentElement.style.setProperty(cssVariable, colors[key] || defaultColors[key]);
-  }
-}
-
-function applyThemePreview(theme) {
-  const defaultColors = createDefaultThemeState().themes[0].colors;
-  const colors = theme?.colors ?? defaultColors;
-
-  for (const [key, cssVariable] of Object.entries(themeCssVariables)) {
-    themePreview.style.setProperty(cssVariable, colors[key] || defaultColors[key]);
-  }
-}
-
-function startNewTheme() {
-  pendingThemeAction = "new";
-  pendingThemeSourceId = "";
-  themeFormTitle.textContent = "New Theme";
-  submitThemeButton.textContent = "Create Theme";
-  themeNameInput.value = "";
-  showThemeForm();
-}
-
-function startCopyTheme() {
-  const sourceTheme = getEditingTheme();
-
-  if (!sourceTheme) {
-    return;
-  }
-
-  pendingThemeAction = "copy";
-  pendingThemeSourceId = sourceTheme.id;
-  themeFormTitle.textContent = "Copy Theme";
-  submitThemeButton.textContent = "Create Copy";
-  themeNameInput.value = `${sourceTheme.name} Copy`;
-  showThemeForm();
-  themeNameInput.select();
-}
-
-function startRenameTheme() {
-  const theme = getEditingTheme();
-
-  if (!theme || theme.builtIn) {
-    return;
-  }
-
-  pendingThemeAction = "rename";
-  pendingThemeSourceId = theme.id;
-  themeFormTitle.textContent = "Rename Theme";
-  submitThemeButton.textContent = "Rename Theme";
-  themeNameInput.value = theme.name;
-  showThemeForm();
-  themeNameInput.select();
-}
-
-function submitThemeForm(event) {
-  event.preventDefault();
-
-  const themeName = themeNameInput.value.trim();
-
-  if (!themeName) {
-    themeNameInput.focus();
-    return;
-  }
-
-  if (pendingThemeAction === "copy") {
-    copyTheme(themeName, pendingThemeSourceId);
-  } else if (pendingThemeAction === "rename") {
-    renameTheme(themeName, pendingThemeSourceId);
-  } else {
-    createTheme(themeName);
-  }
-
-  hideThemeForm();
-}
-
-function createTheme(themeName) {
-  const defaultColors = structuredClone(createDefaultThemeState().themes[0].colors);
-  const theme = {
-    id: createThemeId(themeName),
-    name: themeName,
-    builtIn: false,
-    colors: defaultColors
-  };
-
-  themeState.themes.push(theme);
-  editingThemeId = theme.id;
-  renderThemeSelect();
-  renderThemeEditor();
-  clearThemeAlert();
-}
-
-function copyTheme(themeName, sourceThemeId = editingThemeId) {
-  const sourceTheme = themeState.themes.find(theme => theme.id === sourceThemeId) ?? getEditingTheme();
-
-  if (!sourceTheme) {
-    return;
-  }
-
-  const theme = {
-    id: createThemeId(themeName),
-    name: themeName,
-    builtIn: false,
-    colors: structuredClone(sourceTheme.colors)
-  };
-
-  themeState.themes.push(theme);
-  editingThemeId = theme.id;
-  renderThemeSelect();
-  renderThemeEditor();
-  clearThemeAlert();
-}
-
-function renameTheme(themeName, themeId = editingThemeId) {
-  const theme = themeState.themes.find(currentTheme => currentTheme.id === themeId);
-
-  if (!theme || theme.builtIn) {
-    return;
-  }
-
-  theme.name = themeName;
-  editingThemeId = theme.id;
-  renderThemeSelect();
-  renderThemeEditor();
-  clearThemeAlert();
-}
-
-function showThemeForm() {
-  if (themeFormModal) {
-    themeFormModal.show();
-  }
-}
-
-function hideThemeForm() {
-  if (themeFormModal) {
-    themeFormModal.hide();
-  }
-}
-
-async function activateTheme() {
-  if (!getEditingTheme()) {
-    return;
-  }
-
-  themeState.activeThemeId = editingThemeId;
-  renderThemeSelect();
-  renderThemeEditor();
-  applyActiveTheme();
-  await saveThemes("Active theme saved to themes.json.");
-}
-
-async function deleteTheme() {
-  const theme = getEditingTheme();
-
-  if (!theme || theme.builtIn) {
-    return;
-  }
-
-  if (!window.confirm(`Delete only the selected theme '${theme.name}'? Other themes will be kept.`)) {
-    return;
-  }
-
-  themeState.themes = themeState.themes.filter(currentTheme => currentTheme.id !== theme.id);
-
-  if (themeState.activeThemeId === theme.id) {
-    themeState.activeThemeId = "default";
-  }
-
-  editingThemeId = themeState.activeThemeId;
-  renderThemeSelect();
-  renderThemeEditor();
-  applyActiveTheme();
-  await saveThemes(`Theme '${theme.name}' deleted from themes.json.`);
-}
-
-function getEditingTheme() {
-  return themeState.themes.find(theme => theme.id === editingThemeId)
-    ?? themeState.themes[0];
-}
-
-function createThemeId(seed) {
-  const baseId = slugify(seed || "theme") || "theme";
-  let candidate = baseId;
-  let suffix = 2;
-
-  while (themeState.themes.some(theme => theme.id === candidate)) {
-    candidate = `${baseId}-${suffix}`;
-    suffix += 1;
-  }
-
-  return candidate;
-}
-
-function setThemeBusy(isBusy) {
-  saveThemesButton.disabled = isBusy;
-  newThemeButton.disabled = isBusy;
-  copyThemeButton.disabled = isBusy;
-  renameThemeButton.disabled = isBusy || Boolean(getEditingTheme()?.builtIn);
-  resetThemesButton.disabled = isBusy;
-  activateThemeButton.disabled = isBusy || editingThemeId === themeState.activeThemeId;
-  deleteThemeButton.disabled = isBusy || Boolean(getEditingTheme()?.builtIn);
-  saveThemesSpinner.classList.toggle("d-none", !isBusy);
-  saveThemesIcon.classList.toggle("d-none", isBusy);
-}
-
-function showThemeAlert(type, message) {
-  showPageAlert(themeAlert, type, message);
-}
-
-function clearThemeAlert() {
-  clearPageAlert(themeAlert);
-}
-
-function navigateTo(route, replace = false) {
+async function navigateTo(route, replace = false) {
   const normalizedRoute = normalizeRoute(route);
+  closeSidebar();
+  if (currentRoute === '/themes' && isThemeDirty() && !await discardThemeChanges()) {
+    if (location.pathname !== '/themes') history.pushState({ route: '/themes' }, '', '/themes');
+    return;
+  }
   const previousRoute = currentRoute;
   currentRoute = normalizedRoute;
+  if (previousRoute === '/reports' && normalizedRoute !== '/reports') {
+    ++reportsLoadVersion;
+    reportsBusy = false;
+    closeReportDetail(true);
+    if (reportsConfirmingDelete) managementConfirmModal?.hide();
+  }
 
   dashboardPage.hidden = normalizedRoute !== "/";
   configPage.hidden = normalizedRoute !== "/config";
+  peripheralPage.hidden = normalizedRoute !== "/peripherals";
+  deviceTypesPage.hidden = normalizedRoute !== '/device-types';
+  workstationsPage.hidden = normalizedRoute !== '/workstations';
   reportsPage.hidden = normalizedRoute !== "/reports";
+  document.querySelector('.topbar-actions').hidden = normalizedRoute === '/reports';
   integrationsPage.hidden = normalizedRoute !== "/integrations";
   regionsPage.hidden = normalizedRoute !== "/regions";
   themesPage.hidden = normalizedRoute !== "/themes";
@@ -4592,12 +4305,19 @@ function navigateTo(route, replace = false) {
   });
 
   if (replace) {
-    history.replaceState({ route: normalizedRoute }, "", normalizedRoute);
+    const url = normalizedRoute === '/workstations' && location.pathname === normalizedRoute
+      ? normalizedRoute + location.search : normalizedRoute;
+    history.replaceState({ route: normalizedRoute }, "", url);
   } else if (location.pathname !== normalizedRoute) {
     history.pushState({ route: normalizedRoute }, "", normalizedRoute);
   }
 
   closeSidebar();
+
+  if (previousRoute === '/peripherals' && normalizedRoute !== '/peripherals') hideManagementModal(peripheralModelElement);
+  if (previousRoute === '/device-types' && normalizedRoute !== '/device-types') hideManagementModal(deviceTypeModalElement);
+  if (previousRoute === '/regions' && normalizedRoute !== '/regions') hideRegionForm();
+  if (previousRoute === '/themes' && normalizedRoute !== '/themes') hideThemeForm();
 
   if (previousRoute === "/config" && normalizedRoute !== "/config") {
     resetDeviceForm();
@@ -4613,6 +4333,10 @@ function navigateTo(route, replace = false) {
 }
 
 function resetRouteViewState(route) {
+  if (route === '/workstations') {
+    restoreWorkstationFilters();
+    return;
+  }
   if (route === "/") {
     resetDashboardViewState();
     return;
@@ -4675,6 +4399,7 @@ function resetConfigViewState() {
   activeBulkFacility = "";
   activeBulkCategory = "";
   collapsedBulkFacilityNames.clear();
+  configSearchBulkCollapseSnapshot = null;
 
   if (configDeviceSearchInput) {
     configDeviceSearchInput.value = "";
@@ -4695,17 +4420,36 @@ function resetConfigViewState() {
 
 function resetRegionsViewState() {
   editingRegionId = "";
+  document.querySelector('#regions-search').value = '';
+  document.querySelector('#regions-region-filter').value = '';
+  document.querySelector('#regions-status-filter').value = '';
   hideRegionForm();
   clearRegionAlert();
 }
 
 function resetThemesViewState() {
   editingThemeId = "";
+  themeDraft = null;
+  document.querySelector('#themes-search').value = '';
+  document.querySelector('#themes-status-filter').value = '';
+  document.querySelector('#theme-editor').hidden = true;
   hideThemeForm();
   clearThemeAlert();
 }
 
 function refreshRouteData(route) {
+  if (route === '/device-types') {
+    void loadDeviceTypes();
+    return;
+  }
+  if (route === '/workstations') {
+    void loadWorkstations();
+    return;
+  }
+  if (route === '/peripherals') {
+    void loadPeripheralCatalog();
+    return;
+  }
   if (route === "/") {
     void refreshDashboardFromActiveRegion();
     return;
@@ -4737,12 +4481,17 @@ function refreshRouteData(route) {
 }
 
 async function refreshConfigFromActiveRegion() {
-  await loadRegions({ showBusy: false, showErrors: false });
-  await loadConfig();
+  setConfigBusy(true, { showSaveSpinner: false });
+  try {
+    await loadRegions({ showBusy: false, showErrors: false });
+    await loadConfig({ showBusy: false });
+  } finally {
+    setConfigBusy(false, { showSaveSpinner: false });
+  }
 }
 
 function normalizeRoute(pathname) {
-  const knownRoutes = new Set(["/", "/config", "/regions", "/reports", "/integrations", "/themes", "/manual", "/about"]);
+  const knownRoutes = new Set(["/", "/config", "/regions", "/reports", "/integrations", "/themes", "/manual", "/about", "/peripherals", "/workstations", "/device-types"]);
   return knownRoutes.has(pathname) ? pathname : "/";
 }
 
@@ -4750,6 +4499,9 @@ function getPageLabel(route) {
   const labels = {
     "/": "Dashboard",
     "/config": "Configuration",
+    "/peripherals": "Peripherals",
+    "/device-types": "Device Types",
+    "/workstations": "Workstations",
     "/regions": "Support Groups",
     "/reports": "Reports",
     "/integrations": "Integrations",
@@ -4980,7 +4732,9 @@ checkModeInputs.forEach(input => {
 });
 groupCheckSelect.addEventListener("change", () => {
   runGroupCheckButton.disabled = !groupCheckSelect.value;
+  updateDashboardFilterReset();
 });
+clearDashboardFiltersButton.addEventListener('click', clearDashboardFilters);
 facilityTabs.addEventListener("click", event => {
   const facilityButton = event.target.closest("[data-facility-filter]");
 
@@ -5021,6 +4775,12 @@ resultsBody.addEventListener("shown.bs.collapse", event => {
   }
 });
 resultsBody.addEventListener("click", event => {
+  const commandButton = event.target.closest('[data-copy-command]');
+  if (commandButton) {
+    event.preventDefault();
+    void copyDeviceCommand(commandButton);
+    return;
+  }
   const runFacilityButton = event.target.closest("[data-run-facility-only]");
   const runCategoryButton = event.target.closest("[data-run-category]");
   const runDeviceButton = event.target.closest("[data-run-device-name]");
@@ -5042,6 +4802,12 @@ resultsBody.addEventListener("click", event => {
       facility: runDeviceButton.dataset.runDeviceFacility,
       category: runDeviceButton.dataset.runDeviceCategory
     });
+    return;
+  }
+  const header = event.target.closest('.facility-section-header, .category-header');
+  if (header && !event.target.closest('button, a, input, select, textarea, label, summary, [role="button"], [contenteditable="true"]')
+      && !window.getSelection()?.toString()) {
+    header.querySelector('[data-bs-toggle="collapse"]')?.click();
   }
 });
 searchInput.addEventListener("input", debounce(event => {
@@ -5064,7 +4830,16 @@ saveConfigButton.addEventListener("click", () => saveConfig());
 configNormalViewButton.addEventListener("click", () => switchConfigView("normal"));
 configBulkViewButton.addEventListener("click", () => switchConfigView("bulk"));
 configDeviceSearchInput.addEventListener("input", debounce(event => {
+  const hadSearch = Boolean(activeConfigSearch.trim());
   activeConfigSearch = event.target.value;
+  if (activeConfigSearch.trim()) {
+    if (!hadSearch) configSearchBulkCollapseSnapshot = new Set(collapsedBulkFacilityNames);
+    collapsedBulkFacilityNames.clear();
+  } else if (configSearchBulkCollapseSnapshot) {
+    collapsedBulkFacilityNames.clear();
+    configSearchBulkCollapseSnapshot.forEach(name => collapsedBulkFacilityNames.add(name));
+    configSearchBulkCollapseSnapshot = null;
+  }
   renderConfigDevices();
   renderBulkEditDevices();
 }, 150));
@@ -5096,7 +4871,18 @@ bulkActionSelect.addEventListener("change", updateBulkSelectionControls);
 bulkActionValueInput.addEventListener("input", updateBulkSelectionControls);
 bulkApplyActionButton.addEventListener("click", applyBulkAction);
 refreshReportsButton.addEventListener("click", () => loadReports({ showBusy: true, showErrors: true }));
-exportReportsButton.addEventListener("click", exportFilteredReports);
+exportReportsButton.addEventListener('click', () => exportFilteredReports('json'));
+reportsCsvButton.addEventListener('click', () => exportFilteredReports('csv'));
+reportsProfileFilter.addEventListener('change', event => {
+  reportsFilters.profile = event.target.value;
+  reportsFilters.facility = reportsFilters.category = reportsFilters.runKey = reportsFilters.deviceKey = '';
+  populateReportFilterOptions();
+  renderReportsFromFirstPage();
+});
+reportsPeriodFilter.addEventListener('change', event => {
+  reportsFilters.period = event.target.value;
+  renderReportsFromFirstPage();
+});
 reportsPageSizeSelect.addEventListener("change", event => {
   reportsPageSize = Number(event.target.value) || 10;
   renderReportsFromFirstPage();
@@ -5149,14 +4935,15 @@ reportsRunsNextPageButton.addEventListener("click", () => {
   renderReports();
 });
 resetReportFiltersButton.addEventListener("click", () => {
-  resetReportsViewState();
+  resetReportsViewState({ resetView: false });
   populateReportFilterOptions();
   renderReports();
 });
-reportsSearchInput.addEventListener("input", debounce(event => {
+const renderReportSearch = debounce(() => renderReportsFromFirstPage(), 150);
+reportsSearchInput.addEventListener('input', event => {
   reportsFilters.search = event.target.value;
-  renderReportsFromFirstPage();
-}, 150));
+  renderReportSearch();
+});
 reportsStatusFilter.addEventListener("change", event => {
   reportsFilters.status = event.target.value;
   renderReportsFromFirstPage();
@@ -5167,11 +4954,13 @@ reportsModeFilter.addEventListener("change", event => {
 });
 reportsFacilityFilter.addEventListener("change", event => {
   reportsFilters.facility = event.target.value;
+  reportsFilters.category = reportsFilters.runKey = reportsFilters.deviceKey = '';
   populateReportFilterOptions();
   renderReportsFromFirstPage();
 });
 reportsCategoryFilter.addEventListener("change", event => {
   reportsFilters.category = event.target.value;
+  reportsFilters.runKey = reportsFilters.deviceKey = '';
   renderReportsFromFirstPage();
 });
 reportsFromDateInput.addEventListener("change", event => {
@@ -5183,6 +4972,20 @@ reportsToDateInput.addEventListener("change", event => {
   renderReportsFromFirstPage();
 });
 document.querySelector("#reports-page").addEventListener("click", event => {
+  const view = event.target.closest('[data-report-view]');
+  const grouping = event.target.closest('[data-report-group]');
+  const remove = event.target.closest('[data-report-remove-filter]');
+  const detail = event.target.closest('[data-report-detail]');
+  const run = event.target.closest('[data-report-open-run]');
+  const facility = event.target.closest('[data-report-facility]');
+  const category = event.target.closest('[data-report-category]');
+  if (view) { setReportView(view.dataset.reportView); return; }
+  if (grouping) { setReportSummaryGroup(grouping.dataset.reportGroup); return; }
+  if (remove) { removeReportFilter(remove.dataset.reportRemoveFilter); return; }
+  if (detail) { openReportDetail(detail.dataset.reportDetail, detail); return; }
+  if (run) { openReportRun(run.dataset.reportOpenRun); return; }
+  if (facility) { openReportScope(facility.dataset.reportProfile, facility.dataset.reportFacility); return; }
+  if (category) { openReportScope(category.dataset.reportProfile, undefined, category.dataset.reportCategory); return; }
   const deleteRunButton = event.target.closest("[data-delete-report-run]");
   const sortButton = event.target.closest("[data-report-sort]");
   const facilitySortButton = event.target.closest("[data-report-facility-sort]");
@@ -5190,6 +4993,7 @@ document.querySelector("#reports-page").addEventListener("click", event => {
   const runSortButton = event.target.closest("[data-report-run-sort]");
 
   if (deleteRunButton) {
+    closeManagementMenu(deleteRunButton);
     deleteReportRun(deleteRunButton.dataset.deleteReportRun);
     return;
   }
@@ -5226,6 +5030,59 @@ document.querySelector("#reports-page").addEventListener("click", event => {
   reportsCurrentPage = 1;
   renderReports();
 });
+reportsPage.querySelector('[role="tablist"]').addEventListener('keydown', event => {
+  const tabs = [...reportsPage.querySelectorAll('[data-report-view]')];
+  const index = tabs.indexOf(event.target);
+  if (index < 0 || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  event.preventDefault();
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+    : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+  setReportView(tabs[next].dataset.reportView, true);
+});
+configureManagementModalFocus(reportsDetailElement, '[data-bs-dismiss="modal"]');
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && reportsSelectedRow && currentRoute === '/reports') {
+    event.preventDefault();
+    event.stopPropagation();
+    closeReportDetail();
+  }
+}, true);
+reportsMobileQuery.addEventListener('change', () => renderReports());
+for (const id of ['summary', 'run', 'device']) {
+  document.querySelector(`#reports-${id}-sort`).addEventListener('change', event => {
+    const [key, direction] = event.target.value.split(':');
+    if (id === 'summary') {
+      if (reportsSummaryGroup === 'facility') { reportsFacilitySort = { key, direction }; reportsFacilityPage = 1; }
+      else { reportsCategorySort = { key, direction }; reportsCategoryPage = 1; }
+    } else if (id === 'run') { reportsRunSort = { key, direction }; reportsRunPage = 1; }
+    else { reportsSort = { key, direction }; reportsCurrentPage = 1; }
+    renderReports();
+  });
+}
+reportsDetailElement.addEventListener('hidden.bs.modal', () => {
+  reportsSelectedRow = null;
+  if (currentRoute !== '/reports') return;
+  const target = reportsDetailTrigger?.isConnected && reportsDetailTrigger.getClientRects().length
+    ? reportsDetailTrigger : document.querySelector(`#reports-tab-${reportsActiveView}`);
+  target.focus({ preventScroll: true });
+});
+document.querySelector('#reports-detail-run').addEventListener('click', () => {
+  if (reportsSelectedRow) openReportRun(reportsSelectedRow.runKey);
+});
+document.querySelector('#reports-detail-device').addEventListener('click', () => {
+  const row = reportsSelectedRow;
+  if (!row) return;
+  reportsFilters.profile = reportProfileKey(row);
+  reportsFilters.facility = row.facility;
+  reportsFilters.category = row.category;
+  reportsFilters.deviceKey = reportDeviceKey(row);
+  reportsFilters.runKey = reportsFilters.search = reportsFilters.status = '';
+  reportsSearchInput.value = reportsStatusFilter.value = '';
+  closeReportDetail();
+  populateReportFilterOptions();
+  setReportView('devices', true);
+  renderReportsFromFirstPage();
+});
 reloadIntegrationsButton.addEventListener("click", () => loadIntegrations({ showBusy: true, showErrors: true }));
 saveIntegrationsButton.addEventListener("click", saveIntegrations);
 [
@@ -5261,11 +5118,34 @@ retryDelayMsInput.addEventListener("input", () => {
 });
 addDeviceButton.addEventListener("click", startAddDevice);
 deviceForm.addEventListener("submit", submitDevice);
+deviceForm.addEventListener('invalid', event => {
+  showDeviceCheckAlert(event.target.validationMessage || 'Review the highlighted field before saving.');
+}, true);
 resetDeviceFormButton.addEventListener("click", resetDeviceForm);
 addCheckButton.addEventListener("click", () => addCheckRow({ type: "tcp", port: 80 }));
+document.querySelector('#device-monitoring-preset').addEventListener('change', event => {
+  const rows = [...checksList.querySelectorAll('.check-row')];
+  const untouched = rows.length === 1
+    && rows[0].querySelector('[data-check-type]').value === 'ping';
+  if (!untouched && !confirm('Replace the current checks with this preset?')) {
+    event.target.value = rows.every(row => row.querySelector('[data-check-type]').value === 'http') ? 'web' : 'network';
+    return;
+  }
+  checksList.innerHTML = '';
+  addCheckRow({ type: event.target.value === 'web' ? 'http' : 'ping' });
+});
 checksList.addEventListener("change", event => {
   if (event.target.matches("[data-check-type]")) {
-    updateCheckPortState(event.target.closest(".check-row"));
+    const row = event.target.closest('.check-row');
+    const previous = event.target.dataset.previousType;
+    const configured = previous === 'http' ? row.querySelector('[data-check-url]').value.trim()
+      : previous === 'tcp' ? row.querySelector('[data-check-port]').value : '';
+    if (previous !== event.target.value && configured && !confirm('Replace this configured check with the selected type?')) {
+      event.target.value = previous;
+      return;
+    }
+    event.target.dataset.previousType = event.target.value;
+    updateCheckPortState(row);
   }
 });
 checksList.addEventListener("click", event => {
@@ -5273,6 +5153,7 @@ checksList.addEventListener("click", event => {
 
   if (removeButton) {
     removeButton.closest(".check-row").remove();
+    updateDeviceAddressRequirement();
   }
 });
 configDevicesBody.addEventListener("click", event => {
@@ -5362,69 +5243,11 @@ bulkDevicesBody.addEventListener("click", event => {
 });
 confirmDeleteDeviceButton.addEventListener("click", confirmDeleteDevice);
 if (deviceFormModalElement) {
-  deviceFormModalElement.addEventListener("shown.bs.modal", () => {
-    deviceNameInput.focus();
-  });
+  configureManagementModalFocus(deviceFormModalElement, '#device-name');
 }
-regionSelect.addEventListener("change", event => {
-  selectRegion(event.target.value);
-});
-regionsBody.addEventListener("click", event => {
-  const row = event.target.closest("[data-region-row]");
-
-  if (row) {
-    selectRegion(row.dataset.regionRow);
-  }
-});
-regionsBody.addEventListener("keydown", event => {
-  if (event.key !== "Enter" && event.key !== " ") {
-    return;
-  }
-
-  const row = event.target.closest("[data-region-row]");
-
-  if (row) {
-    event.preventDefault();
-    selectRegion(row.dataset.regionRow);
-  }
-});
-regionForm.addEventListener("submit", submitRegionForm);
-newRegionButton.addEventListener("click", startNewRegion);
-copyRegionButton.addEventListener("click", copyRegion);
-renameRegionButton.addEventListener("click", startRenameRegion);
-activateRegionButton.addEventListener("click", activateRegion);
-deleteRegionButton.addEventListener("click", deleteRegion);
-if (regionFormModalElement) {
-  regionFormModalElement.addEventListener("shown.bs.modal", () => {
-    regionNameInput.focus();
-    regionNameInput.select();
-  });
+if (deleteDeviceModalElement) {
+  configureManagementModalFocus(deleteDeviceModalElement, '.modal-footer [data-bs-dismiss="modal"]');
 }
-if (themeFormModalElement) {
-  themeFormModalElement.addEventListener("shown.bs.modal", () => {
-    themeNameInput.focus();
-    themeNameInput.select();
-  });
-}
-themeSelect.addEventListener("change", event => {
-  syncThemeEditorToState();
-  editingThemeId = event.target.value;
-  renderThemeEditor();
-  clearThemeAlert();
-});
-themeColorInputs.forEach(input => {
-  input.addEventListener("input", () => {
-    syncThemeEditorToState();
-  });
-});
-themeForm.addEventListener("submit", submitThemeForm);
-newThemeButton.addEventListener("click", startNewTheme);
-copyThemeButton.addEventListener("click", startCopyTheme);
-renameThemeButton.addEventListener("click", startRenameTheme);
-activateThemeButton.addEventListener("click", activateTheme);
-deleteThemeButton.addEventListener("click", deleteTheme);
-saveThemesButton.addEventListener("click", () => saveThemes());
-resetThemesButton.addEventListener("click", resetThemes);
 window.addEventListener("popstate", () => navigateTo(location.pathname, true));
 
 void loadRegions({ showBusy: false, showErrors: false });

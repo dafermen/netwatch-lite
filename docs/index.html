@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NetWatch Lite Documentation</title>
+  <link rel="icon" type="image/png" href="/netwatch-lite-favicon.png">
   <style>
     :root {
       color-scheme: light;
@@ -156,19 +157,87 @@
     .degraded { color: var(--yellow); font-weight: 700; }
     .down { color: var(--red); font-weight: 700; }
   </style>
+  <link rel="stylesheet" href="styles.css?v=20260801">
+<link rel="stylesheet" href="innovalogic-docs.css">
+<script defer src="docs-reading-tools.js"></script>
 </head>
 <body>
-  <header>
-    <h1>NetWatch Lite Documentation</h1>
-    <p>Documentacion tecnica y operativa del monitor de red ASP.NET Core + Bootstrap. Cubre arquitectura, JSON editable, endpoints, servicios, UI y publicacion portable para Windows.</p>
+  <a class="skip-link" href="#docs-content">Saltar al contenido</a>
+
+  <header class="docs-topbar">
+    <button class="docs-button docs-menu-button" id="docs-menu-button" type="button" aria-label="Abrir menu de documentacion" aria-controls="docs-sidebar" aria-expanded="false">
+      <span class="docs-menu-icon" aria-hidden="true"></span>
+    </button>
+    <a class="docs-brand" href="/docs/" aria-label="Inicio de la documentacion de NetWatch Lite">
+      <img src="/netwatch-lite-logo.png" alt="">
+      <span>NetWatch Lite Docs</span>
+    </a>
+    <nav class="docs-primary-nav" aria-label="Navegacion principal">
+      <a href="#product-overview">Documentacion</a>
+      <a href="#execution-flow">Producto</a>
+      <a href="#project-structure">Arquitectura</a>
+      <a href="#versions">Estado</a>
+    </nav>
+    <div class="docs-topbar-actions">
+      <div class="docs-search" role="search">
+        <label class="visually-hidden" for="docs-search-input">Buscar documentacion</label>
+        <input id="docs-search-input" type="search" placeholder="Buscar documentacion" autocomplete="off" aria-controls="docs-search-results">
+        <div class="docs-search-results" id="docs-search-results" aria-live="polite" hidden></div>
+      </div>
+      <button class="docs-button" id="docs-theme-toggle" type="button" aria-pressed="false">Tema oscuro</button>
+      <a class="docs-app-link desktop-app-link" href="/" target="_self">Volver a la aplicacion</a>
+    </div>
   </header>
 
-  <main>
-    <section>
+  <div class="docs-layout">
+    <aside class="docs-sidebar" id="docs-sidebar" aria-label="Secciones de documentacion">
+      <nav>
+        <details class="docs-nav-group nav-section" open><summary>Producto</summary>
+          <a href="#product-overview">Introduccion</a>
+          <a href="#execution-flow">Flujo de ejecucion</a>
+          <a href="#configuration">Configuracion JSON</a>
+          <a href="#device-types">Tipos de dispositivo</a>
+          <a href="#http-checks">Checks HTTP/HTTPS</a>
+          <a href="#peripheral-inventory">Impresoras y escaneres</a>
+          <a href="#workstation-inventory-view">Inventario Workstations</a>
+          <a href="#frontend">Experiencia web</a>
+          <a href="#administration-lists">Administracion unificada</a>
+          <a href="#health-status">Estados y metricas</a>
+        </details>
+        <details class="docs-nav-group nav-section" open><summary>Arquitectura</summary>
+          <a href="#project-structure">Vision general</a>
+          <a href="#api">API y contratos</a>
+          <a href="#code-reference">Recorrido por el codigo</a>
+          <a href="#wallboard">Wallboard</a>
+        </details>
+        <details class="docs-nav-group nav-section" open><summary>Entrega</summary>
+          <a href="#local-development">Desarrollo local</a>
+          <a href="#portable">Publicacion portable</a>
+          <a href="#operations">Operaciones</a>
+          <a href="#security">Seguridad</a>
+        </details>
+        <details class="docs-nav-group nav-section" open><summary>Gestion del proyecto</summary>
+          <a href="#versions">Estado y versiones</a>
+          <a href="https://github.com/dafermen/netwatch-lite/blob/main/CHANGELOG.md">Changelog</a>
+          <a href="https://github.com/dafermen/netwatch-lite/blob/main/CONTRIBUTING.md">Contribucion</a>
+        </details>
+      </nav>
+      <a class="mobile-app-link" href="/" target="_self">Volver a la aplicacion</a>
+    </aside>
+
+    <button class="docs-overlay" id="docs-overlay" type="button" aria-label="Cerrar menu de documentacion"></button>
+
+    <main class="docs-content" id="docs-content" tabindex="-1"><nav class="docs-reading-paths" aria-label="Recorridos de lectura"><a href="#product-overview"><strong>Conocer el producto</strong><span>Propósito y funciones.</span></a><a href="#frontend"><strong>Aprender a usarlo</strong><span>Monitoreo y configuración.</span></a><a href="#local-development"><strong>Explorar el desarrollo</strong><span>Entorno, arquitectura y pruebas.</span></a></nav>
+      <header class="docs-hero">
+        <h1>NetWatch Lite Documentation</h1>
+        <p>Documentacion tecnica y operativa del monitor de red ASP.NET Core + Bootstrap. Cubre arquitectura, JSON editable, endpoints, servicios, UI y publicacion portable para Windows.</p>
+      </header>
+
+    <section class="doc-section" id="product-overview">
       <h2>Resumen Del Proyecto</h2>
-      <p>NetWatch Lite monitorea dispositivos desde un archivo JSON editable, ejecuta checks asincronos de ping y TCP, calcula estado agregado por dispositivo y muestra resultados en un dashboard web.</p>
+      <p>NetWatch Lite monitorea dispositivos desde un archivo JSON editable, ejecuta checks asincronos de ping, TCP y HTTP/HTTPS, calcula estado agregado por dispositivo y muestra resultados en un dashboard web.</p>
       <p>Repositorio GitHub: <a href="https://github.com/dafermen/netwatch-lite">https://github.com/dafermen/netwatch-lite</a></p>
-      <p>La documentacion para programadores esta en <code>docs/developer-guide.md</code>. Ese archivo explica clases, metodos, servicios, endpoints, frontend y flujos internos.</p>
+      <p>La documentacion de ingenieria comienza en <code>docs/README.md</code>, con documentos separados para arquitectura, API, desarrollo, pruebas, despliegue, operaciones, seguridad y solucion de problemas.</p>
       <div class="grid">
         <div class="card">
           <h3>Backend</h3>
@@ -193,14 +262,14 @@
       </div>
     </section>
 
-    <section>
+    <section class="doc-section" id="project-structure">
       <h2>Estructura</h2>
       <pre>netwatch-lite/
 ├── Data/config.sample.json
 ├── Models/
 ├── Services/
 ├── wwwroot/
-├── docs/developer-guide.md
+├── docs/README.md
 ├── docs/index.html
 ├── appsettings.json
 ├── NetWatch.csproj
@@ -208,7 +277,7 @@
 └── README.md</pre>
     </section>
 
-    <section>
+    <section class="doc-section" id="execution-flow">
       <h2>Flujo De Ejecucion</h2>
       <ol>
         <li>La aplicacion inicia en <code>Program.cs</code>.</li>
@@ -223,7 +292,7 @@
       </ol>
     </section>
 
-    <section>
+    <section class="doc-section" id="configuration">
       <h2>Configuracion JSON</h2>
       <p>En desarrollo <code>Data/config.json</code>, <code>Data/regions.json</code> y <code>Data/regions/*.json</code> son locales e ignorados por Git. El ejemplo seguro versionado vive en <code>Data/config.sample.json</code>. Si no existen perfiles, la aplicacion crea un perfil <code>Support Team A</code> desde el config local cuando esta disponible y un perfil protegido <code>Demo</code> desde el sample.</p>
       <p>El archivo <code>themes.json</code> tambien es runtime e ignorado por Git. Guarda templates de color para el GUI y se crea automaticamente con el tema <code>NetWatch Default</code> si no existe.</p>
@@ -269,25 +338,54 @@
           <tr><td><code>facility</code></td><td>Sede, bodega, sucursal o datacenter. El dashboard permite filtrar y ejecutar checks por facility. Si falta, se normaliza como <code>Unassigned</code>.</td></tr>
           <tr><td><code>category</code></td><td>Grupo visual dentro de cada facility.</td></tr>
           <tr><td><code>enabled</code></td><td>Permite conservar dispositivos sin monitorearlos.</td></tr>
-          <tr><td><code>checks</code></td><td>Lista de checks. Soporta <code>ping</code> y <code>tcp</code>.</td></tr>
+          <tr><td><code>checks</code></td><td>Lista de checks. Soporta <code>ping</code>, <code>tcp</code> y <code>http</code> (HTTP/HTTPS).</td></tr>
         </tbody>
       </table>
     </section>
 
-    <section>
+    <section class="doc-section" id="device-types">
+      <h2>Tipos De Dispositivo</h2>
+      <p>El formulario adapta los campos a los checks configurados, sin reemplazarlos al cambiar la clasificacion. Web application crea HTTP sin Ping; Network target identifica el destino de red, Open website link es un acceso directo y URL to monitor pertenece al check HTTP. La busqueda de Configuration abre los grupos con coincidencias. <a href="DEVICE_FORM.md">Guia del formulario y busqueda</a>.</p>
+      <p>Device Types (<code>/device-types</code>) administra tipos personalizados por grupo de soporte. Permite crear, renombrar, buscar y filtrar tipos, con conteos de uso que incluyen dispositivos deshabilitados. El editor de dispositivos usa este catalogo.</p>
+      <p>Los cinco tipos originales, incluido Workstation, conservan sus claves y nombres protegidos. Un tipo en uso no puede eliminarse. Solo la clave <code>workstation</code> habilita impresoras y escaneres; el tipo no selecciona los checks de monitoreo.</p>
+      <p>Los datos anteriores reciben los tipos originales sin migracion. El catalogo viaja al copiar perfiles o importar/exportar. Los cambios de grupo o de catalogo durante una edicion requieren recargar antes de guardar. Consulte <a href="DEVICE_TYPES.md">la guia del maestro de tipos</a>.</p>
+    </section>
+
+    <section class="doc-section" id="http-checks">
+      <h2>Checks HTTP/HTTPS</h2>
+      <p>En Configuration, seleccione HTTP / HTTPS y registre URL, timeout, codigo esperado y texto opcional. Full Check ejecuta estas verificaciones; Ping Only las omite. El estado agregado refleja fallos HTTP aunque el servidor acepte conexiones TCP.</p>
+      <p>El timeout por intento acepta 100-60000 ms y usa 10000 por defecto. El codigo esperado usa 200 por defecto; el texto es literal y distingue mayusculas. Dashboard y Reports muestran codigo real, duracion y mensajes de error.</p>
+      <p>Se hace GET anonimo desde el backend, sin seguir redirecciones, compartir cookies, iniciar sesion ni ejecutar JavaScript. Se valida TLS y se limita el contenido descomprimido a 1 MiB cuando se busca texto. No publique este verificador sin controles de acceso y destinos permitidos. Consulte <a href="HTTP_CHECKS.md">la guia HTTP/HTTPS</a>.</p>
+    </section>
+
+    <section class="doc-section" id="peripheral-inventory">
+      <h2>Impresoras Y Escaneres</h2>
+      <p>El catalogo <code>/peripherals</code> registra fabricante y modelo para el grupo de soporte activo. En Configuration, seleccione el tipo Workstation y registre impresoras y escaneres por separado como sin registrar, ninguno o asignados.</p>
+      <p>Un workstation admite varias asignaciones USB, de red u otras, con identificador, direccion opcional y notas. Los modelos en uso no pueden borrarse. El catalogo viaja con las asignaciones al copiar perfiles o exportar/importar el inventario.</p>
+      <p>Es inventario manual: no detecta presencia USB ni comprueba la salud del periferico. Los datos anteriores siguen funcionando sin migracion ni inferencias por categoria. Consulte <a href="PERIPHERALS.md">el contrato y la guia del inventario</a>.</p>
+    </section>
+
+    <section class="doc-section" id="workstation-inventory-view">
+      <h2>Consulta De Workstations</h2>
+      <p>La vista <code>/workstations</code> consulta el inventario del grupo activo con filtros combinables de texto, sede, modelo e inventario pendiente. Sin registrar y ninguno son estados distintos. Los equipos con monitoreo deshabilitado siguen siendo parte del inventario.</p>
+      <p>Seleccione un modelo en Peripherals para encontrar los workstations que lo utilizan. Cada registro aparece una sola vez aunque tenga varias unidades del modelo; el resumen cuenta las asignaciones por separado. Los filtros y la pagina se conservan en la URL.</p>
+      <p>Es una consulta de solo lectura, sin inferir tipos por categoria ni ejecutar verificaciones. Consulte <a href="PERIPHERALS.md#workstation-inventory-view">la guia del inventario</a>.</p>
+    </section>
+
+    <section class="doc-section" id="wallboard">
       <h2>Proyecto Wallboard Hermano</h2>
       <p>El modo NOC WebView2 vive ahora en un repositorio separado: <code>netwatch-lite-wallboard</code>. Esa separacion mantiene este dashboard web enfocado en monitoreo de red y permite evolucionar el Wallboard como ejecutable Windows independiente.</p>
       <p>WebView2 carga cada panel como navegador nativo, no como iframe, por eso es el modo recomendado para paginas operativas que bloquean embedding en navegador.</p>
     </section>
 
-    <section>
+    <section class="doc-section" id="health-status">
       <h2>Estados Y Metricas</h2>
       <table>
         <thead>
           <tr><th>Estado</th><th>Regla</th><th>Color UI</th></tr>
         </thead>
         <tbody>
-          <tr><td class="healthy">Healthy</td><td>Todos los checks configurados de ping y TCP fueron exitosos.</td><td>Verde</td></tr>
+          <tr><td class="healthy">Healthy</td><td>Todos los checks configurados de ping, TCP y HTTP fueron exitosos.</td><td>Verde</td></tr>
           <tr><td class="degraded">Degraded</td><td>Al menos un check respondio, pero uno o mas checks fallaron.</td><td>Amarillo</td></tr>
           <tr><td class="down">Down</td><td>Ningun check configurado respondio.</td><td>Rojo</td></tr>
         </tbody>
@@ -295,7 +393,7 @@
       <p>Disponibilidad: <code>(HealthyDevices / TotalDevices) * 100</code>, redondeado a un decimal.</p>
     </section>
 
-    <section>
+    <section class="doc-section" id="api">
       <h2>Endpoints</h2>
       <table>
         <thead>
@@ -326,7 +424,7 @@
       </table>
     </section>
 
-    <section>
+    <section class="doc-section" id="code-reference">
       <h2>Referencia De Codigo</h2>
       <h3>Modelos</h3>
       <table>
@@ -380,13 +478,14 @@
       </table>
     </section>
 
-    <section>
+    <section class="doc-section" id="frontend">
       <h2>Frontend</h2>
-      <p><code>wwwroot/index.html</code> define el layout compartido: sidebar hamburguesa, topbar, dashboard, pagina de configuracion, pagina de temas, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto. Cuando hay problemas aparece <code>Run Failed</code> para repetir solo los dispositivos fallidos, y cada fila con problema muestra <code>Run</code> junto al timestamp para repetir solo ese dispositivo.</p>
+      <p><code>wwwroot/index.html</code> define el layout compartido: sidebar hamburguesa, topbar, dashboard, pagina de configuracion, pagina de temas, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto. Cuando hay problemas aparece <code>Run Failed</code> para repetir solo los dispositivos fallidos, y cada fila muestra <code>Run</code> junto al timestamp para comprobar solo ese dispositivo, incluso si esta pendiente o saludable.</p>
+      <p>La busqueda incluye el inventario habilitado antes de ejecutar y conserva los equipos pendientes despues de una ejecucion parcial. Not checked no significa caido. Run Group combina Facility y categoria; con All Facilities comprueba esa categoria en todas las sedes del perfil activo. El textbox solo filtra la vista, no el alcance del chequeo.</p>
       <p>El dashboard muestra botones de facility para enfocar una sede y habilitar <code>Run Facility</code>. En vista general, las tablas se agrupan por facility y luego por categoria, por lo que dos equipos con el mismo nombre en sedes distintas se ven como registros diferentes.</p>
       <p>La pagina <code>/regions</code> permite crear, copiar, renombrar, activar y eliminar perfiles JSON independientes. La pagina <code>/config</code> trabaja sobre la region activa y agrupa los dispositivos por facility y categoria, con grupos colapsados por defecto para facilitar la edicion de inventarios grandes. El modo <code>Bulk Edit</code> muestra una tabla estilo hoja de calculo para actualizar campos comunes y guardar una fila a la vez; incluye filtros por facility/categoria, botones para colapsar o expandir todas las facilities visibles, y separadores visuales para evitar listas masivas dificiles de leer. Las acciones de agregar, copiar, actualizar y eliminar dispositivos guardan inmediatamente en el JSON activo, y el boton <code>Save Settings</code> guarda ajustes generales como intervalo, timeout, reintentos, pausa entre reintentos y concurrencia maxima. <code>Export JSON</code> descarga la configuracion activa e <code>Import JSON</code> valida un archivo antes de reemplazar esa configuracion.</p>
-      <p>La pagina <code>/themes</code> permite crear, copiar, renombrar, activar, borrar, resetear y guardar templates de color en <code>themes.json</code>. El nombre de un tema nuevo, copiado o renombrado se captura en modal, y los colores editables incluyen el sidebar, superficies, estados, categorias, headers colapsables de Configuration, <code>Auto Refresh ON</code>, <code>Auto Refresh OFF</code> y el boton principal de ejecucion.</p>
-      <p>La pagina <code>/reports</code> usa filtros coherentes con la vista operacional: al elegir una facility, las categorias disponibles se limitan a esa facility. Las tablas <code>Facility Performance</code>, <code>Category Performance</code> y <code>Recent Runs</code> son colapsables y cargan cerradas por defecto para priorizar <code>Detailed Monitor History</code>. Todas se calculan desde las mismas filas filtradas, son paginadas y permiten ordenar columnas. La eliminacion se maneja por ejecucion desde <code>Recent Runs</code>, sin limpiar todo el historial.</p>
+      <p>La pagina <code>/themes</code> muestra templates con paletas, busqueda, filtros y acciones por fila. Crear, copiar y renombrar guarda al confirmar el modal. Los colores se editan en un borrador separado y se persisten con Save Colors; seleccionar o previsualizar no activa un tema. La paleta global cambia solo cuando el servidor confirma la operacion.</p>
+      <p>La pagina <code>/reports</code> separa Summary, Runs y Devices con filtros compartidos por grupo historico, facility, categoria, resultado, modo y periodo. Distingue equipos unicos de evaluaciones, conserva desconocidos neutrales y muestra el porcentaje de evaluaciones saludables, no disponibilidad continua. El detalle contiene los checks registrados; los alcances originales y resultados filtrados permanecen separados. Exporta CSV/JSON y confirma borrados secundarios, deshabilitando IDs antiguos ambiguos. Las filas y controles de orden se adaptan a movil. Consulte <a href="REPORTS.md">la guia de reportes</a>.</p>
       <p>La pagina <code>/integrations</code> guarda configuracion local en <code>integrations.json</code> para escoger entre inventario JSON local o endpoint externo futuro, y para preparar un endpoint futuro de envio de reportes. Esta version solo guarda configuracion; no importa inventario ni envia reportes a sistemas externos.</p>
       <h3>Integrations Design</h3>
       <p><strong>Receive Inventory Data</strong> tiene como objetivo traer facilities, devices, categorias y checks desde un sistema externo aprobado. El payload esperado debe incluir version de esquema, sistema origen, fecha de generacion, region, support group, facilities y devices con campos compatibles con <code>MonitorConfiguration</code>. La importacion futura debe validar tamano, esquema, puertos, URLs, duplicados y reglas de configuracion antes de reemplazar el JSON activo.</p>
@@ -405,7 +504,14 @@
       </ul>
     </section>
 
-    <section>
+    <section class="doc-section" id="administration-lists">
+      <h2>Administracion Unificada</h2>
+      <p>Support Groups y Themes usan listas de ancho completo, busqueda, filtros y acciones por fila. Activo y seleccionado son estados distintos. Los grupos se organizan por region y permiten abrir la configuracion del perfil elegido con activacion explicita cuando corresponde.</p>
+      <p>Los maestros comparten confirmaciones de borrado y foco de formularios; Device Types y Peripherals conservan sus acciones directas y protecciones. Las filas se adaptan a movil sin imponer el ancho minimo de las tablas de monitoreo.</p>
+      <p>Un error de carga no crea datos editables ficticios. Los borradores de color requieren confirmacion al descartarse, incluso al recargar o volver atras. Se conservan perfiles, IDs, paletas, formatos y endpoints. Consulte <a href="ADMINISTRATION.md">la guia de administracion</a> y <a href="VALIDATION_MANAGEMENT_2026-11-07.md">la validacion</a>.</p>
+    </section>
+
+    <section class="doc-section" id="local-development">
       <h2>Build Y Ejecucion Local</h2>
       <pre>dotnet restore
 dotnet build
@@ -413,7 +519,7 @@ dotnet run</pre>
       <p>Al iniciar, abrir la URL que imprime la consola, usualmente <code>http://localhost:5000</code> o un puerto similar.</p>
     </section>
 
-    <section>
+    <section class="doc-section" id="versions">
       <h2>Versiones Y Commits</h2>
       <p>Los cambios relevantes del proyecto se documentan en <code>CHANGELOG.md</code>. Cada commit en GitHub debe tener un mensaje corto y claro. Los cambios visibles para usuarios deben agregarse tambien al changelog.</p>
       <table>
@@ -437,34 +543,33 @@ dotnet run</pre>
       </table>
     </section>
 
-    <section>
+    <section class="doc-section" id="portable">
       <h2>Crear Portable Windows</h2>
+      <p>Las instalaciones nuevas usan SQLite esquema 2. La actualizacion desde esquema 1 crea primero un respaldo verificado y conserva los documentos compatibles; volver al binario anterior requiere restaurar ese respaldo en una carpeta nueva. Configuration &gt; Data &amp; backups administra retencion, respaldos y cambios locales. Los JSON existentes requieren migracion explicita; no se importan por copiar archivos sobre una base ya creada. <a href="STORAGE.md">Migracion, respaldo y reversion</a>. <a href="ROADMAP.md">Estado del plan de desarrollo</a>.</p>
       <p>Comando recomendado:</p>
-      <pre>dotnet publish NetWatch.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x64-v0.7.1</pre>
+      <pre>.\scripts\test-packaging.ps1
+.\scripts\publish-portable.ps1 -Version 0.8.0-rc.11</pre>
       <p>Resultado esperado:</p>
-      <pre>publish/win-x64-v0.7.1/
-├── NetWatch-Lite.exe
-├── config.sample.json
-├── appsettings.json
-├── wwwroot/
-└── runtime dependencies...</pre>
-      <p>Crear ZIP en macOS:</p>
-      <pre>cd publish/win-x64-v0.7.1
-zip -r ../../releases/NetWatch-Lite-win-x64-portable-2026-06-27-v0.7.1-reports-integrations-polish.zip .</pre>
+      <pre>artifacts/
+|-- portable/NetWatch-Lite-v0.8.0-rc.11-win-x64/
+|-- packages/NetWatch-Lite-v0.8.0-rc.11-win-x64.zip
+|-- packages/NetWatch-Lite-v0.8.0-rc.11-win-x64.zip.sha256
+`-- verification/{run-id}/</pre>
+      <p>Las versiones anteriores no se sobrescriben. El ZIP exacto se valida en una copia aislada; no incluye inventarios privados ni ajustes locales. <a href="/docs/PORTABLE.md">Guia completa de portables</a>.</p>
       <p>Uso en Windows:</p>
       <ol>
         <li>Descomprimir el ZIP.</li>
-        <li>Editar <code>config.json</code> en la misma carpeta de <code>NetWatch-Lite.exe</code> o usar la pagina <code>/config</code>; si no existe, la aplicacion lo crea al iniciar.</li>
-        <li>Editar temas desde <code>/themes</code>; si <code>themes.json</code> no existe, la aplicacion lo crea al iniciar.</li>
-        <li>Ejecutar <code>NetWatch-Lite.exe</code>.</li>
+        <li>Administrar el inventario desde <code>/config</code>; import/export JSON sigue disponible.</li>
+        <li>Editar temas desde <code>/themes</code>; se guardan en el almacenamiento activo.</li>
+        <li>Ejecutar <code>Start-NetWatch.cmd</code> desde una extraccion nueva, no desde la carpeta historica de artifacts.</li>
         <li>Abrir la URL que muestra la consola.</li>
       </ol>
     </section>
 
-    <section>
+    <section class="doc-section" id="operations">
       <h2>Notas Operativas</h2>
       <ul>
-        <li>El archivo <code>config.json</code> puede recargarse desde el boton Reload JSON en Configuracion o administrarse desde <code>/config</code>.</li>
+        <li>El inventario activo puede recargarse con Reload en Configuracion; <code>/api/storage</code> identifica si usa SQLite o JSON.</li>
         <li>El archivo <code>themes.json</code> se administra desde <code>/themes</code> y guarda el tema activo y los templates de color.</li>
         <li>Si <code>config.json</code> no existe, se crea automaticamente con un check de ping a <code>127.0.0.1</code>.</li>
         <li>Si <code>themes.json</code> no existe, se crea automaticamente con <code>NetWatch Default</code>.</li>
@@ -485,7 +590,7 @@ zip -r ../../releases/NetWatch-Lite-win-x64-portable-2026-06-27-v0.7.1-reports-i
       </ul>
     </section>
 
-    <section>
+    <section class="doc-section" id="security">
       <h2>Modelo De Seguridad</h2>
       <p>NetWatch Lite esta disenado como una herramienta operacional interna. La version actual no incluye autenticacion, roles de usuario ni autorizacion por permisos dentro de la aplicacion; por eso debe ejecutarse en una estacion o servidor interno confiable, o detras de controles existentes como VPN, firewall, autenticacion de reverse proxy o controles de acceso de Windows.</p>
       <ul>
@@ -493,11 +598,26 @@ zip -r ../../releases/NetWatch-Lite-win-x64-portable-2026-06-27-v0.7.1-reports-i
         <li>El repositorio solo debe incluir <code>Data/config.sample.json</code> con datos genericos.</li>
         <li>El publish excluye perfiles runtime para evitar que el portable incluya inventario operacional real.</li>
         <li><code>Import JSON</code> valida extension, tamano maximo, JSON valido y estructura de configuracion antes de reemplazar datos activos.</li>
-        <li>Los guardados se validan en backend antes de escribir archivos y crean backups locales.</li>
+        <li>Los guardados se validan en backend, rechazan dispositivos y checks nulos con HTTP 400, y reemplazan archivos JSON de forma atomica con backups locales. Los errores inesperados devuelven un identificador de seguimiento antes de iniciar la respuesta.</li>
         <li>Las ejecuciones de monitoreo evitan solapamiento y reportan errores controlados en API/UI.</li>
         <li>Direcciones IP, hostnames, facilities, support groups y perfiles JSON deben tratarse como informacion operacional interna.</li>
       </ul>
     </section>
-  </main>
+      <nav class="docs-pagination" aria-label="Navegacion entre secciones">
+        <a id="docs-previous" href="#product-overview" hidden></a>
+        <a id="docs-next" href="#project-structure"></a>
+      </nav>
+      <footer class="docs-footer">
+        NetWatch Lite documentation. Consulte <a href="https://github.com/dafermen/netwatch-lite">el repositorio</a> para el estado y el historial completos.
+      </footer>
+    </main>
+
+    <aside class="docs-toc" aria-label="En esta pagina">
+      <h2>En esta pagina</h2>
+      <nav id="on-page-nav"></nav>
+    </aside>
+  </div>
+  <script src="app.js?v=20260801"></script>
+<script defer src="docs-reading-init.js"></script>
 </body>
 </html>

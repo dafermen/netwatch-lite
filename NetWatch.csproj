@@ -7,16 +7,42 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <ApplicationIcon>Assets/netwatch-lite.ico</ApplicationIcon>
+    <DefaultItemExcludes>$(DefaultItemExcludes);artifacts/**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="src/**" />
-    <EmbeddedResource Remove="src/**" />
-    <None Remove="src/**" />
-    <Content Remove="src/**" />
+    <Content Remove="**/storage-policy.json;storage-restores/**" />
+    <None Remove="**/storage-policy.json;storage-restores/**" />
+    <Content Remove="**/*.db;**/*.db-*;**/*.sqlite;**/*.sqlite-*;**/.netwatch-runtime.lock;storage-backups/**;storage-exports/**;storage-migration-*.json" />
+    <None Remove="**/*.db;**/*.db-*;**/*.sqlite;**/*.sqlite-*;**/.netwatch-runtime.lock;storage-backups/**;storage-exports/**;storage-migration-*.json" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="artifacts/**" />
+    <Content Remove="artifacts/**;releases/**;scripts/**" />
+    <None Remove="artifacts/**;releases/**;scripts/**" />
+    <Compile Remove="node_modules/**" />
+    <Content Remove="node_modules/**;package*.json;playwright.config.cjs" />
+    <None Remove="node_modules/**" />
+    <Content Remove="test-results/**;TestResults/**;playwright-report/**" />
+    <None Remove="test-results/**;TestResults/**;playwright-report/**" />
+    <Compile Remove="src/**" />
+    <Compile Remove="tests/**" />
+    <EmbeddedResource Remove="src/**" />
+    <EmbeddedResource Remove="tests/**" />
+    <None Remove="src/**" />
+    <None Remove="tests/**" />
+    <Content Remove="src/**" />
+    <Content Remove="tests/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="**/*.backup.json" />
+    <None Remove="**/*.backup.json" />
+    <Content Remove="**/.netwatch-*.tmp" />
+    <None Remove="**/.netwatch-*.tmp" />
     <Content Remove="Data/config.backup.json" />
     <Content Remove="Data/config.json" />
     <Content Remove="Data/regions.json" />
@@ -39,5 +65,16 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
+    <None Update="docs/**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
   </ItemGroup>
+
+  <Target Name="LimitPortablePublishContent" AfterTargets="ComputeFilesToPublish" Condition="'$(NetWatchPortable)' == 'true'">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+        Condition="'%(ResolvedFileToPublish.Extension)' != '.dll' and '%(ResolvedFileToPublish.Extension)' != '.exe' and '%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' != 'NetWatch-Lite.deps.json' and '%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' != 'NetWatch-Lite.runtimeconfig.json'" />
+    </ItemGroup>
+  </Target>
 </Project>

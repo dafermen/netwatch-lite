@@ -1,12 +1,12 @@
 namespace NetWatch.Models;
 
 /// <summary>
-/// Result of one executed ping or TCP check.
+/// Result of one executed ping, TCP or HTTP/HTTPS check.
 /// </summary>
 public sealed class CheckResult
 {
     /// <summary>
-    /// Check type that produced this result. Supported values are ping and tcp.
+    /// Check type that produced this result: ping, tcp or http.
     /// </summary>
     public required string Type { get; init; }
 
@@ -16,12 +16,12 @@ public sealed class CheckResult
     public int? Port { get; init; }
 
     /// <summary>
-    /// Ping round-trip latency in milliseconds. Null for TCP checks.
+    /// Ping round-trip latency in milliseconds. Null for TCP/HTTP checks.
     /// </summary>
     public int? LatencyMs { get; init; }
 
     /// <summary>
-    /// True when the check succeeded. For ping this means ICMP success; for TCP this means the socket connected.
+    /// True when the configured connectivity or HTTP response requirements succeeded.
     /// </summary>
     public required bool IsAvailable { get; init; }
 
@@ -34,4 +34,17 @@ public sealed class CheckResult
     /// Display label used by clients, for example Ping or TCP 443.
     /// </summary>
     public required string Label { get; init; }
+
+    /// <summary>HTTP target without query/fragment, to avoid storing URL tokens in history.</summary>
+    public string? Url { get; init; }
+    /// <summary>Actual HTTP status, when response headers were received.</summary>
+    public int? StatusCode { get; init; }
+    /// <summary>Configured expected HTTP status.</summary>
+    public int? ExpectedStatusCode { get; init; }
+    /// <summary>Applied HTTP timeout per attempt.</summary>
+    public int? TimeoutMs { get; init; }
+    /// <summary>Elapsed HTTP time for the final attempt, including text validation.</summary>
+    public long? DurationMs { get; init; }
+    /// <summary>Safe HTTP diagnostic, without response bodies or query values.</summary>
+    public string? Message { get; init; }
 }

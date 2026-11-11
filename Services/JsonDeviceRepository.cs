@@ -21,9 +21,11 @@ public sealed class JsonDeviceRepository
 
     private readonly IWebHostEnvironment _environment;
     private readonly NetworkMonitorOptions _options;
+    private readonly LocalDataStore _storage;
     private readonly JsonRegionProfileRepository _profileRepository;
     private readonly SemaphoreSlim _reloadLock = new(1, 1);
     private MonitorConfiguration _configuration = new();
+    private string? _loadedProfileId;
 
     /// <summary>
     /// Initializes a repository that resolves the configured JSON file relative to the application content root.
@@ -31,13 +33,16 @@ public sealed class JsonDeviceRepository
     /// <param name="environment">ASP.NET Core hosting environment used to resolve relative file paths.</param>
     /// <param name="options">Network monitor options bound from appsettings.json.</param>
     /// <param name="profileRepository">Repository that resolves the active region profile JSON file.</param>
+    /// <param name="storage">Shared JSON/SQLite persistence adapter; JSON when omitted by legacy callers.</param>
     public JsonDeviceRepository(
         IWebHostEnvironment environment,
         IOptions<NetworkMonitorOptions> options,
-        JsonRegionProfileRepository profileRepository)
+        JsonRegionProfileRepository profileRepository,
+        LocalDataStore? storage = null)
     {
         _environment = environment;
         _options = options.Value;
+        _storage = storage ?? new LocalDataStore(environment, Options.Create(new StorageOptions { Provider = "json" }));
         _profileRepository = profileRepository;
     }
 
@@ -70,10 +75,11 @@ public sealed class JsonDeviceRepository
 
         try
         {
-            var filePath = await ResolveDeviceFilePathAsync(cancellationToken);
-            var activeProfile = await ResolveActiveProfileAsync(cancellationToken);
+            var profile = await _profileRepository.GetActiveProfileAsync(cancellationToken);
+            var filePath = _profileRepository.ResolveProfileDeviceFilePath(profile.File);
+            var activeProfile = (Region: profile.Region, SupportGroup: profile.Name);
 
-            if (!File.Exists(filePath))
+            if (!_storage.Exists(filePath))
             {
                 var starterConfiguration = CreateStarterConfiguration();
                 await SaveNormalizedConfigurationAsync(
@@ -82,10 +88,11 @@ public sealed class JsonDeviceRepository
                     createBackup: false,
                     cancellationToken);
                 _configuration = Normalize(starterConfiguration, activeProfile.Region, activeProfile.SupportGroup);
+                _loadedProfileId = profile.Id;
                 return _configuration;
             }
 
-            await using var stream = File.OpenRead(filePath);
+            await using var stream = _storage.OpenRead(filePath);
             var configuration = await JsonSerializer.DeserializeAsync<MonitorConfiguration>(
                 stream,
                 JsonOptions,
@@ -93,6 +100,7 @@ public sealed class JsonDeviceRepository
 
             Validate(configuration);
             _configuration = Normalize(configuration, activeProfile.Region, activeProfile.SupportGroup);
+            _loadedProfileId = profile.Id;
             return _configuration;
         }
         catch (JsonException ex)
@@ -110,11 +118,13 @@ public sealed class JsonDeviceRepository
     /// </summary>
     /// <param name="configuration">Configuration object received from the configuration UI.</param>
     /// <param name="cancellationToken">Token used to cancel file operations.</param>
+    /// <param name="expectedProfileId">Optional client profile precondition; older clients may omit it.</param>
     /// <returns>The normalized configuration after it has been saved and loaded into memory.</returns>
     /// <exception cref="InvalidDataException">Thrown when the submitted configuration is not valid.</exception>
     public async Task<MonitorConfiguration> SaveAsync(
         MonitorConfiguration configuration,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? expectedProfileId = null)
     {
         await _reloadLock.WaitAsync(cancellationToken);
 
@@ -122,14 +132,17 @@ public sealed class JsonDeviceRepository
         {
             Validate(configuration);
 
-            var activeProfile = await ResolveActiveProfileAsync(cancellationToken);
+            var profile = await _profileRepository.GetActiveProfileAsync(cancellationToken);
+            AssertProfile(profile, expectedProfileId);
+            var activeProfile = (Region: profile.Region, SupportGroup: profile.Name);
             var normalized = Normalize(configuration, activeProfile.Region, activeProfile.SupportGroup);
             await SaveNormalizedConfigurationAsync(
-                await ResolveDeviceFilePathAsync(cancellationToken),
+                _profileRepository.ResolveProfileDeviceFilePath(profile.File),
                 normalized,
                 createBackup: true,
                 cancellationToken);
             _configuration = normalized;
+            _loadedProfileId = profile.Id;
             return _configuration;
         }
         finally
@@ -144,16 +157,20 @@ public sealed class JsonDeviceRepository
     /// <param name="deviceIndex">Zero-based device index in the active configuration.</param>
     /// <param name="device">Replacement device submitted by the UI.</param>
     /// <param name="cancellationToken">Token used to cancel file operations.</param>
+    /// <param name="expectedProfileId">Optional client profile precondition.</param>
     /// <returns>The normalized configuration after the row update is saved.</returns>
     public async Task<MonitorConfiguration> UpdateDeviceAsync(
         int deviceIndex,
         Device device,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? expectedProfileId = null)
     {
         await _reloadLock.WaitAsync(cancellationToken);
 
         try
         {
+            var profile = await _profileRepository.GetActiveProfileAsync(cancellationToken);
+            AssertProfile(profile, expectedProfileId);
             if (deviceIndex < 0 || deviceIndex >= _configuration.Devices.Count)
             {
                 throw new InvalidDataException("Device was not found in the active configuration.");
@@ -165,25 +182,87 @@ public sealed class JsonDeviceRepository
             var candidate = new MonitorConfiguration
             {
                 Settings = _configuration.Settings,
+                DeviceTypes = _configuration.DeviceTypes,
+                PeripheralCatalog = _configuration.PeripheralCatalog,
                 Devices = devices
             };
 
             Validate(candidate);
 
-            var activeProfile = await ResolveActiveProfileAsync(cancellationToken);
+            var activeProfile = (Region: profile.Region, SupportGroup: profile.Name);
             var normalized = Normalize(candidate, activeProfile.Region, activeProfile.SupportGroup);
             await SaveNormalizedConfigurationAsync(
-                await ResolveDeviceFilePathAsync(cancellationToken),
+                _profileRepository.ResolveProfileDeviceFilePath(profile.File),
                 normalized,
                 createBackup: true,
                 cancellationToken);
             _configuration = normalized;
+            _loadedProfileId = profile.Id;
             return _configuration;
         }
         finally
         {
             _reloadLock.Release();
         }
+    }
+
+    /// <summary>Returns a fresh, consistent catalog snapshot for the active profile.</summary>
+    public async Task<DeviceTypeCatalogSnapshot> GetDeviceTypeCatalogAsync(CancellationToken cancellationToken = default)
+    {
+        await _reloadLock.WaitAsync(cancellationToken);
+        try
+        {
+            var (profile, _, configuration) = await ReadDeviceTypeConfigurationAsync(cancellationToken);
+            _configuration = configuration;
+            _loadedProfileId = profile.Id;
+            return DeviceTypeRules.Snapshot(profile, configuration);
+        }
+        finally { _reloadLock.Release(); }
+    }
+
+    /// <summary>Updates only the type catalog against fresh inventory with stale-editor protection.</summary>
+    public async Task<DeviceTypeCatalogSnapshot> UpdateDeviceTypeCatalogAsync(
+        UpdateDeviceTypesRequest request, CancellationToken cancellationToken = default)
+    {
+        await _reloadLock.WaitAsync(cancellationToken);
+        try
+        {
+            var (profile, filePath, current) = await ReadDeviceTypeConfigurationAsync(cancellationToken);
+            var snapshot = DeviceTypeRules.Snapshot(profile, current);
+            if (request.ProfileId != snapshot.ProfileId || request.Version != snapshot.Version)
+                throw new DeviceTypeConflictException("The active support group or type catalog changed. Reload Device Types before saving.");
+
+            var candidate = new MonitorConfiguration
+            {
+                DeviceTypes = request.DeviceTypes,
+                Settings = current.Settings,
+                PeripheralCatalog = current.PeripheralCatalog,
+                Devices = current.Devices
+            };
+            Validate(candidate);
+            var normalized = Normalize(candidate, profile.Region, profile.Name);
+            // Use the captured profile path, never resolve a possibly switched profile for this write.
+            await SaveNormalizedConfigurationAsync(filePath, normalized, createBackup: true, cancellationToken);
+            _configuration = normalized;
+            _loadedProfileId = profile.Id;
+            return DeviceTypeRules.Snapshot(profile, normalized);
+        }
+        finally { _reloadLock.Release(); }
+    }
+
+    private async Task<(RegionProfile Profile, string FilePath, MonitorConfiguration Configuration)> ReadDeviceTypeConfigurationAsync(
+        CancellationToken cancellationToken)
+    {
+        var profile = await _profileRepository.GetActiveProfileAsync(cancellationToken);
+        var filePath = _profileRepository.ResolveProfileDeviceFilePath(profile.File);
+        try
+        {
+            await using var stream = _storage.OpenRead(filePath);
+            var configuration = await JsonSerializer.DeserializeAsync<MonitorConfiguration>(stream, JsonOptions, cancellationToken);
+            Validate(configuration);
+            return (profile, filePath, Normalize(configuration, profile.Region, profile.Name));
+        }
+        catch (JsonException ex) { throw new InvalidDataException("config.json contains invalid JSON.", ex); }
     }
 
     /// <summary>
@@ -206,14 +285,14 @@ public sealed class JsonDeviceRepository
 
         var contentRootPath = Path.Combine(_environment.ContentRootPath, _options.DeviceFilePath);
 
-        if (File.Exists(contentRootPath))
+        if (_storage.Exists(contentRootPath))
         {
             return contentRootPath;
         }
 
         var developmentDataPath = Path.Combine(_environment.ContentRootPath, "Data", _options.DeviceFilePath);
 
-        if (File.Exists(developmentDataPath))
+        if (_storage.Exists(developmentDataPath))
         {
             return developmentDataPath;
         }
@@ -238,7 +317,7 @@ public sealed class JsonDeviceRepository
     /// <param name="configuration">Already-normalized configuration to persist.</param>
     /// <param name="createBackup">Whether to create config.backup.json when replacing an existing file.</param>
     /// <param name="cancellationToken">Token used to cancel file IO.</param>
-    private static async Task SaveNormalizedConfigurationAsync(
+    private async Task SaveNormalizedConfigurationAsync(
         string filePath,
         MonitorConfiguration configuration,
         bool createBackup,
@@ -251,16 +330,7 @@ public sealed class JsonDeviceRepository
             Directory.CreateDirectory(directory);
         }
 
-        if (createBackup && File.Exists(filePath))
-        {
-            var backupPath = Path.Combine(
-                directory ?? string.Empty,
-                $"{Path.GetFileNameWithoutExtension(filePath)}.backup{Path.GetExtension(filePath)}");
-            File.Copy(filePath, backupPath, true);
-        }
-
-        await using var stream = File.Create(filePath);
-        await JsonSerializer.SerializeAsync(stream, configuration, JsonOptions, cancellationToken);
+        await _storage.WriteJsonAsync(filePath, configuration, JsonOptions, cancellationToken, createBackup);
     }
 
     /// <summary>
@@ -337,11 +407,16 @@ public sealed class JsonDeviceRepository
             .Where(IsValidDevice)
             .Select(device => new Device
             {
+                DeviceType = string.IsNullOrWhiteSpace(device.DeviceType) ? "unspecified" : PeripheralInventoryRules.Token(device.DeviceType),
+                WorkstationPeripherals = PeripheralInventoryRules.Normalize(device.WorkstationPeripherals),
                 Name = device.Name,
                 Ip = device.Ip,
                 Hostname = NormalizeOptionalText(device.Hostname),
                 UseHostnameForPing = device.UseHostnameForPing ?? legacyUseHostnameForPing,
                 WebsiteUrl = NormalizeOptionalText(device.WebsiteUrl),
+                Command = NormalizeOptionalText(device.Command),
+                Location = NormalizeOptionalText(device.Location),
+                Notes = NormalizeOptionalText(device.Notes),
                 Region = NormalizeRegion(device.Region, defaultRegion, defaultSupportGroup),
                 SupportGroup = NormalizeFacility(defaultSupportGroup),
                 Facility = NormalizeFacility(device.Facility),
@@ -349,6 +424,14 @@ public sealed class JsonDeviceRepository
                 Enabled = device.Enabled,
                 Checks = (device.Checks ?? [])
                     .Where(IsValidCheck)
+                    .Select(check => string.Equals(check.Type, "http", StringComparison.OrdinalIgnoreCase)
+                        ? new DeviceCheck
+                        {
+                            Type = "http", Url = check.Url!.Trim(),
+                            TimeoutMs = check.TimeoutMs ?? HttpCheckService.DefaultTimeoutMs,
+                            ExpectedStatusCode = check.ExpectedStatusCode ?? 200,
+                            ExpectedText = string.IsNullOrEmpty(check.ExpectedText) ? null : check.ExpectedText
+                        } : check)
                     .ToList()
             })
             .ToList();
@@ -356,6 +439,8 @@ public sealed class JsonDeviceRepository
         return new MonitorConfiguration
         {
             Settings = NormalizeSettings(configuration.Settings),
+            DeviceTypes = DeviceTypeRules.Normalize(configuration.DeviceTypes),
+            PeripheralCatalog = PeripheralInventoryRules.NormalizeCatalog(configuration.PeripheralCatalog),
             Devices = devices
         };
     }
@@ -376,11 +461,13 @@ public sealed class JsonDeviceRepository
     /// </summary>
     /// <param name="jsonStream">Readable stream containing a monitor configuration JSON document.</param>
     /// <param name="cancellationToken">Token used to cancel JSON parsing and save operations.</param>
+    /// <param name="expectedProfileId">Optional client profile precondition.</param>
     /// <returns>The normalized configuration after it has been saved and loaded into memory.</returns>
     /// <exception cref="InvalidDataException">Thrown when JSON is malformed or the configuration is invalid.</exception>
     public async Task<MonitorConfiguration> ImportAsync(
         Stream jsonStream,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? expectedProfileId = null)
     {
         try
         {
@@ -394,12 +481,19 @@ public sealed class JsonDeviceRepository
                 throw new InvalidDataException("Imported file does not contain a configuration object.");
             }
 
-            return await SaveAsync(configuration, cancellationToken);
+            return await SaveAsync(configuration, cancellationToken, expectedProfileId);
         }
         catch (JsonException ex)
         {
             throw new InvalidDataException("Imported file contains invalid JSON.", ex);
         }
+    }
+
+    private void AssertProfile(RegionProfile profile, string? expectedProfileId)
+    {
+        if ((!string.IsNullOrWhiteSpace(expectedProfileId) && !string.Equals(expectedProfileId, profile.Id, StringComparison.OrdinalIgnoreCase))
+            || (_loadedProfileId is not null && !string.Equals(_loadedProfileId, profile.Id, StringComparison.OrdinalIgnoreCase)))
+            throw new ConfigurationConflictException();
     }
 
     /// <summary>
@@ -446,6 +540,9 @@ public sealed class JsonDeviceRepository
             throw new InvalidDataException("devices is required.");
         }
 
+        DeviceTypeRules.Validate(configuration);
+        PeripheralInventoryRules.Validate(configuration);
+
         if (configuration.Settings.IntervalSeconds <= 0)
         {
             throw new InvalidDataException("intervalSeconds must be greater than zero.");
@@ -475,6 +572,11 @@ public sealed class JsonDeviceRepository
         {
             var device = configuration.Devices[deviceIndex];
 
+            if (device is null)
+            {
+                throw new InvalidDataException($"Device #{deviceIndex + 1} must not be null.");
+            }
+
             if (string.IsNullOrWhiteSpace(device.Name))
             {
                 throw new InvalidDataException($"Device #{deviceIndex + 1} requires a name.");
@@ -495,11 +597,37 @@ public sealed class JsonDeviceRepository
                 throw new InvalidDataException($"Device '{device.Name}' has an invalid websiteUrl. Use an absolute http:// or https:// URL.");
             }
 
+            if (device.Command is { } command && (command.Length > 4096
+                || command.Any(character => char.IsControl(character) || character is '\u2028' or '\u2029')))
+            {
+                throw new InvalidDataException("Command must be a single line of at most 4096 characters without control characters.");
+            }
+
+            if (device.Location is { } location && (location.Length > 200
+                || location.Any(character => char.IsControl(character) || character is '\u2028' or '\u2029')))
+            {
+                throw new InvalidDataException("Location must be a single line of at most 200 characters without control characters.");
+            }
+
+            if (device.Notes is { } notes && (notes.Length > 2000
+                || notes.Any(character => char.IsControl(character) && character is not ('\r' or '\n' or '\t'))))
+            {
+                throw new InvalidDataException("Notes must be at most 2000 characters; only line breaks and tabs are allowed as control characters.");
+            }
+
             foreach (var check in device.Checks)
             {
+                if (check is null)
+                {
+                    throw new InvalidDataException($"Device '{device.Name}' contains a null check.");
+                }
+
                 if (!IsValidCheck(check))
                 {
-                    throw new InvalidDataException($"Device '{device.Name}' has an invalid check.");
+                    var detail = string.Equals(check.Type, "http", StringComparison.OrdinalIgnoreCase)
+                        ? HttpCheckService.ValidationError(check)
+                        : "Use ping, TCP with a port between 1 and 65535, or HTTP/HTTPS with a URL.";
+                    throw new InvalidDataException($"Device '{device.Name}' has an invalid check. {detail}");
                 }
             }
         }
@@ -515,6 +643,11 @@ public sealed class JsonDeviceRepository
         if (string.Equals(check.Type, "ping", StringComparison.OrdinalIgnoreCase))
         {
             return true;
+        }
+
+        if (string.Equals(check.Type, "http", StringComparison.OrdinalIgnoreCase))
+        {
+            return HttpCheckService.ValidationError(check) is null;
         }
 
         return string.Equals(check.Type, "tcp", StringComparison.OrdinalIgnoreCase)

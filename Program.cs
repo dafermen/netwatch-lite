@@ -19,19 +19,76 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 // Register configuration and singleton services. Singletons keep the loaded JSON in memory.
 builder.Services.Configure<NetworkMonitorOptions>(
     builder.Configuration.GetSection(NetworkMonitorOptions.SectionName));
+builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection("Storage"));
+builder.Services.AddSingleton<LocalDataStore>();
+builder.Services.AddSingleton<StorageOperations>();
+builder.Services.AddSingleton<SqliteQueries>();
+builder.Services.AddHostedService<StorageBackupWorker>();
+builder.Services.AddSingleton<RuntimeDataLease>();
 builder.Services.AddSingleton<JsonRegionProfileRepository>();
 builder.Services.AddSingleton<JsonDeviceRepository>();
 builder.Services.AddSingleton<JsonThemeRepository>();
 builder.Services.AddSingleton<JsonMonitorHistoryRepository>();
 builder.Services.AddSingleton<JsonAppErrorLogRepository>();
 builder.Services.AddSingleton<JsonIntegrationRepository>();
+builder.Services.AddHttpClient(HttpCheckService.ClientName, client =>
+{
+    client.Timeout = Timeout.InfiniteTimeSpan;
+}).ConfigurePrimaryHttpMessageHandler(HttpCheckService.CreateHandler)
+  .RemoveAllLoggers();
+builder.Services.AddSingleton<HttpCheckService>();
 builder.Services.AddSingleton<NetworkMonitorService>();
 builder.Services.AddSingleton<MonitorExecutionService>();
 
-var app = builder.Build();
+await using var app = builder.Build();
+_ = app.Services.GetRequiredService<RuntimeDataLease>();
+var storageAction = builder.Configuration["StorageAction"];
+if (!string.IsNullOrWhiteSpace(storageAction))
+{
+    var storageOptions = builder.Configuration.GetSection("Storage").Get<StorageOptions>() ?? new StorageOptions();
+    var database = StorageMaintenance.DatabasePath(app.Environment.ContentRootPath, storageOptions);
+    var destination = builder.Configuration["StorageDestination"];
+    switch (storageAction.ToLowerInvariant())
+    {
+        case "migrate-json":
+            var result = await StorageMaintenance.MigrateAsync(app.Environment.ContentRootPath, storageOptions,
+                builder.Configuration.GetSection(NetworkMonitorOptions.SectionName).Get<NetworkMonitorOptions>() ?? new());
+            Console.WriteLine(JsonSerializer.Serialize(result));
+            break;
+        case "verify":
+            Console.WriteLine(JsonSerializer.Serialize(new { documents = StorageMaintenance.Verify(database), integrity = "ok" }));
+            break;
+        case "export-json":
+            destination ??= Path.Combine(app.Environment.ContentRootPath, "storage-exports", Guid.NewGuid().ToString("N"));
+            Console.WriteLine(JsonSerializer.Serialize(new { documents = await StorageMaintenance.ExportAsync(database, destination), destination }));
+            break;
+        case "backup":
+            destination ??= Path.Combine(app.Environment.ContentRootPath, "storage-backups", Guid.NewGuid().ToString("N") + ".db");
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(destination))!);
+            app.Services.GetRequiredService<LocalDataStore>().Backup(destination);
+            Console.WriteLine(JsonSerializer.Serialize(new { destination, integrity = StorageMaintenance.Verify(destination) }));
+            break;
+        case "restore-backup":
+            var source = builder.Configuration["StorageSource"] ?? throw new InvalidDataException("StorageSource is required.");
+            destination ??= Path.Combine(app.Environment.ContentRootPath,"storage-restores",Guid.NewGuid().ToString("N"));
+            StorageMaintenance.Restore(source,destination);
+            Console.WriteLine(JsonSerializer.Serialize(new { destination,verified=true }));
+            break;
+        case "snapshot-readonly":
+            var snapshotSource = builder.Configuration["StorageSource"] ?? throw new InvalidDataException("StorageSource is required.");
+            destination ??= Path.Combine(app.Environment.ContentRootPath,"storage-backups",Guid.NewGuid().ToString("N")+".db");
+            StorageMaintenance.SnapshotReadOnly(snapshotSource,destination);
+            Console.WriteLine(JsonSerializer.Serialize(new { destination,verified=true }));
+            break;
+        default: throw new InvalidDataException("Unknown StorageAction. Use migrate-json, verify, backup, restore-backup or export-json.");
+    }
+    return;
+}
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
+
+var documentationPath = Path.Combine(app.Environment.ContentRootPath, "docs");
 
 app.Use(async (context, next) =>
 {
@@ -39,9 +96,13 @@ app.Use(async (context, next) =>
     {
         await next();
     }
+    catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+    {
+        app.Logger.LogDebug("Request {TraceId} was cancelled by the client.", context.TraceIdentifier);
+    }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Unhandled application error.");
+        app.Logger.LogError(ex, "Unhandled application error {TraceId}.", context.TraceIdentifier);
 
         try
         {
@@ -53,7 +114,17 @@ app.Use(async (context, next) =>
             app.Logger.LogError(logException, "Unable to write app-errors.json.");
         }
 
-        throw;
+        if (context.Response.HasStarted)
+        {
+            throw;
+        }
+
+        context.Response.Clear();
+        await Results.Problem(
+            title: "An unexpected application error occurred.",
+            statusCode: StatusCodes.Status500InternalServerError,
+            extensions: new Dictionary<string, object?> { ["traceId"] = context.TraceIdentifier })
+            .ExecuteAsync(context);
     }
 });
 
@@ -78,6 +149,12 @@ app.MapGet("/api/devices", async (JsonDeviceRepository deviceRepository) =>
     var devices = await deviceRepository.GetDevicesAsync();
     return Results.Ok(devices);
 });
+
+app.MapGet("/api/storage", (LocalDataStore storage) => Results.Ok(new
+{
+    provider = storage.Provider, schemaVersion = storage.IsSqlite ? LocalDataStore.CurrentSchemaVersion : (int?)null, engineVersion = storage.EngineVersion
+}));
+app.MapStorageEndpoints();
 
 // Reloads the active support group JSON from disk without restarting the application.
 app.MapPost("/api/reload", async (JsonDeviceRepository deviceRepository) =>
@@ -121,17 +198,22 @@ app.MapGet("/api/config", async (JsonDeviceRepository deviceRepository) =>
 // Saves the full monitor configuration to the active support group JSON, creates a sibling backup, and reloads memory.
 app.MapPost("/api/config", async (
     MonitorConfiguration configuration,
-    JsonDeviceRepository deviceRepository) =>
+    JsonDeviceRepository deviceRepository,
+    HttpRequest request) =>
 {
     try
     {
-        var saved = await deviceRepository.SaveAsync(configuration);
+        var saved = await deviceRepository.SaveAsync(configuration, expectedProfileId: request.Headers["X-NetWatch-Profile"].ToString());
 
         return Results.Ok(new
         {
             savedAt = DateTimeOffset.Now,
             configuration = saved
         });
+    }
+    catch (ConfigurationConflictException ex)
+    {
+        return Results.Conflict(new { error = ex.Message });
     }
     catch (InvalidDataException ex)
     {
@@ -154,11 +236,12 @@ app.MapPost("/api/config/devices/{deviceIndex:int}", async (
     int deviceIndex,
     Device device,
     JsonDeviceRepository deviceRepository,
+    HttpRequest request,
     CancellationToken cancellationToken) =>
 {
     try
     {
-        var saved = await deviceRepository.UpdateDeviceAsync(deviceIndex, device, cancellationToken);
+        var saved = await deviceRepository.UpdateDeviceAsync(deviceIndex, device, cancellationToken, request.Headers["X-NetWatch-Profile"].ToString());
 
         return Results.Ok(new
         {
@@ -167,6 +250,10 @@ app.MapPost("/api/config/devices/{deviceIndex:int}", async (
             device = saved.Devices[deviceIndex],
             configuration = saved
         });
+    }
+    catch (ConfigurationConflictException ex)
+    {
+        return Results.Conflict(new { error = ex.Message });
     }
     catch (InvalidDataException ex)
     {
@@ -180,6 +267,41 @@ app.MapPost("/api/config/devices/{deviceIndex:int}", async (
         return Results.Problem(
             title: "Unable to save device.",
             detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
+// Reads/edits classifications without posting an old copy of the device inventory.
+app.MapGet("/api/device-types", async (JsonDeviceRepository deviceRepository, CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return Results.Ok(await deviceRepository.GetDeviceTypeCatalogAsync(cancellationToken));
+    }
+    catch (Exception ex) when (IsConfigurationReadException(ex))
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/device-types", async (
+    UpdateDeviceTypesRequest request, JsonDeviceRepository deviceRepository, CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return Results.Ok(await deviceRepository.UpdateDeviceTypeCatalogAsync(request, cancellationToken));
+    }
+    catch (DeviceTypeConflictException ex)
+    {
+        return Results.Conflict(new { error = ex.Message });
+    }
+    catch (InvalidDataException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (Exception ex) when (IsConfigurationWriteException(ex) || IsConfigurationReadException(ex))
+    {
+        return Results.Problem(title: "Unable to save device types.", detail: ex.Message,
             statusCode: StatusCodes.Status500InternalServerError);
     }
 });
@@ -256,7 +378,7 @@ app.MapPost("/api/config/import", async (
         }
 
         await using var stream = file.OpenReadStream();
-        var imported = await deviceRepository.ImportAsync(stream, cancellationToken);
+        var imported = await deviceRepository.ImportAsync(stream, cancellationToken, request.Headers["X-NetWatch-Profile"].ToString());
 
         return Results.Ok(new
         {
@@ -265,6 +387,10 @@ app.MapPost("/api/config/import", async (
             enabledCount = imported.Devices.Count(device => device.Enabled),
             configuration = imported
         });
+    }
+    catch (ConfigurationConflictException ex)
+    {
+        return Results.Conflict(new { error = ex.Message });
     }
     catch (InvalidDataException ex)
     {
@@ -845,6 +971,17 @@ app.MapGet("/api/monitor/stream", async (
     }
 });
 
+app.MapGet("/docs/{**documentationFile}", (HttpContext context, string? documentationFile) =>
+{
+    if (string.IsNullOrWhiteSpace(documentationFile)
+        && !context.Request.Path.Value!.EndsWith('/'))
+    {
+        return Results.Redirect("/docs/");
+    }
+
+    return GetDocumentationFile(documentationPath, documentationFile);
+});
+
 app.MapFallbackToFile("index.html");
 
 app.Run();
@@ -863,3 +1000,43 @@ static bool IsConfigurationWriteException(Exception exception)
         or UnauthorizedAccessException
         or OperationCanceledException;
 }
+
+static IResult GetDocumentationFile(string documentationRoot, string? requestedFile)
+{
+    var rootPath = Path.GetFullPath(documentationRoot);
+    var relativePath = string.IsNullOrWhiteSpace(requestedFile)
+        ? "index.html"
+        : requestedFile.TrimStart('/', '\\');
+    var filePath = Path.GetFullPath(Path.Combine(rootPath, relativePath));
+    var rootPrefix = rootPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+        + Path.DirectorySeparatorChar;
+
+    if (!filePath.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase)
+        || !File.Exists(filePath))
+    {
+        return Results.NotFound();
+    }
+
+    var contentType = Path.GetExtension(filePath).ToLowerInvariant() switch
+    {
+        ".html" => "text/html; charset=utf-8",
+        ".css" => "text/css; charset=utf-8",
+        ".js" => "text/javascript; charset=utf-8",
+        ".md" => "text/markdown; charset=utf-8",
+        ".png" => "image/png",
+        ".jpg" or ".jpeg" => "image/jpeg",
+        ".gif" => "image/gif",
+        ".svg" => "image/svg+xml",
+        ".webp" => "image/webp",
+        _ => null
+    };
+
+    return contentType is null
+        ? Results.NotFound()
+        : Results.File(filePath, contentType, enableRangeProcessing: true);
+}
+
+/// <summary>
+/// Exposes the Minimal API entry point to isolated ASP.NET Core test hosts.
+/// </summary>
+public partial class Program;

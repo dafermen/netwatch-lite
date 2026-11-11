@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "agent/**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore netwatch.sln
+
+      - name: Build
+        run: dotnet build netwatch.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test netwatch.sln --configuration Release --no-build --collect "XPlat Code Coverage" --results-directory TestResults
+
+      - name: Check frontend JavaScript
+        run: |
+          node --check wwwroot/app.js
+          node --check wwwroot/management.js
+          node --check wwwroot/peripherals.js
+          node --check wwwroot/device-types.js
+          node --check wwwroot/workstations.js
+          node --check docs/app.js
+          node --check docs/docs-reading-tools.js
+          node --check docs/docs-reading-init.js
+
+      - name: Packaging guard regression
+        shell: powershell
+        run: .\scripts\test-packaging.ps1
+
+      - name: Targeted storage mutation regression
+        shell: powershell
+        run: .\scripts\test-storage-mutations.ps1
+
+      - name: Reject tracked runtime data
+        shell: pwsh
+        run: |
+          $patterns = @(
+            '\.(db|sqlite)(-[^/]*)?$',
+            '(^|/)\.netwatch-runtime\.lock$',
+            '^(storage-backups|storage-exports)/',
+            '^storage-migration-.*\.json$',
+            '\.backup\.json$',
+            '^Data/config(\.backup)?\.json$',
+            '^Data/regions\.json$',
+            '^Data/regions/',
+            '^Data/themes\.json$',
+            '^Data/monitor-history\.json$',
+            '^Data/app-errors\.json$',
+            '^Data/integrations\.json$',
+            '^(config|regions|themes|monitor-history|app-errors|integrations)\.json$'
+          )
+          $tracked = git ls-files
+          $blocked = $tracked | Where-Object {
+            $path = $_
+            $patterns | Where-Object { $path -match $_ }
+          }
+          if ($blocked) {
+            $blocked | ForEach-Object { Write-Error "Runtime data is tracked: $_" }
+            exit 1
+          }
+
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            TestResults
+            artifacts/verification/storage-mutations-*/result.json
+          if-no-files-found: warn
+
+  browser-regression:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        storage: [json, sqlite]
+    env:
+      NETWATCH_TEST_STORAGE: ${{ matrix.storage }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Restore .NET
+        run: dotnet restore netwatch.sln
+      - name: Install browser test dependencies
+        run: npm ci --ignore-scripts
+      - name: Audit browser test dependencies
+        run: npm audit --audit-level=high
+      - name: Install Chromium
+        run: npx playwright install chromium
+      - name: Browser workflows on desktop and mobile
+        run: npm run test:e2e
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-results-${{ matrix.storage }}
+          path: |
+            test-results
+            playwright-report
+          if-no-files-found: warn
+
+  portable-validation:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Generate and verify isolated CI portable
+        shell: powershell
+        run: .\scripts\publish-portable.ps1 -Version "0.0.0-ci.${{ github.run_id }}.${{ github.run_attempt }}"
+      - name: Upload verified candidate and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portable-candidate
+          path: |
+            artifacts/packages/
+            artifacts/verification/*/result.json
+          if-no-files-found: warn
+

@@ -240,6 +240,8 @@ public sealed class MonitorExecutionService
         return new MonitorConfiguration
         {
             Settings = configuration.Settings,
+            DeviceTypes = configuration.DeviceTypes,
+            PeripheralCatalog = configuration.PeripheralCatalog,
             Devices = devices.ToList()
         };
     }

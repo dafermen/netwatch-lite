@@ -1,4 +1,1128 @@
-# netwatch-lite documentation
+# Current Status
+
+Last updated: 2026-11-11
+
+## URL CRUD Visibility - 2026-11-11
+
+COMPLETE: source fixes, complete regression, backed-up source restart and native
+portable rc.12 delivery/verification. Operator/other-PC acceptance and the remaining
+stable-deployment gates are still pending; GitHub publication remains on hold.
+The user clarified that save reports success but the record disappears. Three
+isolated SQLite browser failures reproduced missing HTTP URL search, renamed rows
+excluded by the old search, and saved copies hidden by collapsed parents. API
+reads confirmed the rows were persisted. Do not characterize this as proven
+SQLite data loss or claim every operator scenario has the same cause.
+
+Saved device create/edit/copy now reveals its Configuration row and opens its
+enabled pending Dashboard row on the next visit, without checks or implicit
+enabling. HTTP-only forms hide Location/Command without deleting existing values;
+mixed checks restore them. Validation/API details stay in the modal and retry
+restores check-specific disabled controls. No schema/data migration is needed.
+Initial .NET regression passed all 357 cases (34 unit, 28 integration, 295 contract).
+The initial full SQLite browser run passed 163/164 and exposed a Reports deletion
+race. A busy-state render scheduled SQL reads before DELETE settled, invalidating
+its response/revision; a delayed-write test reproduced it deterministically.
+Pending reads are now invalidated and busy mutation renders do not schedule SQL
+queries. Final dual-provider regression passed all 332 browser cases (166 SQLite,
+166 JSON, desktop/mobile), without skips, failures or browser retries. Eight
+focused deletion cases also passed. Initial failures and traces remain preserved
+under the evidence root. Both shells passed 58 packaging guards; 281 links in
+55 documentation files, JavaScript syntax and Git whitespace checks passed.
+Desktop/mobile screenshots were reviewed; compact-form overflow checks passed.
+Source rc.12 is now running on port 5000, PID 7504 (old PID 30132 stopped).
+Verified private backup and recovery runtime:
+`artifacts/verification/crud-20261111/activation-423ffd03411c4c2081b3fdcb912834d3/`.
+All document bytes, eight API snapshots and original JSON matched after restart;
+SQLite remains schema 2 without migration or old JSON reimport.
+
+Immutable local delivery:
+
+- Folder: `artifacts/portable/NetWatch-Lite-v0.8.0-rc.12-win-x64/`.
+- ZIP: `artifacts/packages/NetWatch-Lite-v0.8.0-rc.12-win-x64.zip`, with adjacent SHA sidecar.
+- 47462529 ZIP bytes, 421 package files, 77 public assets.
+- SHA-256: `a4d55e7cd57d767d112669d359189580dda18d407a4b107240795df14b0078d2`.
+
+Generation (PowerShell 5.1), final ZIP (7) and folder-copy (5.1) each passed
+26 routes/eight negative checks, neutral SQLite first run and immutable-byte
+checks. Receipts: `fe9f311bbb9f4b9392f3a48ee3557ad8`,
+`94d292203190468383c8328d9a12ef45`, `6443ff66ec2d4468a08b47e26e24a334`.
+`artifacts/verification/crud-20261111/package-audit.json` confirmed manifest/SHA,
+77 build-time source matches, all 4476 historical files and 15 original Data JSON
+unchanged, and no publisher lock. Final live check confirmed source PID 7504,
+version rc.12, updated UI and SQLite schema 2 / engine 3.53.3 on port 5000.
+Archive documentation is a frozen build-time checkpoint; these final receipts
+do not rewrite the ZIP/folder. Previously recorded Windows JSON/file-sharing
+intermittencies remain historical risks, not claimed resolved by these passes.
+New evidence: [URL CRUD validation](docs/VALIDATION_URL_CRUD_2026-11-11.md).
+GitHub remains on hold. Earlier status/PIDs/packages below are historical.
+
+## Relational SQLite Work Order - 2026-11-10
+
+The owner approved all five recommendations: structured history/SQL Reports,
+configurable retention, relational inventory, local change auditing and managed
+backups/verified restore. Schema 2 source, additive query/maintenance endpoints,
+bounded Reports UI and Configuration Data & backups are implemented. Document
+compatibility is retained transactionally; see ADR 0007. The explicitly authorized
+active-root upgrade is COMPLETE: SQLite schema 2 / engine 3.53.3, version rc.11,
+source service PID 30132 on http://localhost:5000/ (previous PID 27804 stopped).
+Verified pre-upgrade snapshot and old runtime were retained privately before
+upgrade. Offline exports matched every document byte before starting the new
+service; all eight live API snapshots and original JSON also matched afterward.
+Activation evidence and private recovery material:
+`artifacts/verification/sqlite-v2-handoff/activation-60949302224f41928e55bc267b1af999/`.
+Schema-upgrade backups also exist under storage-backups/schema-upgrades/.
+Older binaries require a schema-1 backup restored into a separate deployment,
+not an in-place binary downgrade or selection of stale original JSON.
+
+Initial .NET regression passed 346 cases (34 unit, 25 integration, 287 contract).
+Browser validation exposed PascalCase/numeric-enum historical serialization;
+compatibility was corrected, and the new real SQL 132-evaluation paged/export
+case passed on desktop/mobile. Expanded .NET regression passed 354 cases
+(34 unit, 28 integration, 292 contract); six sampled storage mutants were killed.
+The final-code pilot at `relational-pilot-a902e91ef1274abe8f6bb7e3c7c6ccaa/`
+also matched eight APIs, document hashes and schema-1 rollback. A 5000-evaluation
+sample returned 7394 bytes for ten rows versus a 784800-byte full document
+(188.4 ms for that test request, not an SLO or general speedup claim).
+Final source regression passed 355 cases (34 unit, 28 integration, 293 contract)
+with sequential xUnit collections, retaining explicit concurrency tests. Four
+final SQL desktop/mobile browser cases passed, including invalid-date recovery,
+retention confirmation and complete 132-evaluation export. Later parallel JSON
+File.Replace and temporary-cleanup failures remain recorded, not claimed solved
+by green sequential tests. Full browser matrices passed 296 cases (148 SQLite,
+148 JSON; desktop/mobile), without failures/skips/retries. Four additional final
+UI cases passed after search-whitespace and mobile table-width adjustments, with
+reviewed screenshots and explicit overflow assertions. Final pilot
+`relational-pilot-0030903427974f17be26454a4422922c/` also reconciled SQL query
+counts with the compatible APIs. Both shells passed 58 package guards; syntax,
+277 links across 55 Markdown documents and Git whitespace passed. NuGet/npm
+audits found no known vulnerabilities. All source/test evidence is under
+`artifacts/verification/sqlite-v2-*`; the handoff baseline covers 4062 historical
+files and 14 original JSON files. Native rc.11 delivery is COMPLETE:
+
+- Folder: `artifacts/portable/NetWatch-Lite-v0.8.0-rc.11-win-x64/`.
+- ZIP: `artifacts/packages/NetWatch-Lite-v0.8.0-rc.11-win-x64.zip` and adjacent SHA sidecar.
+- ZIP bytes: 47454045; 420 package files and 76 public assets.
+- SHA-256: `4d9992d921442cabb7342df7fa82086d6ec6348c8904daa6e2c736496006e3cb`.
+
+Generation/final ZIP/folder-copy checks passed 26 routes/eight negative probes,
+neutral schema-2 SQLite startup and unchanged artifact bytes on PowerShell 5.1/7.
+Receipts under artifacts/verification/: b485cd59331143758f757585eb1dcda0,
+dd86245730b944218b8c6838749fed20 and b26b2b9af46e4358ad75956e026ba052.
+Final audit `sqlite-v2-handoff/final-audit.json` confirmed package/SHA policy,
+76 build-time source matches, all 4062 historical files and 14 original JSON
+unchanged, no staging/publisher lock and the correct live service. NuGet audit
+covers application dependencies; npm covers the local tooling lockfile.
+Archive documentation is frozen at build time; these final handoff receipts do
+not rewrite the historical ZIP/folder. Next: operator/other-PC acceptance and
+remaining stable-deployment gates. No stable-release approval or resolution of
+the known intermittent Windows JSON/File.Replace incidents is implied.
+Do not publish to GitHub until the owner explicitly authorizes it.
+Older evidence below is historical.
+
+## HTTP Field Help And Compact Shortcuts - 2026-11-10
+
+Added concise Spanish help below HTTP Timeout/Expected text, with unique per-row
+IDs and aria-describedby. Removed the extra Shortcuts note/reference, retaining
+Command help. HTTP fields stack on small screens. Existing retry controls remain
+in Configuration > Settings (Retries 0-5, Retry delay 0-10000 ms), saved per active
+profile and applied to failed Ping/TCP/HTTP attempts. No operator settings changed.
+Isolated Release solution build passed without warnings/errors, with 32 focused
+HTTP/command browser passes (16 SQLite/16 JSON on desktop/mobile), no skips/retries.
+Visual review confirmed wrapping/stacking and no overlaps; unique description
+references and synthetic retry-setting saves passed. Both shells passed 54 package
+guards; syntax/whitespace passed. Generated and validated local portable rc.10
+(416 files, 72 public assets):
+`artifacts/portable/NetWatch-Lite-v0.8.0-rc.10-win-x64/`, ZIP under
+`artifacts/packages/NetWatch-Lite-v0.8.0-rc.10-win-x64.zip` and adjacent SHA sidecar.
+ZIP bytes: 47413948. SHA-256:
+`aed1937f0c3afc43157d87393da2aacd72d476990bafa18193297729cbedb138`.
+Exact ZIP/folder validation passed 19 routes/seven negative checks and clean
+SQLite startup on PowerShell 5.1/7. All 3644 historical files and 14 original JSON
+hashes stayed unchanged; no private data was packaged. The same source service
+PID 27804 serves the new helpers on port 5000 with SQLite, without restarting.
+Final audit:
+`artifacts/verification/http-hints-5bb65994506f4957a47fbca136aef1ee/final-audit.json`.
+Archive documentation reflects build-time state; final delivery receipts are
+recorded here without modifying the immutable archive.
+No GitHub push/tag/publication is authorized. rc.9/earlier outputs stay immutable.
+See [HTTP helper validation](docs/VALIDATION_HTTP_HINTS_2026-11-10.md).
+
+## Local Shortcut Descriptions - 2026-11-10
+
+Added short Spanish descriptions below Shortcuts and Command, with associated
+aria-describedby references. They distinguish shortcuts from monitoring checks
+and clarify clipboard-only command text, without automatic execution or changes
+to values, validation, persistence or copy behavior. Isolated Release solution
+build passed without warnings/errors; all 16 focused browser cases passed
+(eight SQLite/eight JSON on desktop/mobile). Visual review confirmed wrapping
+and no overlap. Both shells passed 54 package guards; syntax/whitespace passed.
+Generated and validated local portable rc.9 (415 files, 71 public assets):
+`artifacts/portable/NetWatch-Lite-v0.8.0-rc.9-win-x64/`, ZIP under
+`artifacts/packages/NetWatch-Lite-v0.8.0-rc.9-win-x64.zip` and adjacent SHA sidecar.
+ZIP bytes: 47410308. SHA-256:
+`00542d00f792fe23cf56e1d1f643416dd3b684ee4e595bf72bc54ca12a091cf5`.
+Exact ZIP/folder tests passed 19 routes/seven negative checks and clean SQLite
+startup on PowerShell 5.1/7. All 3227 historical files and 14 original JSON hashes
+were unchanged; no private data was packaged. The same source service PID 27804
+serves the new HTML on port 5000 with SQLite, without restarting. Final audit:
+`artifacts/verification/shortcut-hints-648af97482df49cfa208461d9a4d848a/final-audit.json`.
+The current
+SQLite service remains on port 5000; no restart/data change is needed for HTML.
+
+The user explicitly put GitHub publication on hold. Do not push/tag/publish or
+upload until explicitly authorized; this instruction is also recorded in AGENTS.
+The rc.8/earlier archives remain immutable. Local-only validation/delivery details:
+[shortcut hints validation](docs/VALIDATION_SHORTCUT_HINTS_2026-11-10.md).
+
+## Work Order And Portable rc.8 - 2026-11-10
+
+Completed the approved local work order: Configuration search reveals matching
+Normal/Bulk groups; the editor follows actual checks and Workstation inventory,
+with clear target/shortcut/monitor URL labels and a new-record Web application
+preset. Hidden identity/metadata and existing checks remain compatible. Initial
+loading cannot close a new draft; stale-profile saves/imports return 409 and
+failed saves retain the draft without duplicate creates on retry.
+
+SQLite is ACTIVE in this project, explicitly approved by the user after the
+private-copy pilot. The source service runs at http://localhost:5000/ (PID 27804),
+schema 1 / engine 3.53.3, database netwatch.db. Offline migration imported 12
+source logical documents, created a private JSON backup and verified SQLite
+snapshot under storage-backups/, and retained all 14 original JSON hashes.
+Eight actual service API snapshots matched the final pilot. No agent monitoring
+request was made. Original JSON is not live storage now; use current-data export
+for reversal, not stale pre-cutover files. Maintenance requires stopping this
+content-root instance. See docs/STORAGE.md and ADR 0006.
+
+Final source verification: Release build without warnings/errors, 342 .NET cases
+(34 unit, 25 integration, 283 contract) with coverage; 280 browser cases (140
+SQLite, 140 JSON; 70 desktop/70 mobile per provider), no failures/skips/retries.
+Reviewed synthetic desktop/mobile form captures for bounds, labels and overlap.
+Both shells passed 54 package guards each. Four sampled storage mutants were
+killed; deterministic storage fuzzing covers 256 values. Dependency audits
+reported zero known NuGet/npm vulnerabilities, not comprehensive security proof.
+Final pilot retained 15 sources, validated migration/repeat/backup/JSON reversal
+and matched eight API snapshots. Evidence and earlier failures:
+[work-order validation](docs/VALIDATION_WORK_ORDER_2026-11-10.md).
+
+Generated and validated immutable Windows x64 self-contained candidate
+0.8.0-rc.8, including the SQLite native runtime and license notices:
+
+- Folder: artifacts/portable/NetWatch-Lite-v0.8.0-rc.8-win-x64/.
+- ZIP: artifacts/packages/NetWatch-Lite-v0.8.0-rc.8-win-x64.zip.
+- Checksum: the adjacent .zip.sha256 sidecar.
+- ZIP bytes: 47406912.
+- SHA-256: 55cec60f9e62ad515ca42a8dae2c293d71c248bf3c633bd951f22f2049d18c90.
+
+Windows PowerShell 5.1 generated/validated the exact ZIP; PowerShell 7 retested
+the final ZIP and PowerShell 5.1 retested the final folder through a copy. Each
+passed 19 read-only HTTP routes, seven negative checks, clean SQLite first run
+and unchanged source bytes. All 414 package files matched policy/manifests;
+all 70 public files matched build-time source. No database, journal/sidecar,
+lease, operational inventory, notes, history, theme, integration, backup/export
+or external input was packaged. All 2803 previous portable/package files and
+eight legacy archives retained hashes. Duplicate rc.8 publishing was rejected
+without changing outputs. No publisher lock or staging entry remained.
+
+Evidence under artifacts/verification/:
+
+- 22c75153ab344fcda817493767919ac9/result.json: generated ZIP, PowerShell 5.1.
+- efd2a15dddfa4a0391d1acfbc624c18f/result.json: final ZIP, PowerShell 7.
+- abe431688cfe4e94b178626f1a756d38/result.json: final folder, PowerShell 5.1.
+- work-order-b497b91c6da94802b1f71f8d45c5243a/portable-final-audit.json:
+  policy/manifests/public bytes/SHA/privacy/history/duplicate rejection.
+- The same work-order directory holds source-cutover.json, dependency audits
+  and separate final SQLite/JSON browser evidence.
+- storage-pilot-0009c66285c546a7b2787c56b43768dc/result.json: final private pilot.
+
+Artifacts remain Git-ignored and were not uploaded. Metadata records
+sourceDirty: true for this untagged candidate. Post-generation repository
+handoff notes do not modify the archive's immutable build-time documentation.
+
+Final handoff passed 15 read-only live routes (HTTP 200), final frontend/profile
+guards and SQLite provider, unchanged ZIP/SHA and all 14 original JSON hashes.
+No test app, publisher lock or staging entry remained. All 265 local links across
+51 Markdown documents and Git whitespace passed. Final receipt:
+artifacts/verification/work-order-b497b91c6da94802b1f71f8d45c5243a/final-state.json.
+
+Next: operator acceptance on the other Windows x64 PC, then the remaining
+stable-deployment quality gates or approved exceptions. The original Notes-500/
+history incident root causes remain unproven; tested sharing-lock mitigations,
+profile guards and trace diagnostics do not retroactively establish them.
+HTTP deadline/status semantics now have separate header/body tests without
+extending real deadlines. This is not stable-deployment approval, clean-machine
+certification, network-share/multi-instance support, SSO or outbound integration.
+The chronological checkpoints below describe older states, not pending
+implementation of the now-completed search/form/SQLite work.
+
+## Coordinated Development - 2026-11-09
+
+The user requested consolidating all discussed/pending work and coordinating its
+development. The authoritative sequence is [ROADMAP.md](docs/ROADMAP.md), with
+individual scope/status in [IMPROVEMENTS.md](docs/IMPROVEMENTS.md): close IMP-003
+Wireless/Cabled delivery, then IMP-001 search visibility and IMP-004 field-name/
+dynamic-form UX, investigate existing reliability issues, then isolated SQLite
+architecture/migration/pilot and explicit cutover gates. No live database change
+is authorized by merely recording the plan; JSON remains active.
+
+The proposed form combines device classification and actual check definitions,
+not type names alone. Network target/Open website link/URL to monitor naming and
+Shortcuts grouping remain queued, not shipped in rc.7. Existing data/checks must
+not be silently erased; Workstation protection, custom types and current API/JSON
+compatibility remain required. Reliability failures are not assumed fixed by
+successful reruns or by choosing SQLite. See roadmap stages for acceptance gates.
+
+## Peripheral Link Type And Portable rc.7 - 2026-11-09
+
+Implemented optional per-printer/scanner `linkType`: unrecorded, wireless or
+cabled. The new Link type select is independent from USB/Network/Other; legacy,
+null and blank values remain unknown. Network address behavior is unchanged.
+Each physical assignment retains its own value through normal/Advanced/copy/
+bulk/profile/JSON flows. Configuration/Dashboard/Workstations details show the
+recorded link; inventory-pending filters and monitoring/history are unchanged.
+The model selector spans a full row, with Connection and Link type adjacent on
+desktop and stacked on mobile. No migration or operational inventory edit.
+
+Release solution build passed with zero warnings/errors. All 28 new contract
+tests and eight focused browser cases passed. Only the verified source service
+was restarted for rebuilding (old PID 7488, current PID 21688 on port 5000).
+Original local JSON hashes were recorded; user monitoring/configuration activity
+continued during this task, so do not revert operator changes to match a snapshot.
+
+Answered the user's HTTP setup questions: checks are under Add/Edit Device >
+Checks > HTTP / HTTPS; Website URL is a shortcut only. Their screenshot showed
+HTTP 200 with expected-text mismatch and Ping using a full URL. Recommended
+HTTP-only with expected status 200, optional text blank and Full Check; no real
+monitoring or device/configuration changes were performed by the agent.
+
+Full isolated .NET regression passed all 311 cases (33 unit, 7 integration,
+271 contract) with TRX/coverage. Full browser regression passed all 126 cases
+(63 desktop, 63 mobile), without failures/skips/retries. Desktop/mobile captures
+of printer/scanner link controls were reviewed: full-width model, adjacent
+Connection/Link type on desktop, mobile stacking and no text/control overlap.
+All 49 packaging guards passed on both shells after adding the roadmap. JavaScript
+syntax, 232 local links across 47 Markdown documents and Git whitespace passed.
+Recorded historical baseline: six folders (2385 files), 20 archive/checksum files.
+
+Generated and validated Windows x64 self-contained candidate `0.8.0-rc.7`, with
+Wireless/Cabled and the coordinated plan. Delivered immutable outputs:
+
+- Folder: `artifacts/portable/NetWatch-Lite-v0.8.0-rc.7-win-x64/`.
+- ZIP: `artifacts/packages/NetWatch-Lite-v0.8.0-rc.7-win-x64.zip`.
+- SHA-256: the adjacent `.zip.sha256` sidecar.
+- ZIP bytes: 46181874.
+- SHA-256: `6c8b9d2e41eca0f8ed90c5003d1b21ea378f32ab54b8dc98232f5f3d54b09079`.
+
+Windows PowerShell 5.1 generated/validated the exact ZIP; PowerShell 7 retested
+the final ZIP, and PowerShell 5.1 retested the final folder through a copy.
+Each passed native startup, 17 read-only routes, four negative cases, neutral
+first-run data and unchanged package bytes. All 403 package files matched policy/
+manifests; all 66 public files matched build-time source bytes. No operational
+inventory or private data was packaged. All 2385 files across six older portable
+folders and all 20 historical ZIP/checksum files retained hashes. Repeating rc.7
+was rejected without altering its outputs. Evidence under artifacts/verification/:
+
+- Build-time ZIP: `3d96cacaf1b84f78b87cc4cd704f5f7b/result.json`.
+- Final ZIP / PowerShell 7: `8cdd9953920d4f12aefc7bb0b596d1ce/result.json`.
+- Final folder / PowerShell 5.1: `3c516bf70aff4608b959d588fb0fb4bc/result.json`.
+- Preservation/content/SHA: `rc7-handoff-a3d8909a2f6d41b9abc64423513cd064/result.json`.
+
+The local updated source service remains on port 5000 (PID 21688). Artifacts
+remain ignored and were not uploaded; metadata records sourceDirty: true for
+this untagged candidate. Repository handoff docs do not change the archive's
+build-time snapshot. IMP-003/stage 0 is complete as a local test candidate;
+IMP-001/IMP-002/IMP-004 remain queued and storage remains JSON. Evidence/limits:
+[peripheral link validation](docs/VALIDATION_PERIPHERAL_LINKS_2026-11-09.md).
+
+Final read-only handoff checks passed for 11 app/docs/API routes (HTTP 200),
+the ZIP/checksum and sole port-5000 listener. No publisher lock, staging entry
+or test app remained. Receipt: `artifacts/verification/rc7-handoff-a3d8909a2f6d41b9abc64423513cd064/final-state.json`.
+Of 15 original local JSON fingerprints, four changed while the operator was
+using the service; none was restored. No agent monitoring request was made.
+The final documentation recheck passed 233 local links across 47 Markdown
+documents; the live app and roadmap both returned HTTP 200 after handoff edits.
+
+Next: Configuration search visibility, then incremental form/field-name UX as
+specified in the roadmap; investigate existing reliability issues before stable
+release/cutover. SQLite requires isolated design/migration/pilot evidence and
+explicit operational cutover selection. No silent live-data migration.
+
+## Local Service Restart - 2026-11-09
+
+Restarted the shared source service at the user's request. Verified the old
+port-5000 listener was this checkout (PID 26844), stopped only that process,
+rebuilt NetWatch.csproj in Release with zero warnings/errors and started a new
+hidden dotnet process (PID 7488) with content root C:\Projects\netwatch-lite.
+The old process is no longer running. Six read-only app/docs/API routes returned
+HTTP 200; current markup/scripts and API include Location before Notes. All 14
+local JSON hashes matched the pre-restart snapshot. No monitoring was requested,
+code changed, data migrated or portable regenerated. Application regression
+tests were not rerun for this operational restart.
+
+The previous instance already served Location/Notes. A full browser refresh may
+be required for an existing tab. IMP-001 (search expansion) and IMP-002 (SQLite)
+remain pending; restarting does not implement backlog items. Logs are ignored at
+`artifacts/verification/service-restart-20261109-e952775d16bc42cca527a0ec736e902d/`.
+
+## Improvement Backlog - 2026-11-09
+
+Recorded user report IMP-001: Configuration search can find a workstation while
+its parent groups stay collapsed, hiding the result. Requested improvement:
+expand matching Facility/category groups to reveal found devices immediately.
+See the [improvement backlog](docs/IMPROVEMENTS.md) for scope and proposed
+acceptance checks. Status is pending, not implemented or independently reproduced.
+
+Recorded IMP-002 at the user's request: introduce SQLite for local persistence
+with safe JSON-data migration, backup/rollback, portable compatibility and retained
+JSON import/export. This is a backlog entry only; no schema, dependency or database
+has been created. JSON remains active under ADR 0001 until a documented cutover
+is implemented. See the same backlog for proposed acceptance checks.
+
+This is a documentation-only handoff, as requested. No application behavior,
+operational data, service process or portable artifact was changed. The public
+documentation allowlist includes the backlog for future builds so its index link
+will remain valid. No application regression suite was rerun for this note.
+
+
+## Device Location And Portable rc.6 - 2026-11-08
+
+Implemented optional `location` immediately before Notes in the device editor
+for floor/office/desk. Single-line, max 200 UTF-16 code units before trimming,
+no control characters or Unicode line/paragraph separators. Facility remains
+the monitoring site/group. Existing Notes is never parsed/moved; legacy files
+need no migration. Normal/Advanced/copy, unrelated Bulk Edit and JSON/profile
+workflows retain Location, Notes and Facility. Configuration/Dashboard display
+escaped location text and search it before/after checks. Location does not enter
+monitoring results/history or report rows and is not geolocation.
+
+Release solution build passed with zero warnings/errors; all 34 new contract
+cases and eight focused browser cases passed, without failures or skips. Only
+the verified old development process was stopped for rebuilding its locked DLL;
+the updated service is back on port 5000 (PID 26844). No operational inventory
+was edited or checked. Runtime JSON hashes were recorded before restarting.
+
+Final isolated regression passed all 283 .NET tests (33 unit, 7 integration,
+243 contract) with TRX/coverage, and the full browser run passed all 118 cases
+(59 desktop, 59 mobile), with no skips or automatic browser retries. The initial
+concurrent .NET run had 281/283 passes: a Notes save returned HTTP 500 without
+captured response detail, and a 200 ms slow-body check timed out before recording
+the expected status code. The complete isolated rerun and three focused repeats
+(five cases each, 15 passes) did not reproduce them. Added response-body failure
+diagnostics to the Notes test only; no production persistence/HTTP behavior was
+changed. Original TRX/coverage remains under TestResults. These intermittent failures
+are not resolved by adding Location; investigate before stable deployment.
+
+All 49 packaging guards passed on both shells. JavaScript syntax, 211 local links
+across 44 Markdown files, Git whitespace and seven read-only service routes
+passed. All 14 local JSON hashes matched the pre-restart snapshot. Visual review
+at 1440x1000 and 390x844 confirmed ordering, wrapping, modal bounds and unchanged
+aligned actions using synthetic data; captures are under test-results/.
+Historical hashes cover five prior folders (1985 files) and 18 ZIP/checksum files.
+
+Generated and validated Windows x64 self-contained candidate `0.8.0-rc.6` with
+Location before Notes, plus all prior Reports/Command features. Delivered:
+
+- Folder: `artifacts/portable/NetWatch-Lite-v0.8.0-rc.6-win-x64/`.
+- ZIP: `artifacts/packages/NetWatch-Lite-v0.8.0-rc.6-win-x64.zip`.
+- SHA-256: the adjacent `.zip.sha256` sidecar.
+- ZIP bytes: 46167057.
+- SHA-256: `d2357af8aa3f27fb498b904d02f278c0c525675f0318f19b4860dd7fcc711f7a`.
+
+Windows PowerShell 5.1 generated/validated the exact ZIP; PowerShell 7 retested
+the final ZIP and PowerShell 5.1 retested the final folder through a disposable
+copy. Each passed native startup, 17 read-only HTTP routes, four negative cases,
+neutral first-run data and unchanged bytes. All 400 package files matched policy/
+manifests; all 63 public files matched build-time source bytes, with Location,
+Notes, Reports and Command markers present. No private data was packaged.
+Before/after hashes matched for all 1985 files in five previous portable folders
+and all 18 old ZIP/checksum files, including eight legacy archives. Repeating
+rc.6 was rejected without altering its folder/ZIP/checksum. Evidence under
+`artifacts/verification/`:
+
+- Build-time ZIP: `bd96c71c01bf4d3d97e2053f7e02c5bf/result.json`.
+- Final ZIP / PowerShell 7: `18bbd7c1d067478a93392992b4d996c5/result.json`.
+- Final folder / PowerShell 5.1: `f400163ecc0e4339b66aa4eb3e307481/result.json`.
+- Preservation/content/SHA: `rc6-handoff-1c98d4ac6a8949c6a041e8519dead569/result.json`.
+
+Artifacts are Git-ignored, not uploaded; metadata records sourceDirty: true for
+this untagged local candidate. Final repository evidence does not modify the
+immutable artifact's build-time documentation. Normal source service remains
+on port 5000 (PID 26844). Use a new deployment folder, not an archived folder.
+Final handoff verified eight read-only routes (all 200), Location ordering/model,
+unchanged ZIP/manifest/SHA, 211 local links across 44 documents and unchanged
+hashes for all 14 local JSON files. No publisher lock, staging entry or disposable
+test application remained. Final state:
+`artifacts/verification/rc6-handoff-1c98d4ac6a8949c6a041e8519dead569/final-state.json`.
+Evidence and remaining deployment gates:
+[Location validation](docs/VALIDATION_DEVICE_LOCATION_2026-11-08.md).
+
+Next: operator/other-PC acceptance, investigate the initial Notes-save/HTTP
+intermittencies and earlier Windows history-replacement incident, then complete
+all thirteen deployment gates with evidence or approved exceptions. RC package
+validation is not stable-deployment approval; all historical outputs stay immutable.
+
+## Device Notes And Portable rc.5 - 2026-11-08
+
+Implemented optional `notes` on every device type for physical location, assigned
+user/team or other observations. Notes is multiline, max 2000 UTF-16 code units,
+trimmed outside, with CR/LF/tab allowed and other controls rejected before writes.
+Old files need no migration. Add/Edit/Advanced/copy/import/export/profile flows
+and unrelated bulk changes preserve it. Configuration/Dashboard offer escaped,
+keyboard-operable disclosures and text search; monitoring results/history do not
+contain it. No user identity verification or automatic location discovery exists.
+
+Release build passed with zero warnings/errors. All 25 new contract tests and
+eight focused browser cases passed. Initial browser assertions incorrectly
+assumed null fields in JSON exports and the generic full-run completion label;
+they now support optional omission and named single-device messages. Initial
+evidence is retained under
+`artifacts/verification/notes-focused-initial-72034ca163394d9f9d33e845927396bb/`.
+An initial build was blocked by the known running service's DLL; only that
+verified process was stopped, the solution rebuilt and the service restarted
+on port 5000 (PID 22204). No operational inventory was edited or checked.
+
+Full regression passed: all 249 .NET tests (33 unit, 7 integration, 209 contract)
+with TRX/coverage, and all 110 browser cases (55 desktop, 55 mobile), without
+failures/skips/retries. All 49 packaging guards passed on both Windows PowerShell
+5.1 and PowerShell 7. JavaScript syntax, 204 local links across 43 Markdown files,
+Git whitespace and seven read-only service routes passed. All 14 operational
+JSON hashes matched the pre-restart snapshot; no inventory migration occurred.
+
+Visual review covered Configuration/Dashboard disclosures and the Notes editor
+at 1440x1000 and 390x844. Two extra geometry cases passed with separate evidence
+under `artifacts/verification/notes-visual-19dce8a4922e422ba034a321747efca4/`,
+preserving the full HTML regression report. An intermediate desktop capture
+was taken before the modal's opening animation finished; waiting for the public
+shown.bs.modal event corrected the test timing, without product changes.
+Its evidence remains in `artifacts/verification/notes-visual-4d5e9e5eb79848cf92b349a6cc4c0801/`.
+
+Generated and validated Windows x64 self-contained candidate `0.8.0-rc.5` with
+Notes, Reports, Command and all previous changes. Delivered immutable outputs:
+
+- Folder: `artifacts/portable/NetWatch-Lite-v0.8.0-rc.5-win-x64/`.
+- ZIP: `artifacts/packages/NetWatch-Lite-v0.8.0-rc.5-win-x64.zip`.
+- SHA-256: the adjacent `.zip.sha256` sidecar.
+- ZIP bytes: 46160154.
+- SHA-256: `8c202e8774cb687dd533150af5e4c5c210ed2bd1ae41fa735c64304991c0b7fc`.
+
+Windows PowerShell 5.1 generated/validated the exact ZIP; PowerShell 7 retested
+the final ZIP and PowerShell 5.1 retested the final folder through a copy. Each
+passed native startup, 17 read-only HTTP routes, four negative cases, neutral
+first-run configuration and immutable-byte checks. All 399 files matched package
+policy/manifests and all 62 public source files matched build-time bytes. Notes,
+Reports and Command markers were present. No private inventory or notes were
+packaged. All 1586 files across four previous portable folders and all 16 old
+ZIP/checksum files retained their hashes. Repeating rc.5 was rejected without
+altering its folder/ZIP/sidecar. Evidence under `artifacts/verification/`:
+
+- Build-time ZIP: `38377533967d4ffc9bf54a05e395c7d2/result.json`.
+- Final ZIP / PowerShell 7: `c43c80f42a964d3080ce5be1830f7172/result.json`.
+- Final folder / PowerShell 5.1: `f42f582c1e9a41ba9111d7716be50bb5/result.json`.
+- Preservation/content/SHA: `rc5-handoff-4eec6aa218994e6199b431df2b8ff647/result.json`.
+
+Artifacts are Git-ignored and were not uploaded. Metadata records sourceDirty:
+true for this untagged local candidate. Final repository evidence does not alter
+the immutable artifact's build-time documentation. The normal updated source
+service remains on port 5000 (PID 22204). Never run an archived version directly.
+Final handoff rechecked eight read-only HTTP routes (all 200), ZIP/manifest/SHA,
+204 local links across 43 documents and unchanged hashes for all 14 operational
+JSON files. No publisher lock, staging entry or disposable test app remained.
+Final state: `artifacts/verification/rc5-handoff-4eec6aa218994e6199b431df2b8ff647/final-state.json`.
+Evidence and pending deployment gates:
+[Notes validation](docs/VALIDATION_DEVICE_NOTES_2026-11-08.md).
+
+Next: real operator/other-PC acceptance, investigate the earlier Windows history
+replacement incident and complete all thirteen deployment gates with evidence
+or approved exceptions. Local RC validation is not stable-deployment approval.
+
+## Portable Candidate 0.8.0-rc.4 - 2026-11-08
+
+Generated and validated the new Windows x64 self-contained candidate with the
+Reports redesign and all rc.3 features, including copy-only Command. Delivered:
+
+- Folder: `artifacts/portable/NetWatch-Lite-v0.8.0-rc.4-win-x64/`.
+- ZIP: `artifacts/packages/NetWatch-Lite-v0.8.0-rc.4-win-x64.zip`.
+- SHA-256: the adjacent `.zip.sha256` sidecar.
+- ZIP bytes: 46152417.
+- SHA-256: `88238b3d2d89e72cfc302ffb398df10d37e6a0097b0832e6e973560f964ae84c`.
+
+Every future portable delivery must include its versioned folder, compressed
+ZIP and SHA-256 sidecar; ZIP is the primary file to copy/share. AGENTS and the
+portable guide record this standing preference. The existing generator already
+enforces all three outputs and required no behavior change.
+
+Fresh source regression passed: Release solution build with zero warnings/errors,
+all 224 .NET tests (33 unit, 7 integration, 184 contract) with TRX/coverage and all
+102 browser cases (51 desktop, 51 mobile), without failures, skips or retries.
+All 49 packaging guards passed on both Windows PowerShell 5.1 and PowerShell 7.
+JavaScript/PowerShell syntax, 197 local Markdown links across 42 documents and
+Git whitespace checks passed. Eight read-only app/docs/config routes returned
+HTTP 200 on the existing service (PID 29316).
+
+Windows PowerShell 5.1 generated and validated the exact ZIP; PowerShell 7
+revalidated the final ZIP and PowerShell 5.1 tested the final folder through a
+disposable copy. Each passed native startup, 17 read-only HTTP routes, four
+negative cases, neutral first-run files and immutable-byte checks. All 398
+package files matched policy/manifests; all 61 public files matched build-time
+source hashes, including Reports and Command. No private operational data or
+external Excel/JSON inputs were included/imported.
+
+Before/after hashes matched for all 1188 files in rc.1/rc.2/rc.3 folders and all
+14 historical ZIP/checksum files (including eight legacy archives). Repeating
+rc.4 publishing was rejected without changing its folder, ZIP or checksum.
+Evidence under `artifacts/verification/`:
+
+- Build-time ZIP: `d0caa10a96124b7187434de02dfe71d8/result.json`.
+- Final ZIP / PowerShell 7: `e6eb4a7cf8434bdabcfb31c0dbdd13b2/result.json`.
+- Final folder / PowerShell 5.1: `6ca762beedc8466ca45519beaf6e06bf/result.json`.
+- Preservation/content/SHA audit: `rc4-handoff-a2990d29121343e4a651ddd95195c221/result.json`.
+
+The normal source service remains on http://localhost:5000/ (PID 29316 at this
+checkpoint); no historical portable was run directly. Generated artifacts are
+Git-ignored and were not uploaded. Metadata records sourceDirty: true for this
+untagged local candidate. Post-generation repository documentation/evidence
+does not modify the immutable build-time folder/ZIP. See
+[portable validation](docs/VALIDATION_PORTABLE_2026-11-08.md).
+
+Final handoff rechecked the unchanged ZIP/checksum and package manifest, 196
+local links across 42 Markdown documents and nine read-only service routes
+(HTTP 200). No publisher lock, staging entry or disposable test app remains.
+
+Next: operator acceptance, investigate the earlier Windows history-file
+replacement incident and complete all thirteen deployment gates with evidence
+or approved exceptions. Candidate validation is not stable-deployment approval.
+Any subsequent build requires a new version, never overwriting this one.
+
+## Reports Redesign - 2026-11-07
+
+Implemented Summary/Runs/Devices, shared historical group/Facility/category/date
+filters and chips, unique-identity versus evaluation metrics and a measured
+Healthy ratio (not uptime). Detail/drilldown uses recorded checks only, with
+mobile flat rows/order controls, keyboard and back handling. CSV/JSON exports
+contain all matches; deletion is confirmed, non-optimistic and disabled for
+ambiguous legacy IDs. Older records remain readable without a schema migration.
+No operational inventory/history was edited and no real-inventory checks were
+performed; monitoring tests used isolated fixtures.
+
+Release build passed without warnings/errors and all 224 .NET tests (33 unit,
+7 integration, 184 contract) passed with TRX/coverage. Final browser regression
+passed all 102 cases (51 desktop, 51 mobile), with zero failures, flaky cases,
+skips or automatic retries. Twenty Reports cases cover metrics/identity,
+profiles, periods, drilldown, escaping, legacy/duplicate IDs, malformed/failed/
+stale reads, CSV/JSON, sorting/pagination and deletion/navigation.
+
+Intermediate checks found early detail Escape and hidden mobile sorting issues;
+both were corrected. One mobile stale-read test needed its navigation drawer
+opened before clicking. An 18-case focused run then passed before the additional
+legacy coverage and final full regression. Visual captures were reviewed at
+1440x1000 and 390x844 with no page overflow. Two detail cases were additionally
+rerun after waiting for opening completion, asserting panel bounds and preserving
+the full HTML regression report. Evidence: test-results/, playwright-report/,
+TestResults/ and artifacts/verification/reports-visual-e8f9f86ccbf5465b99ba368cfda8980d/.
+
+All 49 packaging guards passed after allowlisting the public report guide.
+JavaScript syntax, 192 local Markdown links across 41 documents and whitespace
+checks passed. Seven read-only app/docs/config routes returned HTTP 200; the
+shared service remains on port 5000 (PID 29316 at this checkpoint), serving the
+current Reports markup, scripts/styles and guide. No restart was necessary.
+
+Canonical guide: [Reports](docs/REPORTS.md), linked in the documentation map and
+future portable allowlist. Existing rc.3 and older artifacts must remain unchanged;
+at this historical checkpoint the redesign was not yet in a new portable; see
+the rc.4 checkpoint above for subsequent delivery. No GitHub publication is requested.
+Trends/comparison, print/PDF and all remaining deployment gates stay separate.
+The earlier Windows history-file replacement incident remains open; this UI
+work does not change backend persistence or certify full resilience.
+
+## Portable Candidate 0.8.0-rc.3 - 2026-11-07
+
+Generated and validated Windows x64 self-contained candidate 0.8.0-rc.3 with
+the latest Dashboard/Command/Configuration changes and a device deletion
+dialog race fix. Delivered immutable outputs:
+
+- Folder: `artifacts/portable/NetWatch-Lite-v0.8.0-rc.3-win-x64/`
+- ZIP: `artifacts/packages/NetWatch-Lite-v0.8.0-rc.3-win-x64.zip`
+- SHA-256: the adjacent `.zip.sha256` sidecar.
+- ZIP bytes: 46133487.
+- SHA-256: `3d73a118bb4c88fd78aee7d74b62aa9f3535e331216bae6cbd84f567f002c7cb`.
+
+Release solution build passed with zero warnings/errors. All 224 .NET tests
+(33 unit, 7 integration, 184 contract) passed with TRX/coverage evidence; final
+browser regression passed all 82 cases (41 desktop, 41 mobile), without skips
+or automatic retries. An initial browser run had 79/80 passes because Delete
+could close during Bootstrap's opening transition and leave an empty dialog.
+A deterministic regression failed before the fix; the existing close/focus
+helper now handles confirmation and cancellation, and both viewports passed.
+Initial failure/trace evidence is retained under
+`artifacts/verification/rc3-e2e-initial-2b26c9a819ad4048addfe870d03038ff/`.
+
+All 49 packaging guards passed on Windows PowerShell 5.1 and PowerShell 7.
+The exact ZIP passed native startup on both shells; the final folder also
+passed via a disposable copy. Each run passed 17 HTTP routes, four negative
+checks, neutral first-run configuration and unchanged package-byte checks.
+All 396 package files passed policy/manifests, with all 59 public source files
+matching build-time bytes. No runtime inventory, private exports, local themes,
+history, backups or C:\Tmp inputs were included or imported.
+
+The audit verified unchanged bytes for 792 files across rc.1/rc.2 folders, their
+ZIPs/checksums and all eight legacy archives. Re-generating rc.3 was rejected
+without changing its outputs. Evidence under `artifacts/verification/`:
+
+- Build-time ZIP: `3a082a1e935b4c83a75d4fe35b90e87d/result.json`.
+- Final ZIP / PowerShell 7: `6c4bb506955d4e18b0d57b784c879f00/result.json`.
+- Final folder / PowerShell 5.1: `eb6b6c506f3244899c033fa1e88e3150/result.json`.
+- Preservation/content/SHA audit: `rc3-handoff-217cfb31ed5b4999ad8fcdaee70b7f16/result.json`.
+
+The normal development service remains on http://localhost:5000/ (PID 29316 at
+this checkpoint), serving the dialog fix without a restart. Packaged executables
+were tested only in disposable copies on ephemeral ports. No operational
+inventory was edited or checked by this task. Repository handoff/evidence
+updates after generation do not alter the archive's build-time documentation.
+No new GitHub publication/tag was made; artifacts remain ignored.
+Eight final app/docs/config smoke routes returned HTTP 200. JavaScript/PowerShell
+syntax, 182 local Markdown links across 40 documents and Git whitespace checks
+passed. No isolated test app, publisher lock or staging directory remains.
+The release metadata records sourceDirty: true for this untagged local candidate.
+
+Next: real operator acceptance/clipboard permissions, investigate the earlier
+Windows history-file replacement incident and complete all thirteen deployment
+gates with evidence or approved exceptions. Passing candidate validation does
+not resolve that incident or grant stable-deployment approval.
+
+## Configuration Presentation - 2026-11-07
+
+Default facility/category bands now use neutral grays in normal Configuration
+and Bulk Edit. Existing built-in theme normalization refreshes those defaults;
+custom palettes and their active selection remain unchanged. Device actions
+are three fixed-size icon buttons with hover titles/accessible names, kept on
+one row in a reserved column. Narrow screens scroll the table, not the page.
+Existing device edit/copy/delete handlers and collapse behavior are unchanged.
+
+Final Release solution build passed with zero warnings/errors. The final full
+regression passed 224 .NET tests (33 unit, 7 integration, 184 contract), with
+coverage collected, and 80 Chromium cases (40 desktop, 40 mobile), without skips
+or browser retries. The two new theme contracts and four layout cases cover
+geometry/hit tests, collapse, custom palettes/active theme and unchanged inventory.
+Synthetic desktop/mobile captures were visually reviewed: gray bands, complete
+headers and separated actions, with no page overflow. JavaScript syntax,
+180 local Markdown links across 40 documents and whitespace checks passed.
+
+Two incidents are retained, not hidden by retests. The first compile was blocked
+by the owned running DLL; stopping that service resolved it before a clean build.
+One full .NET run failed in CancelledWaiter_DoesNotReleaseAnotherExecutionsLock
+with a Windows File.Replace IOException while saving history. Three unchanged
+isolated runs and the next full suite passed. No external file holder/root cause
+was established and no broad persistence change was made for this visual task.
+Track recurrence and investigate it before deployment; passing retests do not
+close the complete concurrency/resilience gate.
+
+The updated normal service is running on http://localhost:5000/ (PID 29316 at
+this checkpoint). Eight app/docs/config smoke routes returned HTTP 200; served
+HTML/JS/CSS contain the current layout/actions. GET /api/themes confirmed the
+active default's neutral headers through existing theme normalization. No
+operational inventory edits or monitoring executions were made by this task.
+Historical ZIPs are unchanged; no new portable or GitHub publication was made.
+Next: real operator acceptance, clipboard permissions in the target environment,
+file-lock follow-up and all thirteen deployment gates with evidence/approved
+exceptions before deployment. Remote publication remains separate work.
+
+## Dashboard Search And Device Actions - 2026-11-07
+
+Implemented searchable enabled inventory before execution and after partial
+runs. Pending rows remain separate from latestResults/history and show neutral
+Not checked states, including ping/TCP/HTTP. Facility tabs stay available for
+untested sites. Search expands matching groups; every device can run singly,
+including healthy rows. Clear filters resets facility/group/search/status
+without removing measured results/history. Row runs bind category as well as
+name/address/facility. Entire facility/category bands toggle through the existing
+Bootstrap arrow, excluding interactive controls and retaining keyboard support.
+Offline/Problems exclude untested rows; availability uses measured devices only.
+Summary counts retain facility scope independently of text/status filters.
+
+Confirmed existing execution contract: Run Group combines category AND selected
+facility; All Facilities runs that category across the active support group.
+Text search never changes execution scope. Optional device `command` is now
+validated, normalized and preserved by current configuration workflows. It is
+inert clipboard text, not executable code; no shell/launch endpoint was added
+and DeviceResult/history omit it. The editor places it beside Website URL;
+dashboard copy feedback handles normal/fallback/failure paths. No operational
+inventory change; external C:\Tmp preparation remains separate. Failed dashboard
+reads clear/disable stale previews and SPA retry restores them.
+
+Final validation passed 222 .NET tests (33 unit, 7 integration, 182 contract) and
+76 Chromium cases (38 desktop, 38 mobile), without failures/skips/retries.
+Release build had zero warnings/errors and coverage was collected. Clipboard
+adapters were stubbed; no stored command was executed or real OS clipboard read.
+178 local Markdown links across 40 documents and JavaScript/whitespace checks
+passed. Eight read-only app/docs/config routes returned HTTP 200 on the normal
+service (PID 17236 at that checkpoint); served HTML/JS contained current actions.
+Historical rc.1/rc.2 ZIPs are unchanged and predate these
+changes; use a new version if packaging them. Full deployment gates and
+remote publication remain separate work.
+
+## Versioned Portable Generator - 2026-11-07
+
+Implemented scripts for Windows x64 self-contained folder/ZIP/SHA-256 history
+under artifacts/portable and artifacts/packages. Existing destinations and
+redirected directories are rejected; an exclusive publisher lock protects
+concurrent runs. Builds are isolated, packaged content uses an explicit public
+allowlist and generated neutral settings/sample data, never operational files.
+Exact-ZIP verification runs the native executable in a disposable extraction on
+an ephemeral port with sanitized environment, without monitoring executions.
+
+Release build passed with zero warnings/errors. All 194 .NET tests (33 unit,
+7 integration, 154 contract) and 58 browser cases (29 desktop, 29 mobile) passed
+without failures/skips. All 49 packaging guards passed on PowerShell 5.1 and 7.
+Candidate 0.8.0-rc.1 passed exact-ZIP startup/content checks on both shells:
+17 HTTP routes, four corruption/private-file cases, safe first-run files,
+unchanged immutable bytes and no monitoring execution. Re-generating its version
+was rejected, preserving its three outputs and all eight legacy ZIP hashes.
+
+The normal service is active at http://localhost:5000/ (PID 10744 at this
+checkpoint); nine read-only app/docs/config smoke routes returned HTTP 200.
+Final candidate 0.8.0-rc.2 was generated end to end with Windows PowerShell 5.1,
+including the compatibility fixes and updated documentation. Its exact ZIP
+passed the same 17 routes/four negative cases and first-run/hash checks. Both
+version folders, ZIPs and SHA-256 sidecars remain valid; rc.2 is the handoff
+candidate. Its owned staging GUID directory was safely removed after success.
+The two earlier build-stage directories were reviewed and cleaned separately;
+historical versions and all verification evidence are retained.
+
+PowerShell/JavaScript syntax, 177 local Markdown links across 40 documents and
+git whitespace checks passed. Generated artifacts are Git-ignored. CI now runs
+packaging guards and builds/verifies an isolated candidate; remote CI has not
+been executed or published in this local task. No GitHub release/tag was made.
+See [portable guide](docs/PORTABLE.md) and
+[validation](docs/VALIDATION_PORTABLE_2026-11-07.md).
+No C:\Tmp Excel/JSON preparation is imported or packaged. Earlier releases/
+archives are retained. Remote publication and the thirteen deployment gates
+remain separate; a portable build is not stable-deployment approval.
+
+## Unified Administration - 2026-11-07
+
+Implemented full-width Support Groups/Themes lists with search/status filters,
+region grouping, palette swatches, per-row actions and separate active/selected
+states. Support Group menus open the intended configuration with explicit
+activation. IDs, profile files, inventory schemas and API paths are unchanged.
+
+`wwwroot/management.js` now owns those controllers plus shared confirmation and
+transition-safe modal focus. Device Types/Peripherals retain their direct
+actions and validation, sharing confirmations, responsive headings/rows and
+focus behavior. Configuration/Bulk Edit, Dashboard and Reports keep their
+specialized workflows. Failed reads clear stale lists and disable mutation,
+without fabricating editable defaults.
+
+Theme color drafts/previews are separate from the confirmed library. Naming
+operations save immediately; Save Colors persists color edits. Activation and
+deletion apply only after server success. Failed saves retain confirmed state
+and drafts. Selection, reload, close and navigation/browser back confirm dirty
+draft discard. Dropdown instances are disposed before list re-rendering.
+
+Final validation passed all 194 .NET tests (33 unit, 7 integration, 154 contract)
+and 58 Chromium browser cases (29 desktop, 29 mobile), with no failures/skips.
+Release build has zero warnings/errors. Coverage includes preservation, errors,
+protected deletion, keyboard menus, dirty navigation and modal opening/closing
+races. Synthetic desktop/mobile screenshots were visually reviewed with no
+page overflow in the master lists. JavaScript syntax and local documentation
+links/whitespace checks passed. A fresh publish includes the new controller,
+guides and ADR, excluding private runtime files, dependencies and test evidence.
+
+The normal service is active at http://localhost:5000/ (PID 34484 at this
+checkpoint). Dashboard, Support Groups, Themes, Device Types, Peripherals,
+Configuration, docs, new scripts/guides and config/regions/themes APIs returned
+HTTP 200. No operational inventory was edited; isolated browser app processes
+remaining: zero. Theme naming operations now persist immediately; color edits
+still require Save Colors. See [administration](docs/ADMINISTRATION.md),
+[ADR 0005](docs/adr/0005-consistent-management-lists.md) and
+[validation](docs/VALIDATION_MANAGEMENT_2026-11-07.md). The earlier Support Groups
+proposal is now delivered. Remaining work: real operator acceptance, all thirteen
+deployment gates with evidence or approved exceptions, and remote publication
+when requested. Full-document theme/configuration writes still need coordinated
+editing. The following sections are earlier checkpoints, not current service PIDs.
+
+## Device Type Catalog - 2026-11-07
+
+Implemented `/device-types` with profile-scoped custom classification CRUD,
+search/status filters, device counts including disabled records, and dynamic
+Device Type options in the device editor. All five legacy keys/names are
+protected; only `workstation` enables recorded peripheral inventory. Referenced
+types cannot be deleted. Absent legacy catalogs receive defaults without a
+migration write; catalogs/keys survive row/bulk saves, device/profile copies
+and configuration import/export.
+
+New GET/POST `/api/device-types` uses captured profile identity/path, an opaque
+catalog revision and fresh inventory under the existing repository write lock.
+It mutates only the catalog, preventing stale editor copies from replacing
+device/settings/peripheral changes. Stale profile/catalog edits return 409,
+while invalid/reference-breaking catalogs return 400. Full config endpoints
+retain their existing complete-replacement semantics.
+
+Final validation passed 194 .NET tests (33 unit, 7 integration, 154 contract)
+and 38 Chromium browser cases (19 desktop, 19 mobile), without failures/skips.
+Release build has zero warnings/errors. New/affected JavaScript syntax checks,
+142 local Markdown file links across 35 documents and git diff whitespace checks
+passed. Desktop/mobile catalog screenshots were visually reviewed; page-width
+checks found no horizontal overflow. A fresh publish includes the new script,
+guides/ADR/proposal and excludes private runtime/backups, dependencies and test
+evidence. Its owned temporary publish directory was removed.
+
+The normal service is active on port 5000 (PID 34140 at this checkpoint).
+Dashboard, Device Types, Configuration, Support Groups, docs shell, type guide/
+validation/proposal, type script and config/catalog APIs returned HTTP 200.
+The catalog API confirms Workstation protection. No operational inventory
+was edited; isolated browser app processes remaining: zero.
+See [type guide](docs/DEVICE_TYPES.md),
+[ADR 0004](docs/adr/0004-profile-device-types.md) and
+[validation](docs/VALIDATION_DEVICE_TYPES_2026-11-07.md).
+
+Support Groups was reviewed from the provided screenshot/code. Its proposed
+full-width region-grouped list, row actions, explicit active state and responsive
+layout are documented [here](docs/SUPPORT_GROUPS_UX_PROPOSAL.md); this redesign
+is a recommendation, not implemented. Complete deployment gates, real operator
+acceptance and remote publication remain separate work. The modal regression
+is synchronized with Bootstrap's completed opening transition before filling
+fields; no arbitrary delay/retry was added.
+
+The following sections preserve earlier checkpoints.
+
+## HTTP And HTTPS Application Checks - 2026-11-06
+
+Implemented optional `type: http` checks for HTTP/HTTPS URLs with per-attempt
+100-60000 ms timeout (default 10000), exact expected status (default 200),
+optional literal case-sensitive text, actual code, duration and failure messages.
+Full/SSE/Auto Refresh reuse the existing retry/concurrency/health/history flows;
+Ping Only skips HTTP. Configuration supports these fields through normal edits,
+copy, bulk save, profile copies and import/export. Old ping/TCP data is compatible.
+
+The named pooled HttpClient uses strict TLS, no automatic redirects/cookies,
+a linked deadline through required body reads and a 1 MiB decompressed body
+limit. URL credentials/fragments/unsupported schemes are rejected before save.
+Result/history URLs omit queries and no response bodies/raw exceptions are
+stored. Keep this unauthenticated outbound checker behind trusted access and
+network destination controls. No browser login/JavaScript journey or external
+alert delivery is implied. See [HTTP guide](docs/HTTP_CHECKS.md) and
+[ADR 0003](docs/adr/0003-bounded-http-checks.md).
+
+Final validation passed 139 .NET tests (30 unit, 7 integration, 102 contract)
+and 30 desktop/mobile Chromium workflows without failures/skips. Release build
+has zero warnings/errors. JavaScript checks, 120 local Markdown file links and
+git diff whitespace checks passed. A fresh publish includes HTTP docs/assets
+and excludes private runtime files, backups, dependencies and test evidence;
+the check caught and fixed inclusion of Playwright's `.last-run.json`.
+See [HTTP validation](docs/VALIDATION_HTTP_2026-11-06.md).
+
+The normal project service is running at http://localhost:5000/ (PID 36056 at
+this checkpoint). Dashboard, Configuration, Reports, documentation shell,
+HTTP guide/validation record, app script and configuration API returned HTTP
+200. Operational inventory was not modified. Temporary test/publish servers
+and owned publish directories were cleaned; only the shared service remains.
+Real application operator acceptance, complete deployment gates and remote
+publication remain separate work. The following sections are earlier checkpoints.
+
+## Workstation Inventory Queries - 2026-11-06
+
+Implemented `/workstations` as a read-only view of explicit workstation records
+in the active support group. It combines search/facility/model/pending filters,
+distinguishes None from Not recorded, includes disabled monitoring records,
+shows assignment details and paginates the result. Catalog model names open
+reverse lookup with one row per configured workstation and separate unit counts.
+Filter/paging URLs survive reload/back; missing models and failed loads never
+show an unfiltered or stale inventory fallback. No storage/API schema changed.
+
+Validation baseline: 85 .NET tests and 24 Chromium desktop/mobile workflows.
+See [the inventory guide](docs/PERIPHERALS.md#workstation-inventory-view) and
+[validation record](docs/VALIDATION_WORKSTATIONS_2026-11-06.md). This supplements
+the existing release gates; remote publication is not part of this checkpoint.
+
+Release build passed with zero warnings/errors. All 85 .NET and 24 browser
+tests passed without skips. A fresh publish contains the new script/docs and
+no private backups or test dependencies. The normal project service is active
+on port 5000 (PID 34184 at this checkpoint); application, Workstations, catalog,
+script, documentation and configuration API routes returned HTTP 200.
+
+The following sections preserve earlier checkpoints.
+
+## Printer And Scanner Inventory - 2026-11-06
+
+Implemented a profile-scoped printer/scanner catalog with manufacturer/model
+records at `/peripherals` and optional assignments to explicit workstation
+device types. Printer/scanner groups independently record unrecorded, none or
+assigned states; assignments carry USB/network/other connection, optional asset
+ID/address and notes. Configuration and Dashboard show recorded inventory.
+
+Catalog and assignments share the existing support-group JSON file, atomic
+validation/save and import/export/copy behavior. Legacy files need no migration
+and categories are not used to infer device type or peripheral absence. In-use
+model deletion and malformed references are rejected before persistence.
+This is manual inventory, not automatic peripheral discovery/monitoring.
+
+Validation baseline: 85 .NET tests (11 unit, 7 integration, 67 contract) and
+16 Chromium desktop/mobile workflows. See [the feature guide](docs/PERIPHERALS.md)
+and [validation record](docs/VALIDATION_PERIPHERALS_2026-11-06.md). Deployment
+gates and GitHub publication remain separate pending work.
+
+The shared service is running on port 5000 (PID 25208 at this checkpoint).
+Application, catalog, configuration, peripheral JavaScript, documentation and
+configuration API routes returned HTTP 200. A fresh Release publish includes
+the new script/guide and excludes private backups and test dependencies.
+
+The following sections are prior checkpoints.
+
+## Browser Regression And Resilience - 2026-11-06
+
+Added Playwright desktop/mobile workflows and deterministic tests for busy
+execution handling, cancellation, simulated stream disconnects, concurrent row
+updates, concurrent history appends, fresh-host restart and backup restore.
+The new history test reproduced duplicate IDs for equal completion timestamps;
+new run IDs now include a GUID suffix. Stored legacy IDs remain supported.
+
+Current baseline: 45 .NET tests (11 unit, 7 integration, 27 contract) and
+10 Chromium browser workflows across 1440px desktop and 390px mobile. See
+[validation evidence](docs/VALIDATION_2026-11-06.md) and
+[test instructions](docs/TESTING.md). The new browser CI job is configured;
+remote execution/publication remains pending.
+
+Browser instances have separate temporary content/data roots and dynamically
+assigned loopback ports. No operational inventory is used. The .NET and npm
+test results supplement, rather than complete, the thirteen deployment gates.
+
+The normal project service was restored on port 5000 (PID 29464 at this
+checkpoint). `/`, `/docs/` and `/api/config` returned HTTP 200. A fresh publish
+contained no test dependencies, test directories, npm manifests or backup JSON.
+
+The following sections preserve earlier checkpoints and their dated evidence.
+
+## Functional Validation - 2026-11-05
+
+Release build passed with zero warnings/errors; all 25 tests passed after
+selecting the installed .NET 8 runtime. Synthetic loopback monitoring, SSE,
+history and desktop/mobile page smoke checks passed. See the
+[validation report](docs/VALIDATION_2026-11-05.md) for evidence and limits.
+
+The four review findings have been addressed: null device/check entries are
+rejected with HTTP 400 on save/import; all six JSON repositories now use
+temporary sibling files and atomic replacement with local backups; unexpected
+errors return safe problem responses with a trace identifier; and the local
+.NET runtime conflict is documented in the troubleshooting guide.
+
+Post-fix validation: Release build has zero warnings/errors; 36 tests passed
+(11 unit, 7 integration, 18 contract), with coverage evidence under TestResults.
+Isolated HTTP smoke checks passed for Full/PingOnly monitoring, SSE, history,
+configuration rejection, themes, integrations and profile creation/copy.
+Temporary publish output includes documentation and excludes backup JSON files.
+CI now checks all documentation JavaScript. See the validation report for the
+initial findings and their resolution. The shared local service is running on
+port 5000 (PID 14776 at this checkpoint); `/`, `/docs/` and `/api/config` were
+verified HTTP 200 with the normal project configuration. The isolated test
+instance on port 5001 has been stopped.
+Mandatory deployment gates and remote publication remain separate pending work.
+
+## Documentation web navigation v1 — local candidate, 2026-10-03
+
+InnovaLogic documentation theme, reading paths and reading controls are implemented. dotnet build --no-restore PASS; browser at 1440 and 390 px PASS. Existing unrelated working-tree changes preserved. See [navigation maintenance and evidence](docs/WEB_NAVIGATION.md). GitHub and server delivery of this revision are pending; earlier deployment status below remains historical evidence.
+
+The baseline below records the 2026-08-01 checkpoint; its dated validation
+evidence is historical. The latest review is recorded above.
+
+## Phase
+
+Internal MVP checkpoint / engineering standardization and automated test
+foundation.
+
+The repository is on `main` and the current codebase builds successfully. The active product scope is NetWatch Lite as a local/internal network monitoring dashboard with editable JSON profiles, support groups, themes, reports, local history, local error logging, and local integration settings.
+
+## Completed Functionality
+
+- ASP.NET Core .NET 8 web app with static Bootstrap frontend.
+- JSON-driven device inventory with ping, TCP and HTTP/HTTPS checks.
+- Dashboard summary metrics, facility/category grouping, manual runs, auto refresh toggle, Full Check/Ping Only modes, progressive Server-Sent Events rendering, category-scoped runs, facility-scoped runs, failed-device retry, and device row reruns.
+- Configuration page with device CRUD, settings editing, filters, grouped/collapsible tables, import/export, and Bulk Edit workflows.
+- Support Groups page for independent region/support-group JSON profiles.
+- Themes page with built-in and custom GUI theme templates.
+- Reports page backed by local `monitor-history.json`, including filters, sortable/paginated tables, export, and per-execution deletion.
+- Error log API backed by local `app-errors.json`.
+- Integrations page and local `integrations.json` settings for future inbound inventory and outbound report workflows.
+- Public README, developer guide, quality review checklist, internal release checklist, changelog, screenshots, and portable release artifacts.
+- Continuity files added: `AGENTS.md` and `CURRENT_STATUS.md`.
+- Mandatory pre-deployment quality policy documented across thirteen test
+  categories, with evidence or an approved exception required for every gate.
+- Canonical documentation structure added for architecture, API, development,
+  testing, deployment, operations, security, troubleshooting, and ADRs.
+- GitHub contribution templates plus CI and security workflows added.
+- Central .NET SDK, package, build, and editor conventions added.
+- Initial xUnit test projects added for unit and JSON repository integration
+  testing.
+- Isolated ASP.NET Core contract tests added for the main page and core local
+  API response shapes.
+- Standardized browser documentation served at `/docs/`, with visible
+  application/documentation return paths, grouped desktop/mobile navigation,
+  local search, persistent light/dark theme, section context, and pagination.
+- Documentation assets are included in build/publish output and served only
+  from the fixed `docs/` root with controlled file types and 404 responses.
+
+## Validation Completed
+
+- Release build completed successfully on 2026-08-01 with 0 warnings and 0
+  errors across the application and three test projects.
+- `dotnet test` completed successfully on 2026-08-01 with 25 passing tests:
+  11 unit, 3 integration, and 11 contract tests, with no failures or skips.
+- Cross-platform Cobertura coverage evidence was generated. Coverage is an
+  initial baseline and no deployment threshold has been approved yet.
+- `node --check wwwroot/app.js` and `node --check docs/app.js` completed
+  successfully on 2026-08-01.
+- `/`, `/docs/`, documentation CSS, and documentation JavaScript returned the
+  expected HTTP responses on port 5000.
+- A temporary Release publish check confirmed `docs/index.html`,
+  `docs/styles.css`, and `docs/app.js` are present in deployment output.
+- Documentation was visually reviewed in Chrome at desktop, dark-theme, and
+  emulated 390-pixel mobile widths. Mobile metrics confirmed no horizontal
+  overflow; menu, theme, local search, in-page context, and return link behavior
+  were exercised in the browser.
+- NuGet vulnerability review reported no known vulnerable packages on
+  2026-07-29 across the application and all three test projects.
+- All local Markdown links resolved and `git diff --check` reported no
+  whitespace errors on 2026-08-01.
+
+## Validations Pending
+
+- Manual operational workflow smoke test on `http://localhost:5000`; the
+  documentation workflow has been reviewed, but monitoring/configuration flows
+  still require release-candidate data and operator review.
+- Walk through the release checklist in `docs/DEPLOYMENT.md` before publishing a new release.
+- For any UI changes, verify Dashboard, Configuration, Support Groups, Themes, Reports, Integrations, Manual, and About pages at desktop and mobile widths.
+- Publish the branch and confirm the first remote GitHub Actions runs for
+  `.github/workflows/ci.yml` and `.github/workflows/security.yml`.
+- Expand unit, integration, and contract coverage, then implement and execute
+  the required property/invariant, mutation, fuzz, end-to-end, regression,
+  security, concurrency/resilience, performance/resource, and
+  compatibility/deployment suites before deployment.
+
+## Known Future Work
+
+- Authenticated/multistep browser journeys, independent background scheduling
+  and external alert delivery are not implemented. HTTP checks validate raw
+  anonymous responses, not JavaScript-rendered application workflows.
+- Microsoft Entra ID / SSO and role-based access are not implemented.
+- Verified operator identity and audit fields in monitor history are planned but inactive.
+- External inventory import is not implemented; the Integrations page only stores future settings.
+- Outbound report delivery is not implemented; the Integrations page only stores future settings.
+- Integration authentication, allowlisting, retry behavior, correlation ids, and failure logging still need design and tests before real external calls are added.
+- Initial automated unit and integration coverage is present, but it covers only
+  a small portion of the application and has no approved coverage threshold.
+- The remaining pre-deployment categories still require projects, tools,
+  environments, measurable thresholds, and durable evidence storage.
+
+## Recommended Next Steps
+
+1. Add unit coverage for repository validation and monitoring result
+   aggregation.
+2. Expand API contracts to configuration writes, imports, themes, and
+   Server-Sent Events.
+3. Define approved coverage and quality thresholds, then add mutation and fuzz
+   tooling.
+4. Expand the initial browser/resilience suites and add performance and
+   portable deployment suites.
+5. Move the production project under `src/NetWatch/` only as a separate,
+   dedicated refactor.
 
 ## DOC-STD-20261002 — Documentation organization
 

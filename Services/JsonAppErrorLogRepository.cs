@@ -23,6 +23,7 @@ public sealed class JsonAppErrorLogRepository
 
     private readonly IWebHostEnvironment _environment;
     private readonly NetworkMonitorOptions _options;
+    private readonly LocalDataStore _storage;
     private readonly SemaphoreSlim _errorLock = new(1, 1);
 
     /// <summary>
@@ -30,12 +31,15 @@ public sealed class JsonAppErrorLogRepository
     /// </summary>
     /// <param name="environment">ASP.NET Core hosting environment used to resolve relative file paths.</param>
     /// <param name="options">Network monitor options containing the error log file path.</param>
+    /// <param name="storage">Shared JSON/SQLite persistence adapter; JSON when omitted by legacy callers.</param>
     public JsonAppErrorLogRepository(
         IWebHostEnvironment environment,
-        IOptions<NetworkMonitorOptions> options)
+        IOptions<NetworkMonitorOptions> options,
+        LocalDataStore? storage = null)
     {
         _environment = environment;
         _options = options.Value;
+        _storage = storage ?? new LocalDataStore(environment, Options.Create(new StorageOptions { Provider = "json" }));
     }
 
     /// <summary>
@@ -135,7 +139,7 @@ public sealed class JsonAppErrorLogRepository
     {
         var filePath = ResolveErrorFilePath();
 
-        if (!File.Exists(filePath))
+        if (!_storage.Exists(filePath))
         {
             var empty = new AppErrorLogStore();
             await SaveAsync(empty, cancellationToken);
@@ -144,7 +148,7 @@ public sealed class JsonAppErrorLogRepository
 
         try
         {
-            await using var stream = File.OpenRead(filePath);
+            await using var stream = _storage.OpenRead(filePath);
             return await JsonSerializer.DeserializeAsync<AppErrorLogStore>(stream, JsonOptions, cancellationToken)
                 ?? new AppErrorLogStore();
         }
@@ -164,8 +168,7 @@ public sealed class JsonAppErrorLogRepository
             Directory.CreateDirectory(directory);
         }
 
-        await using var stream = File.Create(filePath);
-        await JsonSerializer.SerializeAsync(stream, store, JsonOptions, cancellationToken);
+        await _storage.WriteJsonAsync(filePath, store, JsonOptions, cancellationToken);
     }
 
     private string ResolveErrorFilePath()
@@ -177,14 +180,14 @@ public sealed class JsonAppErrorLogRepository
 
         var contentRootPath = Path.Combine(_environment.ContentRootPath, _options.ErrorLogFilePath);
 
-        if (File.Exists(contentRootPath))
+        if (_storage.Exists(contentRootPath))
         {
             return contentRootPath;
         }
 
         var developmentDataPath = Path.Combine(_environment.ContentRootPath, "Data", _options.ErrorLogFilePath);
 
-        if (File.Exists(developmentDataPath))
+        if (_storage.Exists(developmentDataPath))
         {
             return developmentDataPath;
         }

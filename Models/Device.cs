@@ -7,6 +7,14 @@ namespace NetWatch.Models;
 /// </summary>
 public sealed class Device
 {
+    /// <summary>Explicit inventory type; legacy devices remain unspecified.</summary>
+    [JsonPropertyName("deviceType")]
+    public string DeviceType { get; init; } = "unspecified";
+
+    /// <summary>Optional manually recorded workstation peripheral inventory.</summary>
+    [JsonPropertyName("workstationPeripherals")]
+    public WorkstationPeripherals? WorkstationPeripherals { get; init; }
+
     /// <summary>
     /// Human-readable device name shown in the dashboard and used by client-side search.
     /// </summary>
@@ -37,6 +45,18 @@ public sealed class Device
     /// </summary>
     [JsonPropertyName("websiteUrl")]
     public string? WebsiteUrl { get; init; }
+
+    /// <summary>Optional single-line text copied by an operator; never executed by the application.</summary>
+    [JsonPropertyName("command")]
+    public string? Command { get; init; }
+
+    /// <summary>Optional physical position within a facility, such as floor, office or desk.</summary>
+    [JsonPropertyName("location")]
+    public string? Location { get; init; }
+
+    /// <summary>Optional private inventory notes, such as assigned user or other observations.</summary>
+    [JsonPropertyName("notes")]
+    public string? Notes { get; init; }
 
     /// <summary>
     /// Higher-level operational region, for example Sample Region.
@@ -69,7 +89,7 @@ public sealed class Device
     public bool Enabled { get; init; } = true;
 
     /// <summary>
-    /// List of checks to run for this device. Supported check types are ping and tcp.
+    /// List of checks to run for this device. Supported types are ping, tcp and http.
     /// </summary>
     [JsonPropertyName("checks")]
     public List<DeviceCheck> Checks { get; init; } = [];

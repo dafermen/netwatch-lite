@@ -16,24 +16,28 @@ public sealed class NetworkMonitorService
     public const string FullCheckMode = "Full";
 
     /// <summary>
-    /// Executes only ICMP ping checks and skips TCP port checks for a connectivity-only run.
+    /// Executes only ICMP ping checks and skips TCP/HTTP checks for a connectivity-only run.
     /// </summary>
     public const string PingOnlyCheckMode = "PingOnly";
 
     private readonly JsonDeviceRepository _deviceRepository;
     private readonly ILogger<NetworkMonitorService> _logger;
+    private readonly HttpCheckService _httpChecks;
 
     /// <summary>
     /// Initializes a network monitor service with configuration access and diagnostic logging.
     /// </summary>
     /// <param name="deviceRepository">Repository that supplies the current monitor configuration.</param>
     /// <param name="logger">Logger used for debug-level network failure details.</param>
+    /// <param name="httpChecks">Bounded HTTP/HTTPS probe executor.</param>
     public NetworkMonitorService(
         JsonDeviceRepository deviceRepository,
-        ILogger<NetworkMonitorService> logger)
+        ILogger<NetworkMonitorService> logger,
+        HttpCheckService httpChecks)
     {
         _deviceRepository = deviceRepository;
         _logger = logger;
+        _httpChecks = httpChecks;
     }
 
     /// <summary>
@@ -254,6 +258,15 @@ public sealed class NetworkMonitorService
 
         try
         {
+            if (string.Equals(check.Type, "http", StringComparison.OrdinalIgnoreCase))
+            {
+                return await RunWithRetryAsync(
+                    () => _httpChecks.CheckAsync(check, cancellationToken),
+                    result => result.IsAvailable,
+                    settings,
+                    cancellationToken);
+            }
+
             if (string.Equals(check.Type, "ping", StringComparison.OrdinalIgnoreCase))
             {
                 var pingResult = await RunWithRetryAsync(
