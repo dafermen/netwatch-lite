@@ -25,8 +25,8 @@ gates are in [ROADMAP.md](ROADMAP.md); queued work is not implemented work.
 
 ## IMP-009 - Supported Runtime Before Stable Deployment
 
-- Authorized: 2026-11-12. .NET 10 LTS implementation/regression complete;
-  backed-up local activation and immutable rc.15 native delivery pending.
+- Authorized: 2026-11-12. .NET 10 LTS implementation, regression, backed-up local
+  activation and immutable rc.15 native folder/ZIP/SHA delivery complete.
 - Found: 2026-11-12. .NET 8 support ended on 2026-11-10, per
   [Microsoft](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core).
 - Historical rc.14 keeps net8.0; its portables pin the final 8.0.34 patch.
@@ -36,7 +36,9 @@ gates are in [ROADMAP.md](ROADMAP.md); queued work is not implemented work.
   See [runtime policy](RUNTIME.md) and [validation](VALIDATION_DOTNET10_2026-11-12.md).
   Local activation/portable delivery and stable deployment are separate gates.
   Final regression: 416 .NET, 444 browser passes; native/data-preservation receipts
-  are recorded separately at delivery. No GitHub publication is authorized.
+  are recorded in validation. One extra historical rc.11 ZIP path is missing,
+  cause/owner clarification pending; no blanket historical-audit approval.
+  No GitHub publication is authorized.
 
 ## Proposed Follow-Ups (Not Authorized)
 

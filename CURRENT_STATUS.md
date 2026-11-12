@@ -2,13 +2,13 @@
 
 Last updated: 2026-11-12
 
-## Supported Runtime - rc.15 Validated For Packaging
+## Local Runtime Delivery - 0.8.0-rc.15
 
 Owner authorized IMP-009 on 2026-11-12. App/tests/CI now target .NET 10 LTS,
 runtime 10.0.15, SDK 10.0.404 (official SHA-512 verified private installation at
 artifacts/tools/dotnet-10.0.404). No machine-wide runtime/environment replacement.
-SQLite stays schema 2. GitHub publication is ON HOLD; local commits/neutral
-folder/ZIP/SHA only. Historical artifacts and operator data must remain intact.
+SQLite stays schema 2. Source activation and neutral folder/ZIP/SHA are delivered.
+GitHub publication is ON HOLD; nothing from this migration was pushed/released.
 
 - Final .NET: 416 passed (34 unit/28 integration/354 contract); zero skips.
   Final solution build: zero warnings/errors; 35 HTTP/TLS retests passed.
@@ -24,10 +24,34 @@ folder/ZIP/SHA only. Historical artifacts and operator data must remain intact.
   replaces slow Node asset copies. Final max setup: JSON 8409 ms/SQLite 6491 ms.
   Failed/aborted earlier attempts and traces remain as evidence, not final passes.
 
-Pending: backed-up local activation on port 5000 (initially stopped), new immutable
-rc.15 folder/ZIP/SHA, native ZIP/folder checks and 5781 protected historical/original
-hashes. Evidence: artifacts/verification/dotnet10-20261112; see
+Source: PID 22568, http://localhost:5000, version
+0.8.0-rc.15+4c5dafdf026944b360a02cb3da932e212fc62b93. Loaded CLR 10.0.15 verified;
+only 127.0.0.1/::1 listeners. Private activation-1348ced460e64cfeaad845d701d7c991
+contains before.db/old runtime and before/after exports. Document bytes/eight APIs/
+15 Data JSON matched; 13 live assets matched. Engine 3.53.3/schema 2, no migration.
+
+Portable source: clean commit 4c5dafdf026944b360a02cb3da932e212fc62b93.
+Folder: artifacts/portable/NetWatch-Lite-v0.8.0-rc.15-win-x64/.
+ZIP: artifacts/packages/NetWatch-Lite-v0.8.0-rc.15-win-x64.zip, adjacent .zip.sha256.
+52543152 bytes; 442 files/91 public assets; both runtimes 10.0.15 included.
+SHA-256: 54169c3a0b6ac63e8d1fee3995f35ff8c23ea63b091c1736d26e0b35c473a308.
+Native generation/PS5.1 ZIP/PS7 folder checks each passed 38 routes/eight negative
+checks. Extra exact-selection, single-use, pause/resume and diagnostic checks passed.
+
+Historical audit OPEN: 5780/5781 baseline paths matched, including all 15 Data
+JSON. One extra archive is missing: artifacts/portable/NetWatch-Lite-v0.8.0-rc.11-win-x64.zip
+(initial SHA 9d2b69e06f745bcc270f2cf318641eec0d82396aea5ad3ab6ea8b8035059d4a3).
+Canonical rc.11 folder and artifacts/packages ZIP remain unchanged; that ZIP has
+a different hash, so it cannot silently replace the missing copy. Cause unknown;
+owner question pending. Do not claim a complete historical audit or recreate an
+old version without instruction. No existing file hash mismatched.
+
+Evidence: artifacts/verification/dotnet10-20261112; see
 [runtime validation](docs/VALIDATION_DOTNET10_2026-11-12.md).
+Native receipts: 141bb50d9d0043a6a068dbde6d8b4253,
+ecacb78f33894515a6cd5bd93cb056eb, af7cd833cdc145eca12c88904eb87579.
+Extra: native-workorder-5e8faaf946e642d98bdd0cc017c4c45e. The ZIP is frozen;
+these post-build source receipts do not rewrite its documentation or bytes.
 Other-PC/proxy/SSO/sustained-load acceptance and stable approval remain separate.
 
 ## Historical Local Delivery - 0.8.0-rc.14

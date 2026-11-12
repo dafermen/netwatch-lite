@@ -22,7 +22,7 @@ contains 5781 original/historical files, including 15 Data JSON files.
 - Packaging guards: 70 passes each on PowerShell 5.1 and 7, including supported
   framework/patch rejection. Two JS cases passed, including 2000 seeded predicates.
 - Static checks: 16 product/docs scripts, 957 translation keys/placeholder parity,
-  62 Markdown documents and 350 relative links. NuGet/npm audits found no known
+  62 Markdown documents and 351 relative links. NuGet/npm audits found no known
   vulnerabilities; this is not a support/security certification.
 - First full-browser attempt stopped on a 30-second Command workflow timeout
   while other compilations were active. The same desktop/mobile cases passed
@@ -64,14 +64,50 @@ max setup: JSON 8409 ms / SQLite 6491 ms; max startup 5713/4026 ms respectively.
 These are bounded local observations, not production SLOs or a general speedup.
 Consolidated receipt: `regression-summary.json` in the evidence root.
 Fresh private runtime pilot: `runtime-pilot-9054ef0bf79243d49da7804796638ab7`.
-Pending: backed-up source activation and rc.15 native folder/ZIP/SHA.
-The port 5000 service was already stopped when inspected; no unknown process
-was terminated. The activation baseline will use a fresh successful private
-net8/net10 copy pilot if no source listener is running.
+Source activation and rc.15 native folder/ZIP/SHA are complete; see receipts below.
+The port 5000 service was already stopped when inspected; no unknown/source process
+was terminated. Activation used the fresh private net8/net10 copy pilot baseline.
 
 Evidence root: `artifacts/verification/dotnet10-20261112/`. These ignored receipts
 must not be packaged or published. See [runtime policy](RUNTIME.md) and
 [current status](../CURRENT_STATUS.md) for the final checkpoint.
+
+## Final Local Activation And Package
+
+- Source PID 22568 uses the private SDK host and verified loaded CLR 10.0.15;
+  localhost:5000 listens only on 127.0.0.1/::1. SQLite schema 2/engine 3.53.3.
+- Activation `activation-1348ced460e64cfeaad845d701d7c991` retained before.db and
+  the old runtime. All document bytes/eight APIs/15 Data JSON matched; 13 served
+  source assets matched. No schema migration or machine-wide runtime replacement.
+- Clean package source: `4c5dafdf026944b360a02cb3da932e212fc62b93`.
+  Immutable folder: `artifacts/portable/NetWatch-Lite-v0.8.0-rc.15-win-x64/`.
+  ZIP/SHA: `artifacts/packages/NetWatch-Lite-v0.8.0-rc.15-win-x64.zip[.sha256]`.
+  ZIP 52543152 bytes, 442 package files/91 public source assets.
+- SHA-256: `54169c3a0b6ac63e8d1fee3995f35ff8c23ea63b091c1736d26e0b35c473a308`.
+  Microsoft.NETCore.App/Microsoft.AspNetCore.App 10.0.15 are both included.
+- Generation, exact ZIP on PowerShell 5.1 and folder copy on PowerShell 7 each
+  passed 38 routes/eight negative checks, clean SQLite and unchanged artifacts.
+  Receipts: `141bb50d9d0043a6a068dbde6d8b4253`,
+  `ecacb78f33894515a6cd5bd93cb056eb`, `af7cd833cdc145eca12c88904eb87579`.
+- Extra native execution/token/pause/diagnostic cases passed in
+  `native-workorder-5e8faaf946e642d98bdd0cc017c4c45e` (actual rc.15 version checked).
+  Earlier extra receipt with an old hardcoded report label is superseded.
+
+## Historical Audit Exception - Open
+
+5780/5781 baseline paths matched exactly, including all 15 original Data JSON.
+The extra `artifacts/portable/NetWatch-Lite-v0.8.0-rc.11-win-x64.zip` is absent;
+its initial SHA was `9d2b69e06f745bcc270f2cf318641eec0d82396aea5ad3ab6ea8b8035059d4a3`.
+No present historical file has a hash mismatch. The canonical rc.11 folder and
+packages ZIP remain unchanged, but the canonical ZIP SHA is different
+(`4d9992d921442cabb7342df7fa82086d6ec6348c8904daa6e2c736496006e3cb`).
+The cause is not established. Owner clarification was requested; no file was
+silently restored/recompressed or baseline rewritten. package-audit.json records
+packagePassed=true separately from historicalAuditPassed=false. Do not describe
+the complete historical audit as green or stable deployment as approved.
+
+The ZIP is an immutable build-time checkpoint; these subsequent source receipts
+do not change its docs/bytes. GitHub and remote CI were not updated or run.
 
 ## Remaining Acceptance
 
