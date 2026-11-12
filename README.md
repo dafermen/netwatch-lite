@@ -23,7 +23,7 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 
 ## Portable Download
 
-Candidate `0.8.0-rc.16` adds a separate **Authenticated browser** check with
+Published prerelease `0.8.0-rc.16` adds a separate **Authenticated browser** check with
 manual sign-in in a dedicated Edge window, distinguishing authentication required
 from site failures. See the [setup and limits](docs/BROWSER_CHECKS.md) and
 [validation record](docs/VALIDATION_BROWSER_2026-11-12.md). Microsoft Edge and an

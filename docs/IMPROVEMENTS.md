@@ -54,8 +54,15 @@ owner's authenticated-browser work order on 2026-11-12. See IMP-014/current stat
   real corporate login during testing. SQLite stays schema 2; HTTP is unchanged.
 - Delivery/validation: [current evidence](VALIDATION_BROWSER_2026-11-12.md) and
   [usage/limits](BROWSER_CHECKS.md). Real application/other-PC acceptance is separate.
+- Completed: rc.16 folder/ZIP/SHA, backed-up loopback activation and GitHub
+  prerelease published; all four source CI jobs passed. No stable rollout.
 
 ## Proposed Follow-Ups (Not Authorized)
+
+- IMP-015 - GitHub Actions runtime maintenance: source CI for rc.16 warns that
+  checkout/setup-dotnet/upload-artifact v4 target deprecated Node 20 and are
+  currently forced onto Node 24. Review supported action releases/pins separately;
+  do not silently upgrade workflow majors as part of browser-check delivery.
 
 - IMP-010 - Offline frontend assets: bundle versioned Bootstrap/FontAwesome and
   licenses locally, then test the complete interface without internet/CDN access.

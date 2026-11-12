@@ -2,7 +2,7 @@
 
 Last updated: 2026-11-12
 
-## Authenticated Browser Checks - Validation Complete, Delivery In Progress
+## Authenticated Browser Checks - rc.16 Delivered And Published
 
 Owner authorized a manually signed-in browser check, regression, documentation,
 new immutable rc.16 folder/ZIP/SHA and GitHub publication. This supersedes the
@@ -29,12 +29,38 @@ vulnerable dependencies. Private pilot matched eight APIs/raw documents/SQL coun
 and rc.15 rollback; original JSON unchanged. Browser test instances now explicitly
 dispose their runtimes; mutation preparation avoids Windows long-path failures.
 
-In progress: immutable rc.16 package/native verification, backed-up local
-activation, final privacy/historical audit and GitHub publication. This is a
-build-time documentation snapshot: final ZIP/SHA/activation/publication receipts
-are recorded in source CURRENT_STATUS and the browser validation document after
-generation, without rewriting an immutable package. Real corporate/other-PC
-acceptance remains external; never claim synthetic fixtures validated THOR.
+Portable source: clean c74ad2d0a49f1b723e09243ee37cdd4c3c5bbe7e, tag
+v0.8.0-rc.16. Folder artifacts/portable/NetWatch-Lite-v0.8.0-rc.16-win-x64/;
+ZIP artifacts/packages/NetWatch-Lite-v0.8.0-rc.16-win-x64.zip and adjacent SHA.
+92470993 bytes; 564 files/94 matched public assets/117 pinned driver files.
+SHA-256: ef6e0c73aed74fe8f43c0392cef84dc105dc41b9058cac9f69ce591ee11b98fa.
+Generation/PS5.1 ZIP/PS7 folder-copy checks each passed 41 routes/11 negatives.
+Native receipts: d9f329bf1d5c4445a5bf4d7340fd7103,
+e3b178309b9b414f85643ffb1e2fc5e0, 237eba750a3d43779104bfcc06bf8b64.
+Packaged Node/Playwright exercised installed Edge with synthetic loopback content;
+the packaged .NET EXE also passed browser CRUD, guarded status, exact selection,
+AuthenticationRequired and neutral SQLite metrics without opening a real site.
+
+Source is active at http://localhost:5000, PID 872, version rc.16+c74ad2d,
+CLR 10.0.15 from private SDK, loopback listeners only, SQLite schema 2/engine
+3.53.3. activation-10e0d117dde14ad0ae77cb91bfd54518 contains before.db,
+old runtime and matching eight APIs/raw exports. All 6224 historical/original
+baseline files, including 15 Data JSON, matched. The extra rc.11 absence remains
+the owner's accepted action; no historical archive was replaced.
+
+GitHub source/tag and ZIP/SHA prerelease are published:
+https://github.com/dafermen/netwatch-lite/releases/tag/v0.8.0-rc.16.
+All four source CI jobs passed (43260541061). Downloaded release ZIP/SHA match
+local bytes/hash; stable latest remains v0.6.2. No remote backend or Pages
+deployment. These receipts are a documentation-only follow-up to the tested
+binary/source commit c74ad2d. The immutable ZIP retains build-time docs; these
+post-generation receipts do not modify its bytes. Evidence is private under
+artifacts/verification/browser-checks-20261112 and the named native receipts.
+Real corporate/other-PC acceptance remains external; never claim synthetic
+fixtures validated the corporate application.
+Next: owner tests real manual login/expiry on the destination PC. IMP-015 records
+the non-blocking GitHub Actions Node-20 deprecation warning; no workflow-major
+upgrade is authorized by this delivery.
 Historical publication holds below describe their original deliveries only;
 the current owner's authorization supersedes them for this delivery.
 
