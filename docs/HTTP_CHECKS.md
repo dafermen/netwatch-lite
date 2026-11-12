@@ -1,5 +1,9 @@
 # HTTP And HTTPS Checks
 
+For manual Microsoft sign-in/rendered-page validation, use the separate
+[authenticated browser check](BROWSER_CHECKS.md). The rules below apply only to
+anonymous `type: http`; its redirect/cookie/TLS behavior has not changed.
+
 ## Configure A Web Application
 
 Open Configuration, add/edit a device and choose **HTTP / HTTPS** in its checks.

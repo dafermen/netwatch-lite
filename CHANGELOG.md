@@ -1,5 +1,25 @@
 # Changelog
 
+## Authenticated Browser Checks And Portable 0.8.0-rc.16 - 2026-11-12
+
+- Added separate browser checks using installed Edge, dedicated non-persistent
+  contexts and manual sign-in/confirmation/closure from saved rows.
+- Authentication-required and unevaluated states remain distinct from downtime
+  in Dashboard, history, reports and diagnostics. Anonymous HTTP is unchanged.
+- Final origin/path/query, HTTP 200 and visible content are validated; optional
+  expected text strengthens access validation. Common Microsoft/Windows-auth
+  error pages cannot count as healthy. Basic access is not a full functional test.
+- Added local same-origin guarded session actions, revision binding, exact
+  navigation origins across redirect hops, bounded sessions/lifetimes and total
+  evaluation deadlines. No personal profile/state export, password/MFA automation
+  or browser login data in SQLite/JSON/history/portable.
+- Included the official pinned Playwright driver through a 117-file hash allowlist,
+  with upstream notices; Edge remains an external prerequisite.
+- Added synthetic browser/login/expiry/redirect/privacy/CRUD tests and bilingual
+  desktop/mobile editor/workflow coverage. SQLite remains schema 2 and .NET 10.0.15.
+- Owner authorized GitHub source/prerelease publication, superseding rc.14/15 hold.
+  Real corporate acceptance and stable deployment are separate decisions.
+
 ## Supported .NET 10 LTS And Portable 0.8.0-rc.15 - 2026-11-12
 
 - Migrated app/tests/CI to net10.0, SDK 10.0.404 and pinned runtime 10.0.15.

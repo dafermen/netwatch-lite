@@ -25,6 +25,7 @@ other development tools.
 - [Reports](REPORTS.md): historical views, metrics, filters, detail and private exports.
 - [Device types](DEVICE_TYPES.md): protected defaults, custom catalog and compatibility.
 - [HTTP and HTTPS checks](HTTP_CHECKS.md): URL setup, expectations, diagnostics and limits.
+- [Authenticated browser checks](BROWSER_CHECKS.md): manual Edge login, expiry and privacy.
 - [Printer and scanner inventory](PERIPHERALS.md): catalog, workstation assignments and compatibility.
 - [Architecture](ARCHITECTURE.md): system boundaries, components, and data flow.
 - [API](API.md): current HTTP endpoints and compatibility expectations.

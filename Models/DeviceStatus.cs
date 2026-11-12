@@ -18,5 +18,11 @@ public enum DeviceStatus
     /// <summary>
     /// No configured checks succeeded.
     /// </summary>
-    Down
+    Down,
+
+    /// <summary>The configured browser check needs manual authentication, not a site outage.</summary>
+    AuthenticationRequired,
+
+    /// <summary>A browser check could not be evaluated (for example a missing local runtime).</summary>
+    Unknown
 }

@@ -1,5 +1,21 @@
 # NetWatch Lite Troubleshooting
 
+## Authenticated Browser Checks
+
+- Sign-in required: open the saved row's dedicated browser on the NetWatch host,
+  sign in manually and choose Finish sign-in. Personal-browser login is separate.
+- Browser unavailable: install approved Microsoft Edge and use an interactive
+  Windows desktop; check corporate policies without bypassing them.
+- Blocked redirect: close the dedicated session, review the approved exact
+  authentication origins and reopen. Popup login is unsupported; use same-tab SSO.
+- Wrong destination: retain required query values in the application's login
+  return. A different facility/login landing page must not count as healthy.
+- HTTP 200 but validation fails: review optional visible Expected text. Basic
+  validation cannot recognize all custom error screens; prefer a stable positive
+  authenticated-page marker when available.
+- Timeout/cancellation: the context is closed to stop navigation; sign in again.
+  Read [browser setup/security](BROWSER_CHECKS.md), not HTTP redirect workarounds.
+
 ## Port 5000 Is Already In Use
 
 Identify the existing listener and either use the running NetWatch Lite

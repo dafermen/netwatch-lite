@@ -25,7 +25,7 @@ function Assert-PlainDirectoryChain([string]$Path) {
 }
 
 function Resolve-PortableChild([string]$Root, [string]$Relative) {
-    if ([string]::IsNullOrWhiteSpace($Relative) -or $Relative -notmatch '^[A-Za-z0-9][A-Za-z0-9._/-]*$' -or
+    if ([string]::IsNullOrWhiteSpace($Relative) -or $Relative -notmatch '^(?:\.playwright/)?[A-Za-z0-9][A-Za-z0-9._/-]*$' -or
         @($Relative.Split('/') | Where-Object { $_ -in @('', '.', '..') }).Count) { throw 'Unsafe relative package path.' }
     $rootPath = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
     $path = [IO.Path]::GetFullPath((Join-Path $rootPath $Relative))
@@ -135,6 +135,22 @@ function Get-PortableRuntimeFiles([string]$Root) {
     return $names
 }
 
+function Get-PortableBrowserFiles([string]$Root) {
+    $manifest = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'portable-browser-files.json') -Raw | ConvertFrom-Json
+    if ($manifest.package -ne 'Microsoft.Playwright' -or $manifest.version -ne '1.64.1') { throw 'Unexpected browser driver version.' }
+    $seen = @{}
+    foreach ($entry in $manifest.files) {
+        if ($entry.path -notmatch '^\.playwright/(package/|node/win32_x64/node.exe$|node/LICENSE$)' -or $seen.ContainsKey($entry.path) -or $entry.sha256 -notmatch '^[0-9a-f]{64}$') { throw 'Invalid browser driver allowlist.' }
+        $seen[$entry.path] = $true
+        $path = Resolve-PortableChild $Root $entry.path
+        Assert-PlainDirectoryChain (Split-Path -Parent $path)
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or (Get-Item -LiteralPath $path).Attributes -band [IO.FileAttributes]::ReparsePoint -or
+            (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $entry.sha256) { throw "Browser driver missing or changed: $($entry.path)" }
+    }
+    if ($seen.Count -ne 117) { throw 'Incomplete browser driver allowlist.' }
+    return $seen
+}
+
 function Write-PortableManifest([string]$Root) {
     $files = @(Get-PortableFiles $Root | Sort-Object Relative | ForEach-Object {
         [ordered]@{ path = $_.Relative; length = $_.Length; sha256 = (Get-FileHash -LiteralPath $_.Path -Algorithm SHA256).Hash.ToLowerInvariant() }
@@ -162,6 +178,7 @@ function Assert-PortablePackage([string]$Root) {
     $productVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $Root 'NetWatch-Lite.dll')).ProductVersion
     if (($productVersion -split '\+')[0] -ne $metadata.version) { throw 'Assembly and package versions differ.' }
     $allowed = Get-PortableRuntimeFiles $Root
+    foreach ($name in (Get-PortableBrowserFiles $Root).Keys) { $allowed[$name] = $true }
     foreach ($name in Get-PortablePublicFiles) { $allowed[$name] = $true }
     foreach ($name in @('config.sample.json', 'appsettings.json', 'Start-NetWatch.cmd', 'START-HERE.txt', 'portable-release.json', 'portable-manifest.json',
         'licenses/dotnet-runtime/LICENSE.txt', 'licenses/dotnet-runtime/THIRD-PARTY-NOTICES.txt',

@@ -31,7 +31,7 @@ public sealed class DashboardSummary
     public required int DegradedDevices { get; init; }
 
     /// <summary>
-    /// Percentage of healthy devices over total devices, rounded to one decimal place.
+    /// Percentage of healthy devices over the expected total excluding explicitly unevaluated browser states.
     /// </summary>
     public required double AvailabilityPercentage { get; init; }
 }

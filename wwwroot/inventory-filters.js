@@ -12,7 +12,7 @@
     if (item.enabled === false) return false;
     if (value === 'online') return item.isOnline === true;
     if (value === 'offline') return item.status === 'Down';
-    if (value === 'problems') return item.status === 'Down' || item.status === 'Degraded';
+    if (value === 'problems') return ['Down', 'Degraded', 'AuthenticationRequired', 'Unknown'].includes(item.status);
     if (value === 'pending') return !item.lastCheck || item.status === 'Pending';
     return false;
   }

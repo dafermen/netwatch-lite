@@ -2,7 +2,12 @@
 
 Last updated: 2026-11-12
 
-Current authorized work: [supported runtime / IMP-009](RUNTIME.md), tracked in
+Current authorized work: [manual authenticated browser checks / IMP-014](BROWSER_CHECKS.md),
+with tests/docs/new rc.16 folder/ZIP/SHA and GitHub publication authorized on
+2026-11-12. This supersedes the historical publication holds below, not stable
+deployment or real corporate acceptance. See [validation](VALIDATION_BROWSER_2026-11-12.md).
+
+Previous delivery: [supported runtime / IMP-009](RUNTIME.md), tracked in
 [runtime validation](VALIDATION_DOTNET10_2026-11-12.md). .NET 10 LTS source/regression
 passed (416 .NET/444 browser), with private compatibility/rollback proven. Local
 activation/new rc.15 folder/ZIP/SHA are delivered. SQLite schema 2/data preserved;

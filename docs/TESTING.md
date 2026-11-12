@@ -1,5 +1,9 @@
 # NetWatch Lite Testing Guide
 
+Authenticated-browser tests require installed Microsoft Edge. Contract tests use
+headless dedicated contexts and synthetic loopback sign-in, never corporate SSO,
+personal profiles or real MFA. See [browser validation](VALIDATION_BROWSER_2026-11-12.md).
+
 Current runtime scope/receipts: [.NET 10 validation](VALIDATION_DOTNET10_2026-11-12.md).
 Use the [matching SDK/runtime](RUNTIME.md) before running commands below.
 The per-test isolated application fixture has a separate 30-second preparation/

@@ -2,7 +2,7 @@
 
 NetWatch-Lite is a .NET 10 LTS ASP.NET Core + Bootstrap network monitoring dashboard.
 It stores local profiles in SQLite or compatible JSON, runs asynchronous ping,
-TCP and HTTP/HTTPS checks, groups results by region/facility/category and can be
+TCP, HTTP/HTTPS and manually authenticated browser checks, groups results by region/facility/category and can be
 published as a portable Windows executable with the .NET runtime included.
 
 Full visual documentation is available at [docs/index.html](docs/index.html).
@@ -23,30 +23,24 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 
 ## Portable Download
 
-Local candidate `0.8.0-rc.15` moves the app, tests and portable to .NET 10 LTS
-(runtime 10.0.15), preserving the rc.14 features and SQLite schema 2.
-It also keeps Configuration actions read-only when search recreates rows during
-a pending inventory load, preventing premature editor closure in Normal/Bulk.
-See [runtime setup/servicing](docs/RUNTIME.md) and [migration validation](docs/VALIDATION_DOTNET10_2026-11-12.md).
-GitHub publication remains on hold; the public download below is still rc.13.
-Published rc.13 bundles the now-unsupported .NET 8 runtime. Keep it as a historical
-evaluation build; use the new local rc.15 ZIP for supported-runtime evaluation.
+Candidate `0.8.0-rc.16` adds a separate **Authenticated browser** check with
+manual sign-in in a dedicated Edge window, distinguishing authentication required
+from site failures. See the [setup and limits](docs/BROWSER_CHECKS.md) and
+[validation record](docs/VALIDATION_BROWSER_2026-11-12.md). Microsoft Edge and an
+interactive desktop are required for this check; no browser sessions, credentials
+or personal profiles are included in the portable. Anonymous HTTP is unchanged.
 
-Preceding local candidate `0.8.0-rc.14` adds English/Spanish UI (English default), inclusive
-device/website forms, shared Configuration filters and Facility/Device Type
-grouping, quick pause/resume, exact filtered manual/automatic monitoring,
-last-execution detail and private diagnostics/export. These rules supersede
-rc.13's global automatic runs and presentation-only search. See
-[filters](docs/DASHBOARD_FILTERS.md), [languages](docs/UI_LANGUAGES.md),
-[diagnostics](docs/DIAGNOSTICS.md) and [validation](docs/VALIDATION_MULTILINGUAL_2026-11-12.md).
-**GitHub publication remains on hold.** The download below remains the
-previous published rc.13. New local ZIP/SHA receipts are in CURRENT_STATUS;
-stable/other-PC acceptance is separate.
+It retains .NET 10 LTS/runtime 10.0.15, SQLite schema 2 and rc.14/15 features:
+English/Spanish UI, shared exact execution filters, grouping, pause/resume,
+diagnostics/export and draft-safe Configuration loading. See
+[runtime](docs/RUNTIME.md), [filters](docs/DASHBOARD_FILTERS.md) and
+[languages](docs/UI_LANGUAGES.md). The owner authorized GitHub publication for
+this delivery; CURRENT_STATUS records actual package/publication receipts.
 
-[Download Windows x64 ZIP 0.8.0-rc.13](https://github.com/dafermen/netwatch-lite/releases/download/v0.8.0-rc.13/NetWatch-Lite-v0.8.0-rc.13-win-x64.zip)
-and [SHA-256 checksum](https://github.com/dafermen/netwatch-lite/releases/download/v0.8.0-rc.13/NetWatch-Lite-v0.8.0-rc.13-win-x64.zip.sha256).
-This is a validated prerelease, not stable-deployment approval. The public download
-matches the immutable local package; all four CI jobs passed for its source commit.
+[Windows x64 ZIP 0.8.0-rc.16](https://github.com/dafermen/netwatch-lite/releases/download/v0.8.0-rc.16/NetWatch-Lite-v0.8.0-rc.16-win-x64.zip)
+and [SHA-256 checksum](https://github.com/dafermen/netwatch-lite/releases/download/v0.8.0-rc.16/NetWatch-Lite-v0.8.0-rc.16-win-x64.zip.sha256).
+This is an evaluation prerelease, not stable-deployment approval. Real corporate
+login/Conditional Access and another-PC acceptance remain operator-owned.
 
 The preceding published Windows x64 candidate is `0.8.0-rc.13`, including dashboard
 inventory search, copy-only device Commands, exact single-device checks, filter

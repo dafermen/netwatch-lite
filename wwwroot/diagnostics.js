@@ -35,7 +35,7 @@ window.NetWatchDiagnostics = (() => {
   }
   function failureSummary(result) {
     const failures = (result.checks ?? []).filter(check => check.isAvailable === false);
-    return failures.map(check => check.type === 'http' ? renderHttpChecks([check])
+    return failures.map(check => check.type === 'browser' ? renderBrowserResults([check]) : check.type === 'http' ? renderHttpChecks([check])
       : NetWatchI18n.html`<span class="badge text-bg-danger me-1">${escapeHtml(check.label || check.type)}: ${escapeHtml(check.status || 'Failed')}</span>`).join('') || renderDeviceStatus(result.status);
   }
   async function load() {

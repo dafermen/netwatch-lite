@@ -16,6 +16,7 @@
     <Content Remove="**/*.db;**/*.db-*;**/*.sqlite;**/*.sqlite-*;**/.netwatch-runtime.lock;storage-backups/**;storage-exports/**;storage-migration-*.json" />
     <None Remove="**/*.db;**/*.db-*;**/*.sqlite;**/*.sqlite-*;**/.netwatch-runtime.lock;storage-backups/**;storage-exports/**;storage-migration-*.json" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.Playwright" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
   </ItemGroup>
 
@@ -74,7 +75,7 @@
   <Target Name="LimitPortablePublishContent" AfterTargets="ComputeFilesToPublish" Condition="'$(NetWatchPortable)' == 'true'">
     <ItemGroup>
       <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
-        Condition="'%(ResolvedFileToPublish.Extension)' != '.dll' and '%(ResolvedFileToPublish.Extension)' != '.exe' and '%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' != 'NetWatch-Lite.deps.json' and '%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' != 'NetWatch-Lite.runtimeconfig.json'" />
+        Condition="!$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').StartsWith('.playwright')) and '%(ResolvedFileToPublish.Extension)' != '.dll' and '%(ResolvedFileToPublish.Extension)' != '.exe' and '%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' != 'NetWatch-Lite.deps.json' and '%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' != 'NetWatch-Lite.runtimeconfig.json'" />
     </ItemGroup>
   </Target>
 </Project>

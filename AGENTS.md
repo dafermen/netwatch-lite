@@ -47,11 +47,10 @@ These instructions are mandatory for any Codex session working on NetWatch Lite.
 
 ## Safety Rules
 
-- GitHub publication is ON HOLD for the new multilingual/filter/diagnostics
-  work order authorized on 2026-11-11 and the .NET 10 migration authorized on
-  2026-11-12. Local commits and a neutral portable are
-  allowed; do not push, create releases or deploy until explicitly authorized.
-  The preceding rc.13 publication was a separate completed delivery.
+- The owner authorized GitHub source/new portable publication for the authenticated
+  browser-check delivery on 2026-11-12, superseding the preceding rc.14/15 hold.
+  Publish only reviewed public source and neutral ZIP/SHA, never sessions, private
+  data or verification copies. This does not authorize a stable deployment.
 - Do not commit runtime operational data. These files must stay private and ignored: `Data/config.json`, `Data/config.backup.json`, `Data/regions.json`, `Data/regions/`, `Data/themes.json`, `Data/monitor-history.json`, `Data/app-errors.json`, and `Data/integrations.json`.
 - Portable releases must include only safe sample data such as `Data/config.sample.json`.
 - Never package database/sidecar/lease files or storage-backups/storage-exports.
@@ -65,7 +64,9 @@ These instructions are mandatory for any Codex session working on NetWatch Lite.
   Maintain the explicit public asset list in `scripts/portable-public-files.json`;
   do not replace it with a recursive workspace copy. Generated neutral settings
   and sample data must not be replaced with local runtime inventories.
-- Do not claim SSO, Microsoft Entra ID, verified operator identity, external inventory import, or outbound report delivery as active features. They are planned/future capabilities only.
+- Manual authenticated browser checks are not SSO for NetWatch. Do not claim
+  NetWatch authentication/verified operator identity, external inventory import
+  or outbound report delivery as active features; those remain future work.
 - Do not expose this app directly to untrusted networks. Treat it as an internal tool unless authentication and deployment controls are added.
 
 ## Engineering Rules
@@ -112,6 +113,12 @@ These instructions are mandatory for any Codex session working on NetWatch Lite.
   all configuration workflows. Keep deadlines across body reads, bounded
   decompressed content, strict TLS, no cookies/redirects and sanitized results.
   This internal URL checker is not a public or authenticated browser monitor.
+- Authenticated checks use a separate `type: browser`; never add cookies or
+  redirect following to anonymous HTTP checks. Use dedicated non-persistent Edge
+  contexts with manual sign-in, bounded lifetime/concurrency and origin guards.
+  Never read an existing personal profile, save/export browser state or package
+  credentials. Authentication-required/unevaluated states are not site downtime.
+  Do not probe corporate SSO or automate MFA during validation; use loopback fixtures.
 - Device `command` is optional inert clipboard text, never a process/shell or
   launch endpoint. Preserve it through normalization and current editing/copy/
   export workflows; keep it out of DeviceResult/history. Structural validation

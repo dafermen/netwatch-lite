@@ -1,0 +1,76 @@
+const { test, expect } = require('./fixtures.cjs');
+
+for (const language of ['en', 'es']) {
+  test(`Browser editor, copy and missing-session states (${language})`, async ({ page, request }, testInfo) => {
+    expect((await request.post('/api/config', { data: { devices: [] } })).ok()).toBeTruthy();
+    await page.goto(`/config?lang=${language}`);
+    await expect(page.locator('#add-device')).toBeEnabled();
+    await page.locator('#add-device').click();
+    await page.locator('#device-name').fill('Synthetic browser portal');
+    await page.locator('[data-check-type]').selectOption('browser');
+    await expect(page.locator('#device-location')).toBeHidden();
+    await expect(page.locator('#device-command')).toBeHidden();
+    await expect(page.locator('#device-address')).not.toHaveAttribute('required', '');
+    await page.locator('[data-check-url]').fill('https://app.example.invalid/BIP?bldg=LAB');
+    await page.locator('[data-check-timeout]').fill('15000');
+    await expect(page.locator('[data-check-status]')).toHaveValue('200');
+    await expect(page.locator('[data-check-status]')).toHaveAttribute('readonly', '');
+    await page.locator('[data-check-origins]').fill('https://sso.example.invalid');
+    await expect(page.locator('[data-http-text-help]')).toContainText(language === 'en' ? 'dedicated Edge window' : 'ventana dedicada de Edge');
+    await page.locator('[data-check-origins]').scrollIntoViewIfNeeded();
+    expect(await page.locator('#device-form-modal .modal-body').evaluate(element => element.scrollWidth <= element.clientWidth)).toBeTruthy();
+    await page.screenshot({ path: testInfo.outputPath(`browser-editor-${language}.png`) });
+    await page.locator('#submit-device').click();
+    await expect(page.locator('#device-form-modal')).toBeHidden();
+    await page.reload();
+    await page.locator('#config-device-search').fill('Synthetic browser portal');
+    await page.locator('[data-edit-device="0"]').click();
+    await expect(page.locator('[data-check-type]')).toHaveValue('browser');
+    await expect(page.locator('[data-check-origins]')).toHaveValue('https://sso.example.invalid');
+    await page.locator('[data-check-text]').fill('READY');
+    await page.locator('#submit-device').click();
+    await expect(page.locator('#device-form-modal')).toBeHidden();
+    await page.locator('[data-copy-device="0"]').click();
+    await page.locator('#device-name').fill('Synthetic browser copy');
+    await page.locator('#submit-device').click();
+    await expect(page.locator('#device-form-modal')).toBeHidden();
+    const config = await (await request.get('/api/config')).json();
+    expect(config.devices).toHaveLength(2);
+    expect(config.devices[1].checks).toEqual(config.devices[0].checks);
+    await page.goto(`/?lang=${language}`);
+    await page.locator('#device-search').fill('Synthetic browser portal');
+    const row = page.locator('[data-dashboard-device="Synthetic browser portal"]');
+    await expect(row).toBeVisible();
+    await expect(row.locator('.http-check-result .badge')).not.toHaveClass(/text-bg-danger/);
+    await row.locator('[data-browser-action="ready"]').click();
+    await expect(row.locator('[data-browser-message]')).toContainText(language === 'en' ? 'Sign-in required' : 'Requiere iniciar');
+    await row.locator('[data-run-device-index]').click();
+    await expect.poll(async () => (await (await request.get('/api/history')).json()).runs.length).toBe(1);
+    await expect(row.locator('.status-badge').first()).toHaveText(language === 'en' ? 'Sign-in required' : 'Requiere iniciar sesi\u00f3n');
+    await expect(row.locator('.status-badge').first()).not.toHaveClass(/text-bg-danger/);
+    await expect(page.locator('#metric-offline')).toHaveText('0');
+    const run = (await (await request.get('/api/history')).json()).runs[0];
+    expect(run.results).toHaveLength(1);
+    expect(run.results[0].status).toBe('AuthenticationRequired');
+    expect(run.results[0].checks[0].url).toBe('https://app.example.invalid/BIP');
+    expect(run.summary.offlineDevices).toBe(0);
+    await page.screenshot({ path: testInfo.outputPath(`browser-auth-required-${language}.png`), fullPage: true });
+    await page.goto(`/reports?lang=${language}`);
+    await page.locator('#reports-tab-devices').click();
+    await page.locator('#reports-status-filter').selectOption('AuthenticationRequired');
+    await expect(page.locator('#reports-table-body')).toContainText('Synthetic browser portal');
+    await expect(page.locator('#reports-table-body')).toContainText(language === 'en' ? 'Sign-in required' : 'Requiere iniciar');
+  });
+}
+
+test('Browser session endpoint rejects missing origin, custom header and stale binding without opening Edge', async ({ request, baseURL }) => {
+  const config = { devices: [{ name: 'Guarded portal', ip: 'app.example.invalid', checks: [{ type: 'browser', url: 'https://app.example.invalid/' }] }] };
+  expect((await request.post('/api/config', { data: config })).ok()).toBeTruthy();
+  const snapshot = await (await request.get('/api/monitor/inventory')).json();
+  const data = { profileId: snapshot.profileId, revision: snapshot.revision, key: snapshot.keys[0], checkIndex: 0, action: 'open' };
+  expect((await request.post('/api/browser-sessions', { data })).status()).toBe(403);
+  expect((await request.post('/api/browser-sessions', { data, headers: { Origin: 'http://attacker.invalid', 'X-NetWatch-Browser': '1' } })).status()).toBe(403);
+  expect((await request.post('/api/browser-sessions', { data: { ...data, revision: 'stale' }, headers: { Origin: baseURL, 'X-NetWatch-Browser': '1' } })).status()).toBe(409);
+  expect((await request.post('/api/browser-sessions', { data: { ...data, action: 'status' }, headers: { Origin: baseURL, 'X-NetWatch-Browser': '1' } })).status()).toBe(200);
+  expect((await (await request.get('/api/history')).json()).runs).toHaveLength(0);
+});

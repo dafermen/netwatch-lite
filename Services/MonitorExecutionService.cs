@@ -356,7 +356,7 @@ public sealed class MonitorExecutionService
                     Name = group.Key,
                     TotalDevices = devices.Count,
                     OnlineDevices = devices.Count(device => device.IsOnline),
-                    OfflineDevices = devices.Count(device => !device.IsOnline),
+                    OfflineDevices = devices.Count(device => device.Status == DeviceStatus.Down),
                     Devices = devices
                 };
             })
@@ -387,9 +387,10 @@ public sealed class MonitorExecutionService
         var degradedDevices = results.Count(device => device.Status == DeviceStatus.Degraded);
         var offlineDevices = results.Count(device => device.Status == DeviceStatus.Down);
         var onlineDevices = results.Count(device => device.IsOnline);
-        var availabilityPercentage = totalDevices == 0
+        var measuredDevices = totalDevices - results.Count(device => device.Status is DeviceStatus.AuthenticationRequired or DeviceStatus.Unknown);
+        var availabilityPercentage = measuredDevices == 0
             ? 0
-            : Math.Round((double)healthyDevices / totalDevices * 100, 1);
+            : Math.Round((double)healthyDevices / measuredDevices * 100, 1);
 
         return new DashboardSummary
         {

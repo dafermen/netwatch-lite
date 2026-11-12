@@ -2,6 +2,42 @@
 
 Last updated: 2026-11-12
 
+## Authenticated Browser Checks - Validation Complete, Delivery In Progress
+
+Owner authorized a manually signed-in browser check, regression, documentation,
+new immutable rc.16 folder/ZIP/SHA and GitHub publication. This supersedes the
+rc.14/15 publication hold, not stable-deployment gates. Preserve SQLite schema 2,
+private data, existing HTTP semantics and historical archives. Manual dedicated
+Edge sessions remain non-persistent; never export cookies or include credentials
+in configuration/history/portables. THOR acceptance needs the owner's real login;
+test synthetic loopback flows only. Expected text is optional; basic access checks
+require the intended final URL/status/rendered content, not merely any 200 page.
+
+Implemented: separate browser definitions/editor, local guarded session actions,
+dedicated volatile Edge contexts, readiness confirmation, auth/unknown states,
+final URL/query/content validation, CDP redirect-hop guards, TTL/limits and
+117-file pinned driver packaging. Focused synthetic contract and bilingual
+desktop/mobile UI tests pass. A blocked-redirect regression found the ordinary
+routing limitation and now passes with CDP interception at every document hop.
+
+Final local regression: 465 .NET passed (73 unit/28 integration/364 contract),
+456 full browser passed (228/provider) plus six final SQLite retests; no skips,
+failures or retries in final receipts. Four browser/eight monitoring/six storage
+sampled mutants killed; 1000 destination/2000 filter generated cases passed.
+73 packaging guards passed on each PS5.1/7; advisory queries reported zero
+vulnerable dependencies. Private pilot matched eight APIs/raw documents/SQL counts
+and rc.15 rollback; original JSON unchanged. Browser test instances now explicitly
+dispose their runtimes; mutation preparation avoids Windows long-path failures.
+
+In progress: immutable rc.16 package/native verification, backed-up local
+activation, final privacy/historical audit and GitHub publication. This is a
+build-time documentation snapshot: final ZIP/SHA/activation/publication receipts
+are recorded in source CURRENT_STATUS and the browser validation document after
+generation, without rewriting an immutable package. Real corporate/other-PC
+acceptance remains external; never claim synthetic fixtures validated THOR.
+Historical publication holds below describe their original deliveries only;
+the current owner's authorization supersedes them for this delivery.
+
 ## Local Runtime Delivery - 0.8.0-rc.15
 
 Owner authorized IMP-009 on 2026-11-12. App/tests/CI now target .NET 10 LTS,

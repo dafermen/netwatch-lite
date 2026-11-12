@@ -35,6 +35,11 @@ try {
     foreach ($relative in $runtimeFiles.Keys) {
         Copy-Item -LiteralPath (Resolve-PortableChild $raw $relative) -Destination (Resolve-PortableChild $package $relative)
     }
+    foreach ($relative in (Get-PortableBrowserFiles $raw).Keys) {
+        $destination = Resolve-PortableChild $package $relative
+        New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+        Copy-Item -LiteralPath (Resolve-PortableChild $raw $relative) -Destination $destination
+    }
     foreach ($relative in Get-PortablePublicFiles) {
         $source = Resolve-PortableChild $repoRoot $relative
         Assert-PlainDirectoryChain (Split-Path -Parent $source)
@@ -96,6 +101,7 @@ try {
         'The launcher sets the content root; direct EXE use from another folder requires --contentRoot <package-folder>.',
         'Runtime files are created only when the application runs. The ZIP contains only neutral loopback sample data.',
         'Clean installations use SQLite (netwatch.db). Existing JSON requires an explicit offline migration; read docs/STORAGE.md.',
+        'Authenticated browser checks require installed Microsoft Edge and an interactive desktop on this PC. The driver is included, not a browser or login session.',
         'Do not operate inside artifacts/portable/: keep that historical package unchanged.',
         'Back up/export old data and migrate it privately into a NEW deployment folder. Never overwrite an installation.',
         'This app has no authentication. Do not expose it to untrusted networks.',

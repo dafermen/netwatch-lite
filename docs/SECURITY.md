@@ -1,5 +1,10 @@
 # NetWatch Lite Security
 
+Authenticated checks use non-persistent Edge contexts with manual login, local
+same-origin session actions and bounded lifetime/concurrency. Never collect
+credentials, load a personal profile, save StorageState or package sessions.
+This does not authenticate NetWatch. Read the [browser trust boundary](BROWSER_CHECKS.md#requirements-and-trust).
+
 ## Supported Security Scope
 
 NetWatch Lite is an internal tool without authentication or role-based access.

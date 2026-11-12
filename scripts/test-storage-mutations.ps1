@@ -35,7 +35,8 @@ foreach ($case in @(@{name='baseline'}) + $mutations) {
     $evidence = Join-Path $workspace 'results'
     $previousErrorAction = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    & dotnet test (Join-Path $workspace 'tests/NetWatch.IntegrationTests/NetWatch.IntegrationTests.csproj') -c Release `
+    # Storage-only mutants never launch a browser; avoid needless driver copies in nested Windows paths.
+    & dotnet test (Join-Path $workspace 'tests/NetWatch.IntegrationTests/NetWatch.IntegrationTests.csproj') -c Release -p:PlaywrightPlatform=none `
         --filter 'FullyQualifiedName~LocalDataStoreTests|FullyQualifiedName~RelationalUpgradeTests' --logger 'trx;LogFileName=result.trx' --results-directory $evidence 2>&1 |
         Out-File -LiteralPath (Join-Path $workspace 'test.log') -Encoding utf8
     $code = $LASTEXITCODE

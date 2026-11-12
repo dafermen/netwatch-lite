@@ -1,5 +1,11 @@
 # NetWatch Lite Operations
 
+Authenticated checks require installed Edge and an interactive desktop on the
+NetWatch host. Manage sessions from localhost, complete sign-in manually and
+confirm it before monitoring. Restart/copy/expiry requires signing in again;
+backups deliberately contain no browser state. A session-required result is not
+site downtime. See [browser operations and limits](BROWSER_CHECKS.md).
+
 ## Start And Health Check
 
 Use the [matching .NET 10 SDK/runtime](RUNTIME.md); the local validated SDK lives

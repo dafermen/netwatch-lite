@@ -356,6 +356,10 @@
       <p>En Configuration, seleccione HTTP / HTTPS y registre URL, timeout, codigo esperado y texto opcional. Full Check ejecuta estas verificaciones; Ping Only las omite. El estado agregado refleja fallos HTTP aunque el servidor acepte conexiones TCP.</p>
       <p>El timeout por intento acepta 100-60000 ms y usa 10000 por defecto. El codigo esperado usa 200 por defecto; el texto es literal y distingue mayusculas. Dashboard y Reports muestran codigo real, duracion y mensajes de error.</p>
       <p>Se hace GET anonimo desde el backend, sin seguir redirecciones, compartir cookies, iniciar sesion ni ejecutar JavaScript. Se valida TLS y se limita el contenido descomprimido a 1 MiB cuando se busca texto. No publique este verificador sin controles de acceso y destinos permitidos. Consulte <a href="HTTP_CHECKS.md">la guia HTTP/HTTPS</a>.</p>
+      <p>Para aplicaciones con inicio de sesion manual use el check separado
+<strong>Authenticated browser</strong>: abre Edge dedicado en el PC del servicio,
+distingue sesion requerida de sitio caido y no guarda cookies en el portable.
+Consulte <a href="BROWSER_CHECKS.md">la guia de navegador autenticado</a>.</p>
     </section>
 
     <section class="doc-section" id="peripheral-inventory">

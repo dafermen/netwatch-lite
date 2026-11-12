@@ -1,5 +1,6 @@
 {
   "files": [
+    "wwwroot/browser-checks.js", "docs/BROWSER_CHECKS.md", "docs/VALIDATION_BROWSER_2026-11-12.md",
     "docs/RUNTIME.md", "docs/VALIDATION_DOTNET10_2026-11-12.md", "docs/adr/0008-dotnet10-lts.md",
     "docs/UI_LANGUAGES.md", "docs/DIAGNOSTICS.md", "docs/VALIDATION_MULTILINGUAL_2026-11-12.md",
     "wwwroot/i18n.js", "wwwroot/i18n-es.js", "wwwroot/inventory-filters.js", "wwwroot/monitoring-ui.js", "wwwroot/http-diagnostics.js", "wwwroot/diagnostics.js",

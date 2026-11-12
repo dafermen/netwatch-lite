@@ -1,5 +1,11 @@
 # Versioned Windows Portables
 
+rc.16 includes a pinned Microsoft.Playwright driver (117 exact SHA-256-checked
+files), not Edge, cookies, sessions or personal profiles. Microsoft Edge and an
+interactive desktop are prerequisites only for [authenticated browser checks](BROWSER_CHECKS.md).
+The explicit driver allowlist is separate from the public documentation/UI list;
+arbitrary files under `.playwright/` are never accepted as release assets.
+
 ## Generate A Candidate
 
 The generator pins **.NET 10 LTS / ASP.NET Core 10.0.15** in Directory.Build.props;

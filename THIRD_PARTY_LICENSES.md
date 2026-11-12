@@ -1,5 +1,14 @@
 # Third-Party Notices
 
+## Authenticated Browser Driver
+
+Microsoft.Playwright 1.64.1 (.NET client/driver) is Apache-2.0, distributed by
+Microsoft: https://github.com/microsoft/playwright-dotnet. The portable includes
+upstream driver LICENSE/NOTICE and bundled Node.js LICENSE under `.playwright/`.
+`scripts/portable-browser-files.json` pins all 117 driver files by SHA-256.
+Microsoft Edge is an external, separately licensed prerequisite, not redistributed.
+Never distribute browser login state.
+
 ## SQLite Persistence
 
 - Microsoft.Data.Sqlite / Microsoft.Data.Sqlite.Core 10.0.15: MIT, maintained by

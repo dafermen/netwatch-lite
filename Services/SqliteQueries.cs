@@ -39,7 +39,7 @@ public sealed class SqliteQueries(LocalDataStore storage,JsonMonitorHistoryRepos
         {
             if (status == "Problems") rows.Add("v.status IN ('Down','Degraded')");
             else if (status == "Unknown") rows.Add("v.status NOT IN ('Healthy','Down','Degraded')");
-            else if (status is "Healthy" or "Down" or "Degraded") Filter(rows,"v.status=$status","$status",status);
+            else if (status is "Healthy" or "Down" or "Degraded" or "AuthenticationRequired") Filter(rows,"v.status=$status","$status",status);
             else throw new InvalidDataException("Invalid report status.");
         }
         if (Value(query,"runKey") is { Length: > 0 } runKey)

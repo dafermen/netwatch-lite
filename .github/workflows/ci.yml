@@ -45,6 +45,7 @@ jobs:
           node --check wwwroot/i18n-es.js
           node --check wwwroot/inventory-filters.js
           node --check wwwroot/monitoring-ui.js
+          node --check wwwroot/browser-checks.js
           node --check wwwroot/http-diagnostics.js
           node --check wwwroot/diagnostics.js
           node --test tests/javascript/monitoring.test.cjs
@@ -64,6 +65,10 @@ jobs:
         shell: powershell
         run: .\scripts\test-monitoring-mutations.ps1
 
+      - name: Targeted authenticated-browser guard mutations
+        shell: powershell
+        run: .\scripts\test-browser-mutations.ps1
+
       - name: Reject tracked runtime data
         shell: pwsh
         run: |
@@ -81,7 +86,9 @@ jobs:
             '^Data/app-errors\.json$',
             '^Data/integrations\.json$',
             '^(config|regions|themes|monitor-history|app-errors|integrations|storage-policy)\.json$',
-            '^Data/storage-policy\.json$'
+            '^Data/storage-policy\.json$',
+            '(^|/)(\.auth|browser-sessions)/',
+            '(^|/)storageState[^/]*\.json$'
           )
           $tracked = git ls-files
           $blocked = $tracked | Where-Object {
@@ -102,6 +109,7 @@ jobs:
             TestResults
             artifacts/verification/storage-mutations-*/result.json
             artifacts/verification/monitoring-mutations-*/result.json
+            artifacts/verification/browser-mutations-*/result.json
           if-no-files-found: warn
 
   browser-regression:

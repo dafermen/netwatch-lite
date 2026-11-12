@@ -29,6 +29,9 @@ coverage.*
 playwright-report/
 test-results/
 node_modules/
+.playwright/
+playwright/.auth/
+browser-sessions/
 tests/.app/
 
 # Logs

@@ -8,7 +8,7 @@ namespace NetWatch.Models;
 public sealed class DeviceCheck
 {
     /// <summary>
-    /// Check type. Supported values are ping, tcp and http (including HTTPS).
+    /// Check type: ping, tcp, anonymous http (including HTTPS), or authenticated browser.
     /// </summary>
     [JsonPropertyName("type")]
     public required string Type { get; init; }
@@ -19,7 +19,7 @@ public sealed class DeviceCheck
     [JsonPropertyName("port")]
     public int? Port { get; init; }
 
-    /// <summary>Absolute HTTP/HTTPS URL for an anonymous GET probe.</summary>
+    /// <summary>Absolute HTTP/HTTPS URL for an HTTP probe or separate browser evaluation.</summary>
     [JsonPropertyName("url")]
     public string? Url { get; init; }
 
@@ -31,7 +31,12 @@ public sealed class DeviceCheck
     [JsonPropertyName("expectedStatusCode")]
     public int? ExpectedStatusCode { get; init; }
 
-    /// <summary>Optional literal, case-sensitive substring of the HTTP response.</summary>
+    /// <summary>Optional case-sensitive text in the HTTP response or browser's visible content.</summary>
     [JsonPropertyName("expectedText")]
     public string? ExpectedText { get; init; }
+
+    /// <summary>Additional trusted HTTPS identity-provider origins for an interactive browser check.</summary>
+    [JsonPropertyName("authenticationOrigins")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? AuthenticationOrigins { get; init; }
 }

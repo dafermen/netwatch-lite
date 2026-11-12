@@ -829,7 +829,7 @@ function createSummaryFromCategories(categories) {
 }
 
 function createSummaryFromResults(results) {
-  const checked = results.filter(result => result.enabled !== false && result.status !== 'Pending' && result.status !== 'Paused');
+  const checked = results.filter(result => result.enabled !== false && ['Healthy', 'Down', 'Degraded'].includes(result.status));
   return { ...createProgressSummary(results, results.length),
     availabilityPercentage: checked.length ? createProgressSummary(checked).availabilityPercentage : null };
 }
@@ -840,9 +840,10 @@ function createProgressSummary(devices, totalDevices = devices.length) {
   const onlineDevices = devices.filter(device => device.isOnline).length;
   const offlineDevices = devices.filter(device => device.status === "Down").length;
   const degradedDevices = devices.filter(device => device.status === "Degraded").length;
-  const availabilityPercentage = expectedTotal === 0
+  const measuredTotal = expectedTotal - devices.filter(device => ['AuthenticationRequired', 'Unknown'].includes(device.status)).length;
+  const availabilityPercentage = measuredTotal === 0
     ? 0
-    : Math.round((healthyDevices / expectedTotal * 100) * 10) / 10;
+    : Math.round((healthyDevices / measuredTotal * 100) * 10) / 10;
 
   return {
     totalDevices: expectedTotal,
@@ -1413,10 +1414,10 @@ function renderReportsTable(rows) {
 }
 
 function renderReportStatusBadge(status) {
-  const styles = { Healthy: ['success', 'circle-check'], Degraded: ['warning', 'triangle-exclamation'], Down: ['danger', 'circle-xmark'] };
+  const styles = { Healthy: ['success', 'circle-check'], Degraded: ['warning', 'triangle-exclamation'], Down: ['danger', 'circle-xmark'], AuthenticationRequired: ['warning', 'key'], Unknown: ['secondary', 'circle-question'] };
   const known = Object.hasOwn(styles, status);
   const [color, icon] = known ? styles[status] : ['secondary', 'circle-question'];
-  return NetWatchI18n.html`<span class="badge text-bg-${color}"><i class="fa-solid fa-${icon} me-1" aria-hidden="true"></i>${escapeHtml(NetWatchI18n.text(known ? status : 'Not recorded'))}</span>`;
+  return NetWatchI18n.html`<span class="badge text-bg-${color}"><i class="fa-solid fa-${icon} me-1" aria-hidden="true"></i>${escapeHtml(NetWatchI18n.text(status === 'AuthenticationRequired' ? 'Sign-in required' : known ? status : 'Not recorded'))}</span>`;
 }
 
 function updateReportSortButtons(selector, sortState, key) {
@@ -1508,6 +1509,7 @@ function openReportDetail(id, trigger) {
   ];
   document.querySelector('#reports-detail-body').innerHTML = NetWatchI18n.html`<dl class="report-detail-meta">${facts.map(([name, value]) => NetWatchI18n.html`<dt>${NetWatchI18n.text(name)}</dt><dd>${value}</dd>`).join('')}</dl>
     <h3 class="h6 mt-4">Recorded checks</h3><ul class="report-check-list">${row.checks.length ? row.checks.map(check => {
+      if (check.type === 'browser') return `<li>${renderBrowserResults([check])}</li>`;
       const known = typeof check.isAvailable === 'boolean';
       const label = check.label || (check.type === 'tcp' ? `TCP ${check.port ?? ''}` : String(check.type || 'Check').toUpperCase());
       return NetWatchI18n.html`<li><div class="report-check-heading"><strong>${escapeHtml(label)}</strong><span class="badge text-bg-${known ? check.isAvailable ? 'success' : 'danger' : 'secondary'}">${NetWatchI18n.text(known ? check.isAvailable ? 'Passed' : 'Failed' : 'Not recorded')}</span></div>
@@ -1987,7 +1989,8 @@ function renderFacilitySection(facility, facilityIndex) {
   const allDevices = facility.categories.flatMap(category => category.devices ?? []);
   const offlineDevices = allDevices.filter(device => device.status === 'Down').length;
   const pendingDevices = allDevices.filter(device => device.status === 'Pending').length;
-  const hasPendingState = allDevices.some(device => device.status === 'Pending' || device.status === 'Paused');
+  const hasPendingState = allDevices.some(device => ['Pending', 'Paused', 'Unknown', 'AuthenticationRequired'].includes(device.status));
+  const authenticationRequired = allDevices.some(device => device.status === 'AuthenticationRequired');
   const problemDevices = facility.categories
     .flatMap(category => category.stateDevices ?? category.devices ?? [])
     .filter(device => device.status === "Degraded" || device.status === "Down")
@@ -2006,7 +2009,7 @@ function renderFacilitySection(facility, facilityIndex) {
     : hasPendingState && isHealthyFacility ? 'text-bg-secondary' : isHealthyFacility ? "text-bg-success" : "text-bg-warning";
   const statusText = isRunningFacility
     ? "Checking"
-    : hasPendingState && isHealthyFacility ? 'Not checked' : isHealthyFacility ? "Healthy" : `${problemDevices} issues`;
+    : authenticationRequired && isHealthyFacility ? 'Sign-in required' : hasPendingState && isHealthyFacility ? 'Not checked' : isHealthyFacility ? "Healthy" : `${problemDevices} issues`;
   const statusIcon = isRunningFacility
     ? "fa-spinner fa-spin"
     : hasPendingState && isHealthyFacility ? 'fa-clock' : isHealthyFacility ? "fa-circle-check" : "fa-triangle-exclamation";
@@ -2078,11 +2081,13 @@ function renderCategory(category, index, facilityName = "") {
   const stateTotalDevices = stateDevices.length;
   const pendingDevices = stateDevices.filter(device => device.status === 'Pending').length;
   const pausedDevices = stateDevices.filter(device => device.enabled === false).length;
+  const unevaluatedDevices = stateDevices.filter(device => ['Unknown', 'AuthenticationRequired'].includes(device.status)).length;
+  const authenticationRequired = stateDevices.some(device => device.status === 'AuthenticationRequired');
   const visiblePendingDevices = devices.filter(device => device.status === 'Pending').length;
   const healthyDevices = stateDevices.filter(device => device.status === "Healthy").length;
   const problemDevices = stateDevices.filter(device => device.status === "Degraded" || device.status === "Down").length;
   const downDevices = stateDevices.filter(device => device.status === "Down").length;
-  const checkedDevices = stateTotalDevices - pendingDevices - pausedDevices;
+  const checkedDevices = stateTotalDevices - pendingDevices - pausedDevices - unevaluatedDevices;
   const categoryPercent = checkedDevices ? `${Math.round(healthyDevices / checkedDevices * 100)}%` : '-';
   const isHealthyCategory = stateTotalDevices > 0 && problemDevices === 0 && healthyDevices === stateTotalDevices;
   const isDegradedCategory = problemDevices > 0 && downDevices === 0;
@@ -2092,15 +2097,17 @@ function renderCategory(category, index, facilityName = "") {
     && (!activeRunFacility || !categoryFacility || activeRunFacility.toLowerCase() === categoryFacility.toLowerCase());
   const stateClass = isRunningCategory
     ? "category-section-running"
-    : (pendingDevices || pausedDevices) && !problemDevices ? 'category-section-pending'
+    : (pendingDevices || pausedDevices || unevaluatedDevices) && !problemDevices ? 'category-section-pending'
     : isHealthyCategory ? "category-section-healthy" : isDegradedCategory ? "category-section-degraded" : "category-section-problem";
   const stateIcon = isRunningCategory
     ? "fa-spinner fa-spin"
-    : (pendingDevices || pausedDevices) && !problemDevices ? 'fa-clock'
+    : (pendingDevices || pausedDevices || unevaluatedDevices) && !problemDevices ? 'fa-clock'
     : isHealthyCategory ? "fa-circle-check" : isDegradedCategory ? "fa-triangle-exclamation" : "fa-circle-xmark";
   const stateLabel = isRunningCategory
     ? "Checking"
     : pausedDevices === stateTotalDevices ? 'Paused'
+    : authenticationRequired && !problemDevices ? 'Sign-in required'
+    : unevaluatedDevices && !problemDevices ? 'Not evaluated'
     : pendingDevices && !problemDevices ? 'Not checked'
     : isHealthyCategory ? "Healthy" : "Needs attention";
   const categoryKey = createCategoryKey(categoryFacility, category.name);
@@ -2209,7 +2216,7 @@ function renderRow(result) {
           <i class="fa-solid ${statusIcon} me-1"></i>${NetWatchI18n.text(statusText)}
         </span>
       </td>
-      <td>${result.enabled === false ? NetWatchI18n.markup('<span class="badge text-bg-secondary">Monitoring paused</span>') : renderPorts(result) + renderDeviceHttpChecks(result)}</td>
+      <td>${result.enabled === false ? NetWatchI18n.markup('<span class="badge text-bg-secondary">Monitoring paused</span>') : renderPorts(result) + renderDeviceHttpChecks(result) + renderBrowserResults(result.checks) + renderBrowserSessionControls(result.inventoryIndex)}</td>
       <td class="text-end">
         <div class="device-check-actions">
           <span class="text-secondary small">${isPending ? NetWatchI18n.text('Not checked') : formatDate(result.lastCheck)}</span>
@@ -2327,10 +2334,12 @@ function getPingCheck(result) {
 }
 
 function renderDeviceStatus(status) {
-  const normalizedStatus = status || "Down";
+  const normalizedStatus = status || "Unknown";
   const statusMap = {
     Pending: { className: 'text-bg-secondary', icon: 'fa-clock', label: 'Not checked' },
     Paused: { className: 'text-bg-secondary', icon: 'fa-pause', label: 'Paused' },
+    AuthenticationRequired: { className: 'text-bg-warning', icon: 'fa-key', label: 'Sign-in required' },
+    Unknown: { className: 'text-bg-secondary', icon: 'fa-circle-question', label: 'Not evaluated' },
     Healthy: {
       className: "text-bg-success",
       icon: "fa-check",
@@ -2347,7 +2356,7 @@ function renderDeviceStatus(status) {
       label: "Down"
     }
   };
-  const statusInfo = statusMap[normalizedStatus] ?? statusMap.Down;
+  const statusInfo = statusMap[normalizedStatus] ?? statusMap.Unknown;
 
   return NetWatchI18n.html`
     <span class="badge ${statusInfo.className} status-badge">
@@ -3783,7 +3792,7 @@ function renderConfigDeviceRow(device, index, groupId, revealed = false) {
       <td><code class="text-break">${escapeHtml(primaryMonitoringTarget(device))}</code></td>
       <td>${device.hostname ? NetWatchI18n.html`<code>${escapeHtml(device.hostname)}</code>` : NetWatchI18n.html`<span class="text-secondary">Not set</span>`}</td>
       <td><span class="badge text-bg-${device.useHostnameForPing ? "primary" : "secondary"}">${NetWatchI18n.text(pingModeLabel)}</span></td>
-      <td>${device.checks?.length ?? 0}</td>
+      <td>${device.checks?.length ?? 0}${renderBrowserSessionControls(index)}</td>
       <td class="text-end">
         <div class="config-device-actions" role="group" aria-label="Device actions for ${escapeAttribute(device.name)}">
           <button class="btn btn-outline-primary btn-sm" type="button" data-edit-device="${index}" title="Edit device" aria-label="Edit ${escapeAttribute(device.name)}">
@@ -4059,7 +4068,7 @@ function readDeviceForm() {
   return {
     name: deviceNameInput.value.trim(),
     ...peripheralFields,
-    ip: deviceAddressInput.value.trim() || (checks.every(check => check.type === "http") ? new URL(checks[0].url).hostname.replace(/^\[|\]$/g, "") : ""),
+    ip: deviceAddressInput.value.trim() || (checks.every(check => ['http', 'browser'].includes(check.type)) ? new URL(checks[0].url).hostname.replace(/^\[|\]$/g, "") : ""),
     region: getActiveRegion()?.region || getActiveRegion()?.name || "Unassigned",
     supportGroup: getActiveRegion()?.name || "Unassigned",
     facility: deviceFacilityInput.value.trim() || "Unassigned",
@@ -4088,7 +4097,7 @@ function readCheckRows() {
       continue;
     }
 
-    if (type === "http") {
+    if (type === "http" || type === "browser") {
       const urlInput = row.querySelector("[data-check-url]");
       const url = urlInput.value.trim();
       let parsed;
@@ -4098,7 +4107,7 @@ function readCheckRows() {
         urlInput.focus();
         return null;
       }
-      const timeoutMs = readIntegerSetting(row.querySelector("[data-check-timeout]"), "HTTP timeout", 100, 60000, showDeviceCheckAlert);
+      const timeoutMs = readIntegerSetting(row.querySelector("[data-check-timeout]"), "HTTP timeout", type === 'browser' ? 1000 : 100, 60000, showDeviceCheckAlert);
       const expectedStatusCode = readIntegerSetting(row.querySelector("[data-check-status]"), "Expected HTTP status", 200, 599, showDeviceCheckAlert);
       if (timeoutMs === null || expectedStatusCode === null) return null;
       const expectedText = row.querySelector("[data-check-text]").value;
@@ -4106,7 +4115,9 @@ function readCheckRows() {
         showDeviceCheckAlert("Expected HTTP text must not exceed 4096 characters.");
         return null;
       }
-      checks.push({ type: "http", url, timeoutMs, expectedStatusCode, expectedText: expectedText || null });
+      const authenticationOrigins = row.querySelector('[data-check-origins]').value.split(/[\r\n,]+/).map(value => value.trim()).filter(Boolean);
+      checks.push({ type, url, timeoutMs, expectedStatusCode, expectedText: expectedText || null,
+        ...(type === 'browser' ? { authenticationOrigins: authenticationOrigins.length ? authenticationOrigins : null } : {}) });
       continue;
     }
 
@@ -4220,6 +4231,7 @@ function addCheckRow(check = { type: "ping" }) {
       <option value="ping">Ping</option>
       <option value="tcp">TCP</option>
       <option value="http">HTTP / HTTPS</option>
+      <option value="browser">Authenticated browser</option>
     </select>
     <input class="form-control form-control-sm" type="number" min="1" max="65535" placeholder="Port" data-check-port aria-label="TCP port">
     <button class="btn btn-outline-danger btn-sm icon-button" type="button" data-remove-check aria-label="Remove check" title="Remove check">
@@ -4230,18 +4242,20 @@ function addCheckRow(check = { type: "ping" }) {
       <div><label class="form-label" for="${helpKey}-timeout">Timeout (ms)</label><input class="form-control form-control-sm" type="number" min="100" max="60000" step="1" id="${helpKey}-timeout" data-check-timeout aria-describedby="${helpKey}-timeout-help" required><div class="form-text" id="${helpKey}-timeout-help" data-http-timeout-help>Maximum wait per HTTP attempt (10000 ms = 10 s), not a ping count. Retries: Settings &gt; Retries (0 = one attempt; 2 = up to three after failures).</div></div>
       <label><span class="form-label">Expected status</span><input class="form-control form-control-sm" type="number" min="200" max="599" step="1" data-check-status required></label>
       <div class="http-check-wide"><label class="form-label" for="${helpKey}-text">Expected text (optional)</label><textarea class="form-control form-control-sm" rows="2" maxlength="4096" id="${helpKey}-text" data-check-text aria-describedby="${helpKey}-text-help"></textarea><div class="form-text" id="${helpKey}-text-help" data-http-text-help>Optional literal response text (for example READY), case-sensitive. Blank: expected status only. No JavaScript or browser login session is used.</div></div>
+      <label class="http-check-wide" data-browser-fields hidden><span class="form-label">Additional authentication origins (optional)</span><textarea class="form-control form-control-sm" rows="2" maxlength="2056" data-check-origins placeholder="https://sso.example.com"></textarea></label>
     </fieldset>`;
 
   const typeSelect = row.querySelector("[data-check-type]");
   const portInput = row.querySelector("[data-check-port]");
 
-  typeSelect.value = ["tcp", "http"].includes(String(check.type).toLowerCase()) ? String(check.type).toLowerCase() : "ping";
+  typeSelect.value = ["tcp", "http", "browser"].includes(String(check.type).toLowerCase()) ? String(check.type).toLowerCase() : "ping";
   typeSelect.dataset.previousType = typeSelect.value;
   portInput.value = check.port ?? "";
   row.querySelector("[data-check-url]").value = check.url ?? "";
   row.querySelector("[data-check-timeout]").value = check.timeoutMs ?? 10000;
   row.querySelector("[data-check-status]").value = check.expectedStatusCode ?? 200;
   row.querySelector("[data-check-text]").value = check.expectedText ?? "";
+  row.querySelector('[data-check-origins]').value = (check.authenticationOrigins ?? []).join('\n');
   checksList.append(row);
   updateCheckPortState(row);
 }
@@ -4250,12 +4264,25 @@ function updateCheckPortState(row) {
   const typeSelect = row.querySelector("[data-check-type]");
   const portInput = row.querySelector("[data-check-port]");
   const isTcp = typeSelect.value === "tcp";
-  const isHttp = typeSelect.value === "http";
+  const isBrowser = typeSelect.value === 'browser';
+  const isHttp = typeSelect.value === "http" || isBrowser;
   row.classList.toggle("is-http", isHttp);
   const httpFields = row.querySelector("[data-http-fields]");
   httpFields.hidden = !isHttp;
   httpFields.disabled = !isHttp;
   portInput.hidden = isHttp;
+  row.querySelector('[data-browser-fields]').hidden = !isBrowser;
+  row.querySelector('[data-check-origins]').disabled = !isBrowser;
+  const statusInput = row.querySelector('[data-check-status]');
+  statusInput.readOnly = isBrowser;
+  if (isBrowser) statusInput.value = 200;
+  row.querySelector('[data-check-timeout]').min = isBrowser ? '1000' : '100';
+  row.querySelector('[data-http-timeout-help]').textContent = NetWatchI18n.text(isBrowser
+    ? 'Maximum total wait for one browser evaluation (10000 ms = 10 s). One attempt; network retry settings do not apply.'
+    : 'Maximum wait per HTTP attempt (10000 ms = 10 s), not a ping count. Retries: Settings > Retries (0 = one attempt; 2 = up to three after failures).');
+  row.querySelector('[data-http-text-help]').textContent = NetWatchI18n.text(isBrowser
+    ? 'Optional case-sensitive visible page text. Blank: final application URL, HTTP 200 and nonempty visible content. Manual sign-in uses a dedicated Edge window on the NetWatch host.'
+    : 'Optional literal response text (for example READY), case-sensitive. Blank: expected status only. No JavaScript or browser login session is used.');
 
   portInput.disabled = !isTcp;
   portInput.required = isTcp;
@@ -4268,7 +4295,7 @@ function updateCheckPortState(row) {
 
 function updateDeviceAddressRequirement() {
   const types = [...checksList.querySelectorAll("[data-check-type]")];
-  const network = !types.length || types.some(input => input.value !== "http");
+  const network = !types.length || types.some(input => !['http', 'browser'].includes(input.value));
   const ping = types.some(input => input.value === 'ping');
   deviceAddressInput.required = network;
   deviceAddressInput.placeholder = NetWatchI18n.text(deviceAddressInput.required ? "" : "Optional - uses the first URL host");
@@ -5340,7 +5367,7 @@ document.querySelector('#device-monitoring-preset').addEventListener('change', e
   const untouched = rows.length === 1
     && rows[0].querySelector('[data-check-type]').value === 'ping';
   if (!untouched && !confirm('Replace the current checks with this preset?')) {
-    event.target.value = rows.every(row => row.querySelector('[data-check-type]').value === 'http') ? 'web' : 'network';
+    event.target.value = rows.every(row => ['http', 'browser'].includes(row.querySelector('[data-check-type]').value)) ? 'web' : 'network';
     return;
   }
   checksList.innerHTML = '';
@@ -5350,7 +5377,7 @@ checksList.addEventListener("change", event => {
   if (event.target.matches("[data-check-type]")) {
     const row = event.target.closest('.check-row');
     const previous = event.target.dataset.previousType;
-    const configured = previous === 'http' ? row.querySelector('[data-check-url]').value.trim()
+    const configured = ['http', 'browser'].includes(previous) ? row.querySelector('[data-check-url]').value.trim()
       : previous === 'tcp' ? row.querySelector('[data-check-port]').value : '';
     if (previous !== event.target.value && configured && !confirm('Replace this configured check with the selected type?')) {
       event.target.value = previous;

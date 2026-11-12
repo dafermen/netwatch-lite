@@ -467,7 +467,11 @@ public sealed class JsonDeviceRepository
                             TimeoutMs = check.TimeoutMs ?? HttpCheckService.DefaultTimeoutMs,
                             ExpectedStatusCode = check.ExpectedStatusCode ?? 200,
                             ExpectedText = string.IsNullOrEmpty(check.ExpectedText) ? null : check.ExpectedText
-                        } : check)
+                        } : string.Equals(check.Type, "browser", StringComparison.OrdinalIgnoreCase)
+                            ? new DeviceCheck { Type="browser",Url=check.Url!.Trim(),TimeoutMs=check.TimeoutMs ?? 15000,
+                                ExpectedStatusCode=200,ExpectedText=string.IsNullOrEmpty(check.ExpectedText)?null:check.ExpectedText,
+                                AuthenticationOrigins=check.AuthenticationOrigins is { Count: > 0 } ? check.AuthenticationOrigins.Select(value=>new Uri(value).GetLeftPart(UriPartial.Authority)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray():null }
+                            : check)
                     .ToList()
             })
             .ToList();
@@ -660,7 +664,8 @@ public sealed class JsonDeviceRepository
 
                 if (!IsValidCheck(check))
                 {
-                    var detail = string.Equals(check.Type, "http", StringComparison.OrdinalIgnoreCase)
+                    var detail = string.Equals(check.Type, "browser", StringComparison.OrdinalIgnoreCase) ? BrowserCheckRules.ValidationError(check)
+                        : string.Equals(check.Type, "http", StringComparison.OrdinalIgnoreCase)
                         ? HttpCheckService.ValidationError(check)
                         : "Use ping, TCP with a port between 1 and 65535, or HTTP/HTTPS with a URL.";
                     throw new InvalidDataException($"Device '{device.Name}' has an invalid check. {detail}");
@@ -676,6 +681,8 @@ public sealed class JsonDeviceRepository
     /// <returns>True for ping checks and tcp checks with a valid port from 1 to 65535.</returns>
     private static bool IsValidCheck(DeviceCheck check)
     {
+        if (string.Equals(check.Type, "browser", StringComparison.OrdinalIgnoreCase)) return BrowserCheckRules.ValidationError(check) is null;
+        if (check.AuthenticationOrigins is not null) return false;
         if (string.Equals(check.Type, "ping", StringComparison.OrdinalIgnoreCase))
         {
             return true;

@@ -1,5 +1,21 @@
 # NetWatch Lite Architecture
 
+## Authenticated Browser Boundary
+
+`BrowserCheckService` owns bounded volatile sessions keyed by active profile,
+saved-row hash and check index. `IBrowserRuntime` lazily creates dedicated Edge
+contexts; no personal browser profile or login state is read/saved/exported.
+`BrowserCheckRules` validates definitions/destinations. A Chromium CDP Fetch guard
+pauses each top-level document request, including redirect hops, before allowing
+only the application or exact trusted identity-provider origins. Popups are not
+supported. This is not a general network sandbox.
+
+`BrowserCheckEndpoints` restricts manual session actions to exact same-origin
+loopback requests and saved revisions. `browser-checks.js` renders controls and
+neutral authentication/unevaluated states. SQL/JSON persist only definitions and
+sanitized monitoring results; sessions never enter SQLite or backups. See
+[browser checks](BROWSER_CHECKS.md). This is distinct from adding SSO to NetWatch.
+
 ## Runtime Baseline
 
 App/tests target .NET 10 LTS, runtime 10.0.15. See [runtime policy](RUNTIME.md)

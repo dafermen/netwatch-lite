@@ -35,6 +35,12 @@ builder.Services.AddSingleton<DiagnosticPages>();
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("browser-sessions", limiter =>
+    {
+        limiter.PermitLimit = 30;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueLimit = 0;
+    });
     options.AddFixedWindowLimiter("browser-diagnostics", limiter =>
     {
         limiter.PermitLimit = 30;
@@ -49,6 +55,9 @@ builder.Services.AddHttpClient(HttpCheckService.ClientName, client =>
 }).ConfigurePrimaryHttpMessageHandler(HttpCheckService.CreateHandler)
   .RemoveAllLoggers();
 builder.Services.AddSingleton<HttpCheckService>();
+builder.Services.AddSingleton<IBrowserRuntime, BrowserRuntime>();
+builder.Services.AddSingleton<BrowserCheckService>();
+builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<BrowserCheckService>());
 builder.Services.AddSingleton<NetworkMonitorService>();
 builder.Services.AddSingleton<MonitorPlans>();
 builder.Services.AddSingleton<MonitorExecutionService>();
@@ -187,6 +196,7 @@ app.MapGet("/api/storage", (LocalDataStore storage) => Results.Ok(new
 }));
 app.MapStorageEndpoints();
 app.MapMonitoringEndpoints();
+app.MapBrowserCheckEndpoints();
 app.MapDiagnosticEndpoints();
 
 // Reloads the active support group JSON from disk without restarting the application.

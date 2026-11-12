@@ -10,6 +10,9 @@ gates are in [ROADMAP.md](ROADMAP.md); queued work is not implemented work.
 
 ## IMP-008 - Multilingual Monitoring And Diagnostics
 
+Historical delivery authorization/hold below was superseded for GitHub by the
+owner's authenticated-browser work order on 2026-11-12. See IMP-014/current status.
+
 - Authorized: 2026-11-11; local development, regression and a new portable only.
   GitHub publication is explicitly on hold.
 - Implemented: English-default/Spanish UI, inclusive device/website entry,
@@ -40,6 +43,17 @@ gates are in [ROADMAP.md](ROADMAP.md); queued work is not implemented work.
   historical rc.11 ZIP and instructed leaving it as-is; that observation is closed.
   Raw exact-path audit evidence is preserved, not relabeled as 5781 matches.
   No GitHub publication is authorized.
+
+## IMP-014 - Manual Authenticated Browser Checks
+
+- Authorized: 2026-11-12, including tests/docs/new portable and GitHub publication.
+- Implemented: dedicated non-persistent Edge contexts, saved-row local sign-in/
+  confirmation/close, strict final URL/query/content checks, distinct auth/unknown
+  states, bounded lifetime/concurrency and redirect-hop origin guards.
+- Safety: no personal profile, credentials, MFA automation or state export. No
+  real corporate login during testing. SQLite stays schema 2; HTTP is unchanged.
+- Delivery/validation: [current evidence](VALIDATION_BROWSER_2026-11-12.md) and
+  [usage/limits](BROWSER_CHECKS.md). Real application/other-PC acceptance is separate.
 
 ## Proposed Follow-Ups (Not Authorized)
 

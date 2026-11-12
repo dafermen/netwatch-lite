@@ -1,5 +1,10 @@
 # NetWatch Lite API
 
+Authenticated checks add `type: browser` and guarded `POST /api/browser-sessions`.
+See [browser-check API/states](BROWSER_CHECKS.md#api-and-compatibility). They do not
+authenticate NetWatch or change HTTP probes. Numeric statuses 0/1/2 are preserved;
+3=AuthenticationRequired and 4=Unknown. SQLite remains schema 2.
+
 ## Conventions
 
 The rc.14 APIs below are additive; SQLite remains schema 2. UI language does not

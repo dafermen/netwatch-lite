@@ -1,7 +1,7 @@
 function primaryMonitoringTarget(item) {
   const checks = item.configuredChecks ?? item.checks ?? [];
-  const http = checks.find(check => check.type === 'http');
-  if (!http || checks.some(check => check.type !== 'http')) return item.ip;
+  const http = checks.find(check => ['http', 'browser'].includes(check.type));
+  if (!http || checks.some(check => !['http', 'browser'].includes(check.type))) return item.ip;
   try { const url = new URL(http.url); return url.origin + url.pathname; } catch { return item.ip; }
 }
 
@@ -72,7 +72,7 @@ function rememberCompletedRun(payload) {
     expandedFacilityNames.add(item.facility || 'Unassigned');
     expandedCategoryNames.add(createCategoryKey(item.facility, item.category));
   }
-  const problems = results.filter(item => item.status === 'Down' || item.status === 'Degraded').length;
+  const problems = results.filter(item => ['Down', 'Degraded', 'AuthenticationRequired', 'Unknown'].includes(item.status)).length;
   document.querySelector('#last-run-receipt').hidden = false;
   document.querySelector('#last-run-receipt-text').textContent = NetWatchI18n.text(`${results.length} items checked, ${problems} need attention. ${formatDate(payload.lastCheck)}`);
   renderFilteredCategories();
@@ -85,7 +85,7 @@ function showLastRun() {
     <thead><tr><th>Name</th><th>Facility</th><th>Device Type</th><th>Status</th><th>Checks</th><th>Checked</th></tr></thead>
     <tbody>${results.map(item => NetWatchI18n.html`<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.facility)}</td>
       <td>${escapeHtml(dashboardDeviceTypeLabel(item.deviceType))}</td><td>${renderDeviceStatus(item.status)}</td>
-      <td>${(item.checks ?? []).map(check => check.type === 'http' ? renderHttpChecks([check])
+      <td>${(item.checks ?? []).map(check => check.type === 'browser' ? renderBrowserResults([check]) : check.type === 'http' ? renderHttpChecks([check])
         : NetWatchI18n.html`<span class="badge ${check.isAvailable ? 'text-bg-success' : 'text-bg-danger'}">${escapeHtml(check.label)}: ${escapeHtml(check.status || 'Unknown')}</span>`).join(' ')}</td>
       <td>${escapeHtml(formatDate(item.lastCheck))}</td></tr>`).join('')}</tbody></table></div>`;
   bootstrap.Modal.getOrCreateInstance(document.querySelector('#last-run-modal')).show();

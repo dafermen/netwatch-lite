@@ -23,6 +23,7 @@ public sealed class NetworkMonitorService
     private readonly JsonDeviceRepository _deviceRepository;
     private readonly ILogger<NetworkMonitorService> _logger;
     private readonly HttpCheckService _httpChecks;
+    private readonly BrowserCheckService? _browserChecks;
 
     /// <summary>
     /// Initializes a network monitor service with configuration access and diagnostic logging.
@@ -30,14 +31,17 @@ public sealed class NetworkMonitorService
     /// <param name="deviceRepository">Repository that supplies the current monitor configuration.</param>
     /// <param name="logger">Logger used for debug-level network failure details.</param>
     /// <param name="httpChecks">Bounded HTTP/HTTPS probe executor.</param>
+    /// <param name="browserChecks">Separate manually authenticated browser evaluator.</param>
     public NetworkMonitorService(
         JsonDeviceRepository deviceRepository,
         ILogger<NetworkMonitorService> logger,
-        HttpCheckService httpChecks)
+        HttpCheckService httpChecks,
+        BrowserCheckService? browserChecks = null)
     {
         _deviceRepository = deviceRepository;
         _logger = logger;
         _httpChecks = httpChecks;
+        _browserChecks = browserChecks;
     }
 
     /// <summary>
@@ -116,7 +120,7 @@ public sealed class NetworkMonitorService
         var pingTarget = ResolvePingTarget(device);
         var checksToRun = GetChecksForExecution(device, normalizedCheckMode);
         var checkTasks = checksToRun.Select(check =>
-            RunLimitedCheckAsync(device.Ip, pingTarget, check, settings, checkLimiter, cancellationToken));
+            RunLimitedCheckAsync(device.Ip, pingTarget, check, settings, checkLimiter, cancellationToken, device.RuntimeKey, device.Checks.IndexOf(check)));
         var checkResults = await Task.WhenAll(checkTasks);
 
         var hasAvailableCheck = checkResults.Any(result => result.IsAvailable);
@@ -228,6 +232,12 @@ public sealed class NetworkMonitorService
     /// <returns>Healthy when every check succeeded, Degraded when some checks succeeded, otherwise Down.</returns>
     private static DeviceStatus ComputeStatus(IReadOnlyCollection<CheckResult> checkResults)
     {
+        var definitive = checkResults.Where(result => result.Type != "browser" || result.Status is not ("AuthenticationRequired" or "NotEvaluated" or "BrowserUnavailable" or "NavigationBlocked" or "UnexpectedDestination" or "SessionLimit")).ToArray();
+        if (definitive.Length == 0 && checkResults.Count > 0)
+            return checkResults.Any(result => result.Status == "AuthenticationRequired") ? DeviceStatus.AuthenticationRequired : DeviceStatus.Unknown;
+        if (definitive.Any(result => !result.IsAvailable))
+            return definitive.Any(result => result.IsAvailable) ? DeviceStatus.Degraded : DeviceStatus.Down;
+        if (definitive.Length != checkResults.Count) return DeviceStatus.Degraded;
         if (!checkResults.Any(result => result.IsAvailable))
         {
             return DeviceStatus.Down;
@@ -247,19 +257,28 @@ public sealed class NetworkMonitorService
     /// <param name="settings">Network timeout and retry settings.</param>
     /// <param name="checkLimiter">Shared semaphore limiting total concurrent checks.</param>
     /// <param name="cancellationToken">Token used to cancel queued or in-flight work.</param>
-    /// <returns>The raw check result for ping or TCP.</returns>
+    /// <param name="browserKey">Revision-scoped saved inventory key for browser sessions.</param>
+    /// <param name="browserCheckIndex">Original check index; never resolves duplicates by display name.</param>
+    /// <returns>The raw result for the configured check.</returns>
     private async Task<CheckResult> RunLimitedCheckAsync(
         string ip,
         string pingTarget,
         DeviceCheck check,
         MonitorSettings settings,
         SemaphoreSlim checkLimiter,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? browserKey = null,
+        int browserCheckIndex = -1)
     {
         await checkLimiter.WaitAsync(cancellationToken);
 
         try
         {
+            if (string.Equals(check.Type, "browser", StringComparison.OrdinalIgnoreCase))
+            {
+                if (_browserChecks is null) return new CheckResult { Type="browser",Label="Browser",IsAvailable=false,Status="NotEvaluated",Message="Browser monitoring is unavailable in this host." };
+                return await _browserChecks.CheckAsync(browserKey, browserCheckIndex, check, cancellationToken);
+            }
             if (string.Equals(check.Type, "http", StringComparison.OrdinalIgnoreCase))
             {
                 return await RunWithRetryAsync(
