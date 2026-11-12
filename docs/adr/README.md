@@ -25,6 +25,8 @@ link both records.
 
 ## Records
 
+- [0008 - Supported .NET 10 LTS runtime](0008-dotnet10-lts.md)
+
 - [0001 - Local JSON persistence](0001-local-json-persistence.md)
 - [0002 - Profile-scoped peripheral inventory](0002-profile-scoped-peripherals.md)
 - [0003 - Bounded HTTP application checks](0003-bounded-http-checks.md)

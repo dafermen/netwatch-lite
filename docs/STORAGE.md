@@ -91,8 +91,8 @@ and reconcile the result before choosing operational cutover.
 From the project directory after a Release build:
 
 ```powershell
-dotnet .\bin\Release\net8.0\NetWatch-Lite.dll --contentRoot C:\Projects\netwatch-lite --StorageAction migrate-json
-dotnet .\bin\Release\net8.0\NetWatch-Lite.dll --contentRoot C:\Projects\netwatch-lite --StorageAction verify
+dotnet .\bin\Release\net10.0\NetWatch-Lite.dll --contentRoot C:\Projects\netwatch-lite --StorageAction migrate-json
+dotnet .\bin\Release\net10.0\NetWatch-Lite.dll --contentRoot C:\Projects\netwatch-lite --StorageAction verify
 ```
 
 For an extracted portable, use its executable instead of `dotnet ...dll`:

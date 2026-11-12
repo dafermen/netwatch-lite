@@ -8,6 +8,12 @@ pause/resume without deleting a record. See [filters](DASHBOARD_FILTERS.md) and
 
 ## Search Visibility
 
+During configuration/inventory loading, search may still reveal matching rows,
+but recreated Normal/Bulk controls retain their disabled state. Row/action
+handlers also reject premature edits, copies and deletes. Once loading settles,
+the editor can open without a late response resetting the draft. This is a UI
+load guard, not authenticated multi-user or same-profile revision control.
+
 A nonempty Configuration search opens the matching Facility/category groups so
 the device rows are visible immediately. Their Edit/Copy/Delete actions still
 use original inventory indexes. Groups can be manually collapsed/expanded while

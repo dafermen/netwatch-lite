@@ -19,6 +19,10 @@ Operational readiness references:
 
 ## Runtime Overview
 
+App/tests target .NET 10 LTS, SDK 10.0.404 and runtime 10.0.15. See
+[runtime setup and servicing](RUNTIME.md), including the process-scoped private
+SDK used locally; the machine-wide SDK/runtime installations are unchanged.
+
 The peripheral inventory model is in `Models/PeripheralInventory.cs`; validation
 and canonicalization live in `Services/PeripheralInventoryRules.cs`. Configuration
 normalization and row updates preserve these optional fields. `wwwroot/peripherals.js`
@@ -56,7 +60,7 @@ NetworkMonitorService
 Ping / TCP / HTTP(S) checks
 ```
 
-Configuration uses `LocalDataStore`: SQLite schema 1 for clean installs and
+Configuration uses `LocalDataStore`: SQLite schema 2 for clean installs and
 compatible JSON for existing installations until explicit offline migration.
 See [storage commands and rollback](STORAGE.md). The logical profile documents
 and API/JSON import/export contracts remain unchanged. `Data/config.sample.json`

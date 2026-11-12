@@ -1,26 +1,34 @@
 #requires -Version 7.0
-param([string]$SourceRoot = (Split-Path -Parent $PSScriptRoot))
+param(
+    [string]$SourceRoot = (Split-Path -Parent $PSScriptRoot),
+    [string]$LegacyDll,
+    [string]$LegacyDotnet = 'C:\Program Files\dotnet\dotnet.exe',
+    [string]$CandidateDotnet = (Get-Command dotnet -ErrorAction Stop).Source
+)
 $ErrorActionPreference = 'Stop'
 $SourceRoot = (Resolve-Path -LiteralPath $SourceRoot).Path
 $repo = Split-Path -Parent $PSScriptRoot
 $run = Join-Path $repo ('artifacts/verification/relational-pilot-' + [guid]::NewGuid().ToString('N'))
 $appRoot = Join-Path $run 'app'
 $runner = Join-Path $repo 'tests/.app/NetWatch-Lite.dll'
-$legacy = Join-Path $SourceRoot 'bin/Release/net8.0/NetWatch-Lite.dll'
-$dotnet = 'C:\Program Files\dotnet\dotnet.exe'
+$legacy = if ($LegacyDll) { (Resolve-Path -LiteralPath $LegacyDll).Path } else { Join-Path $SourceRoot 'bin/Release/net8.0/NetWatch-Lite.dll' }
 New-Item -ItemType Directory -Path $appRoot -Force | Out-Null
 if(Test-Path -LiteralPath (Join-Path $SourceRoot 'Data') -PathType Container){New-Item -ItemType Directory -Path (Join-Path $appRoot 'Data') | Out-Null}
 $process = $null
 $client = [Net.Http.HttpClient]::new()
 $report = [ordered]@{ passed=$false; snapshotRoutes=0; documentHashesMatched=$false; rollbackMatched=$false; originalJsonUnchanged=$false; queryCountsMatched=$false; schema=$null }
 function Info([string]$Dll,[string]$Root,[string[]]$Arguments) {
-    $info = [Diagnostics.ProcessStartInfo]::new($dotnet)
+    $hostPath = if ($Dll -eq $legacy) { $LegacyDotnet } else { $CandidateDotnet }
+    $info = [Diagnostics.ProcessStartInfo]::new($hostPath)
     $info.UseShellExecute=$false; $info.CreateNoWindow=$true; $info.WindowStyle='Hidden'
     $info.RedirectStandardOutput=$true; $info.RedirectStandardError=$true; $info.WorkingDirectory=$Root
     $info.ArgumentList.Add($Dll); $info.ArgumentList.Add('--contentRoot'); $info.ArgumentList.Add($Root)
     foreach($argument in $Arguments){$info.ArgumentList.Add($argument)}
     foreach($key in @($info.Environment.Keys)){if($key -match '^(NetworkMonitor__|Storage__|ASPNETCORE_|DOTNET_ENVIRONMENT)'){$info.Environment.Remove($key)}}
     $info.Environment['ASPNETCORE_ENVIRONMENT']='Production'
+    $info.Environment['DOTNET_ROOT']=Split-Path -Parent $hostPath
+    $info.Environment['DOTNET_ROOT_X64']=Split-Path -Parent $hostPath
+    $info.Environment['DOTNET_ROLL_FORWARD']='LatestPatch'
     return $info
 }
 function Offline([string]$Name,[string[]]$Arguments){
@@ -50,7 +58,12 @@ try{
     Copy-Item -LiteralPath (Join-Path $repo 'tests/.app/config.sample.json') -Destination $appRoot
     $original=@{};foreach($file in Get-ChildItem -LiteralPath (Join-Path $SourceRoot 'Data') -Recurse -File -Filter '*.json'){$original[$file.FullName]=(Get-FileHash -LiteralPath $file.FullName).Hash}
     Offline 'snapshot' @('--StorageAction','snapshot-readonly','--StorageSource',(Join-Path $SourceRoot 'netwatch.db'),'--StorageDestination',(Join-Path $appRoot 'netwatch.db'))
-    $before=Snapshot (Start-Server $legacy $appRoot 'legacy');Stop-Server
+    $legacyBase=Start-Server $legacy $appRoot 'legacy'
+    $legacyStorage=$client.GetStringAsync("$legacyBase/api/storage").GetAwaiter().GetResult()|ConvertFrom-Json
+    if($legacyStorage.schemaVersion -ne 1){throw 'This historical pilot requires a schema-1 baseline. Use test-runtime-upgrade.ps1 for the current schema-2 runtime comparison.'}
+    # Initialize legacy defaults/backups on the copy before freezing its baseline.
+    $null=Snapshot $legacyBase;Stop-Server
+    $before=Snapshot (Start-Server $legacy $appRoot 'legacy-baseline');Stop-Server
     Offline 'export-before' @('--StorageAction','export-json','--StorageDestination',(Join-Path $run 'before'))
     $base=Start-Server $runner $appRoot 'schema2';$after=Snapshot $base
     foreach($route in $before.Keys){if($before[$route] -cne $after[$route]){throw "API snapshot mismatch: $route"};$report.snapshotRoutes++}

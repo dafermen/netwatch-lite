@@ -25,13 +25,39 @@ gates are in [ROADMAP.md](ROADMAP.md); queued work is not implemented work.
 
 ## IMP-009 - Supported Runtime Before Stable Deployment
 
-- Status: High-priority follow-up, not authorized/implemented as a major upgrade.
+- Authorized: 2026-11-12. .NET 10 LTS implementation/regression complete;
+  backed-up local activation and immutable rc.15 native delivery pending.
 - Found: 2026-11-12. .NET 8 support ended on 2026-11-10, per
   [Microsoft](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core).
-- rc.14 keeps the target for compatibility; portables pin the final 8.0.34 patch.
+- Historical rc.14 keeps net8.0; its portables pin the final 8.0.34 patch.
   This does not restore support. No machine-wide SDK/runtime was replaced.
-- Next: separately validate a supported LTS target, patching, native portable,
-  storage compatibility and rollback before stable deployment.
+- Current: SDK 10.0.404/runtime 10.0.15, matching provider/testing packages,
+  package guards and private-copy compatibility/rollback. No schema change.
+  See [runtime policy](RUNTIME.md) and [validation](VALIDATION_DOTNET10_2026-11-12.md).
+  Local activation/portable delivery and stable deployment are separate gates.
+  Final regression: 416 .NET, 444 browser passes; native/data-preservation receipts
+  are recorded separately at delivery. No GitHub publication is authorized.
+
+## Proposed Follow-Ups (Not Authorized)
+
+- IMP-010 - Offline frontend assets: bundle versioned Bootstrap/FontAwesome and
+  licenses locally, then test the complete interface without internet/CDN access.
+  Current browser fixtures provide local assets; this does not prove real offline use.
+- IMP-011 - Shared-service access controls: authentication, read/operator/admin
+  roles and authenticated audit attribution before broader network exposure.
+  Current audit entries are local changes, not verified user identity.
+- IMP-012 - Operational acceptance: another-PC/proxy/SSO checks, representative
+  sustained-load measurements and periodic restore drills into a new folder.
+  Existing backup/restore, diagnostics and bounded local tests are not a substitute
+  for the target environment's acceptance or continuous availability alerts.
+- IMP-013 - Visible running version: show the actual application version, runtime
+  patch and storage provider/schema in About or a read-only status view. This
+  would distinguish an old portable from the source service without exposing
+  database paths, inventory or credentials. Current About identifies .NET 10 LTS
+  but does not expose a live build/version endpoint.
+
+These are recommendations only. Prioritize offline assets for portable usability;
+prioritize access controls first if the service will be shared beyond a trusted PC.
 
 ## IMP-007 - Dashboard Device Type Filter (Historical rc.13)
 

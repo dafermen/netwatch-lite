@@ -12,6 +12,28 @@ function Assert-Rejected([scriptblock]$Action) {
     if (-not $rejected) { throw 'Expected rejection did not occur.' }
     $script:passed++
 }
+$runtime = @{ runtimeOptions = @{ tfm = 'net10.0'; includedFrameworks = @(
+    @{ name = 'Microsoft.NETCore.App'; version = '10.0.15' },
+    @{ name = 'Microsoft.AspNetCore.App'; version = '10.0.15' }
+) } }
+Assert-PortableRuntime $runtime; $script:passed++
+foreach ($tfm in @('net8.0', 'net9.0', 'net11.0', '')) {
+    $bad = $runtime | ConvertTo-Json -Depth 6 | ConvertFrom-Json
+    $bad.runtimeOptions.tfm = $tfm
+    Assert-Rejected { Assert-PortableRuntime $bad }
+}
+foreach ($patch in @('8.0.34', '10.0.14', '11.0.0', '')) {
+    $bad = $runtime | ConvertTo-Json -Depth 6 | ConvertFrom-Json
+    $bad.runtimeOptions.includedFrameworks[0].version = $patch
+    Assert-Rejected { Assert-PortableRuntime $bad }
+}
+$bad = @{ runtimeOptions = @{ tfm = 'net10.0'; includedFrameworks = @($runtime.runtimeOptions.includedFrameworks[0], $runtime.runtimeOptions.includedFrameworks[0]) } }
+Assert-Rejected { Assert-PortableRuntime $bad }
+foreach ($key in @('framework', 'frameworks')) {
+    $bad = @{ runtimeOptions = @{ tfm = 'net10.0'; includedFrameworks = $runtime.runtimeOptions.includedFrameworks } }
+    $bad.runtimeOptions[$key] = @{ name = 'Microsoft.NETCore.App'; version = '10.0.15' }
+    Assert-Rejected { Assert-PortableRuntime $bad }
+}
 foreach ($version in @('0.8.0', '0.8.0-rc.1', '1.2.3-alpha.20261107')) { Assert-PortableVersion $version; $script:passed++ }
 foreach ($version in @('', '1.2', '../1.2.3', '01.2.3', '1.2.3;evil', '1.2.3/evil', ('1.2.3-' + ('a' * 65)))) {
     Assert-Rejected { Assert-PortableVersion $version }

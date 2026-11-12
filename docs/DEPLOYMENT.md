@@ -3,7 +3,13 @@
 Use this checklist before tagging, packaging, demoing, committing a stable
 milestone, or deploying the application.
 
-rc.14 requires its matching backend and UI for snapshot/plan execution, monitoring
+rc.15 requires .NET 10 LTS (runtime 10.0.15 or newer 10.0 patch) for framework-
+dependent hosting; the portable contains 10.0.15. Replace the complete application,
+not just its DLL. Follow [runtime servicing/rollback](RUNTIME.md) and retain a
+verified private backup. No schema change accompanies this migration. See
+[runtime validation](VALIDATION_DOTNET10_2026-11-12.md).
+
+rc.14 and later require matching backend and UI for snapshot/plan execution, monitoring
 switches and Diagnostics. Do not deploy its JS alone over rc.13. Its automatic
 runs intentionally use all active filters. SQLite remains schema 2; back up before
 updating. Only a local evaluation portable is authorized; GitHub publication is

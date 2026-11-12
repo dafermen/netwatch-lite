@@ -11,6 +11,8 @@ other development tools.
 
 ## Core Documents
 
+- [Supported .NET runtime](RUNTIME.md): .NET 10 LTS, servicing, local SDK and rollback.
+
 - [Interface languages](UI_LANGUAGES.md): English default, Spanish preference and data boundaries.
 - [Diagnostics](DIAGNOSTICS.md): references, internal errors versus probe failures and private exports.
 
@@ -36,6 +38,8 @@ other development tools.
 - [Architecture Decisions](adr/README.md): decisions that materially affect the system.
 
 ## Other Documentation
+
+- [.NET 10 migration and local rc.15 - 2026-11-12](VALIDATION_DOTNET10_2026-11-12.md)
 
 - [Multilingual monitoring and local rc.14 - 2026-11-12](VALIDATION_MULTILINGUAL_2026-11-12.md)
 

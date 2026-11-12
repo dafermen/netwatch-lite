@@ -2,17 +2,17 @@
 
 ## Generate A Candidate
 
-The generator pins the final .NET 8 patch, **8.0.34**, instead of an older SDK
-runtime pack. .NET 8 ended support on 2026-11-10; this remains an evaluation
-package, not a supported stable deployment. A supported-runtime migration needs
-separate validation. See [Microsoft](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core).
+The generator pins **.NET 10 LTS / ASP.NET Core 10.0.15** in Directory.Build.props;
+the package validator checks both included versions. rc.14 and older immutable
+packages retain their historical runtime. See [runtime servicing](RUNTIME.md).
+This remains an evaluation candidate, not stable-deployment approval.
 
-Run from the repository with the .NET 8 SDK and Windows PowerShell 5.1 or newer:
+Run from the repository with SDK 10.0.404 (or newer .NET 10 SDK) and Windows PowerShell 5.1 or newer:
 
 ```powershell
 cd C:\Projects\netwatch-lite
 .\scripts\test-packaging.ps1
-.\scripts\publish-portable.ps1 -Version 0.8.0-rc.14
+.\scripts\publish-portable.ps1 -Version 0.8.0-rc.15
 ```
 
 `-Version` is required. Use a new full version on every build, including a new
@@ -20,11 +20,12 @@ prerelease suffix when rebuilding a candidate. The version is passed to .NET
 publish and checked against the resulting assembly metadata. It is not inferred
 from the last directory name. The initial supported target is Windows x64.
 
-The current local candidate is `0.8.0-rc.14`, adding English/Spanish UI, inclusive
+The current local candidate is `0.8.0-rc.15`, upgrading to supported .NET 10 LTS
+and retaining the rc.14 English/Spanish UI, inclusive
 device/website forms, shared filters/grouping, exact filtered manual/automatic
 checks, pause/resume and private diagnostics. GitHub publication is ON HOLD for
 this candidate. rc.13 is the preceding public prerelease. See
-[current validation](VALIDATION_MULTILINGUAL_2026-11-12.md).
+[current runtime validation](VALIDATION_DOTNET10_2026-11-12.md).
 
 The preceding rc.13 includes the dashboard inventory
 preview/search, copy-only Command, individual checks and filter/header controls,
@@ -133,7 +134,7 @@ Every generation validates the staged folder, creates a ZIP, extracts that exact
 ZIP into a new verification directory and checks:
 
 - Explicit file policy, required files, manifest hashes and matching versions.
-- Included .NET 8/ASP.NET Core runtimes, generated settings and loopback sample.
+- Included .NET 10/ASP.NET Core runtimes, generated settings and loopback sample.
 - Rejection of corrupted sample/binary/metadata and injected config/database/sidecar/lease files.
 - ZIP traversal, duplicate/redirected entries and expanded-size limits.
 - Native EXE startup from a different working directory with an explicit

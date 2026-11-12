@@ -103,8 +103,9 @@ scenario or authorize a deployment with an unexplained failure.
 
 ## Testhost Selects The Wrong Runtime
 
-If build succeeds but testhost says .NET 8 is missing and reports a per-user
-installation with only .NET 10, inspect the selected installations:
+If build/testhost cannot find the SDK or pinned .NET 10 runtime, inspect the
+selected installations (a machine-wide 10.0.403 SDK/10.0.14 runtime is too old
+for the current pinned baseline):
 
 ```powershell
 Get-Command dotnet
@@ -113,17 +114,18 @@ dotnet --list-runtimes
 & 'C:\Program Files\dotnet\dotnet.exe' --list-runtimes
 ```
 
-When the system installation contains the required .NET 8 and ASP.NET Core 8
-runtimes, select it for the current PowerShell process only:
+Select an installation containing SDK 10.0.404 and .NET/ASP.NET Core 10.0.15
+or newer matching patches for the current PowerShell process only. Locally:
 
 ```powershell
-$env:DOTNET_ROOT_X64 = 'C:\Program Files\dotnet'
-$env:DOTNET_ROOT = 'C:\Program Files\dotnet'
-& 'C:\Program Files\dotnet\dotnet.exe' test netwatch.sln --configuration Release
-& 'C:\Program Files\dotnet\dotnet.exe' run --configuration Release --no-launch-profile --urls http://localhost:5000
+$env:DOTNET_ROOT = 'C:\Projects\netwatch-lite\artifacts\tools\dotnet-10.0.404'
+$env:DOTNET_ROOT_X64 = $env:DOTNET_ROOT
+$env:PATH = "$env:DOTNET_ROOT;$env:PATH"
+dotnet test netwatch.sln --configuration Release
+dotnet run --configuration Release --no-launch-profile --urls http://localhost:5000
 ```
 
-Use the actual installation path on other machines. If .NET 8 is absent,
-install the required SDK/runtime first. No machine-wide environment change is
-needed for this process-scoped workaround.
+Use the actual installation path on other machines. Install the required
+SDK/runtime first or use the self-contained portable. No persistent environment
+change is needed. See [runtime setup](RUNTIME.md).
 

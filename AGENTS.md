@@ -5,7 +5,7 @@ These instructions are mandatory for any Codex session working on NetWatch Lite.
 ## Project Context
 
 - This repository is `dafermen/netwatch-lite`.
-- The app is a .NET 8 ASP.NET Core Minimal API with a static Bootstrap frontend in `wwwroot/`.
+- The app is a .NET 10 LTS ASP.NET Core Minimal API with a static Bootstrap frontend in `wwwroot/`.
 - The product is an internal network monitoring dashboard. Keep the scope practical: local monitoring, editable JSON profiles, support groups, themes, reports, local history, local error logging, and local integration settings.
 - The companion Windows WebView2 wallboard lives in the separate `netwatch-lite-wallboard` repository. Do not reintroduce wallboard source into this repo unless the user explicitly asks.
 
@@ -48,7 +48,8 @@ These instructions are mandatory for any Codex session working on NetWatch Lite.
 ## Safety Rules
 
 - GitHub publication is ON HOLD for the new multilingual/filter/diagnostics
-  work order authorized on 2026-11-11. Local commits and a neutral portable are
+  work order authorized on 2026-11-11 and the .NET 10 migration authorized on
+  2026-11-12. Local commits and a neutral portable are
   allowed; do not push, create releases or deploy until explicitly authorized.
   The preceding rc.13 publication was a separate completed delivery.
 - Do not commit runtime operational data. These files must stay private and ignored: `Data/config.json`, `Data/config.backup.json`, `Data/regions.json`, `Data/regions/`, `Data/themes.json`, `Data/monitor-history.json`, `Data/app-errors.json`, and `Data/integrations.json`.
@@ -69,10 +70,13 @@ These instructions are mandatory for any Codex session working on NetWatch Lite.
 
 ## Engineering Rules
 
-- Runtime support is a stable-deployment gate: .NET 8 ended support on
-  2026-11-10. Portables pin the final 8.0.34 patch, but remain evaluation builds.
-  IMP-009 requires a separately authorized/validated supported-runtime migration.
-  Do not silently retarget the framework or replace machine-wide runtimes.
+- IMP-009 is authorized on 2026-11-12: use .NET 10 LTS, SDK 10.0.404 or newer
+  supported .NET 10 feature band and runtime 10.0.15. The runtime patch is pinned
+  in Directory.Build.props and checked by the portable validator; update both
+  when servicing. Use a private SDK for local validation, not a silent
+  machine-wide replacement. Historical net8.0 pilot paths/receipts are intentional.
+  Preserve SQLite schema 2 and prove data/rollback compatibility before cutover.
+  See docs/RUNTIME.md; supported runtime does not imply stable-release approval.
 
 - Printer/scanner catalogs live in each support-group configuration, alongside
   workstation assignments. Keep them self-contained for copy/import/export;
@@ -119,7 +123,10 @@ These instructions are mandatory for any Codex session working on NetWatch Lite.
   edit-time migrations. Confirm configured-check replacement. Keep Configuration
   editing disabled until initial profile/configuration loading completes, so a
   delayed read cannot close an operator's draft. Search reveals matching parents
-  without saving or monitoring and restores collapse behavior when cleared.
+  without recreating enabled actions while configurationBusy. Reapply busy state
+  to newly rendered Normal/Bulk controls and guard delegated action handlers.
+  Search operates without saving or monitoring and restores collapse behavior
+  when cleared.
 - Configuration search includes each HTTP check URL. Successful device create/
   edit/copy reveals the saved row, clearing only incompatible filters and opening
   its parents. Reveal it on the next Dashboard visit without executing a check;

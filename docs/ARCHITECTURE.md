@@ -1,5 +1,11 @@
 # NetWatch Lite Architecture
 
+## Runtime Baseline
+
+App/tests target .NET 10 LTS, runtime 10.0.15. See [runtime policy](RUNTIME.md)
+and [ADR 0008](adr/0008-dotnet10-lts.md). SQLite schema 2 and JSON/API contracts
+are unchanged by this upgrade; self-contained portables include both runtimes.
+
 ## rc.14 Additions
 
 `MonitorPlans` captures an exact, bounded, short-lived, single-use selection from

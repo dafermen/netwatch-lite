@@ -2,12 +2,18 @@
 
 Last updated: 2026-11-12
 
-Current delivery: [multilingual monitoring / IMP-008](IMPROVEMENTS.md), tracked in
+Current authorized work: [supported runtime / IMP-009](RUNTIME.md), tracked in
+[runtime validation](VALIDATION_DOTNET10_2026-11-12.md). .NET 10 LTS source/regression
+passed (416 .NET/444 browser), with private compatibility/rollback proven. Local
+activation/new rc.15 portable are pending; preserve SQLite schema 2/private data/
+history and historical artifacts. GitHub remains on hold.
+
+Preceding delivery: [multilingual monitoring / IMP-008](IMPROVEMENTS.md), tracked in
 [validation](VALIDATION_MULTILINGUAL_2026-11-12.md). English/Spanish UI, shared
 filters/grouping, exact filtered runs, monitoring pauses and private Diagnostics
 are implemented. Source rc.14 runs with SQLite schema 2 on port 5000; its neutral
 folder/ZIP/SHA and native validation are complete. GitHub publication is on hold.
-Next gates: operator/other-PC acceptance and the supported-runtime follow-up IMP-009.
+Next gates: supported-runtime validation and operator/other-PC acceptance.
 
 The user requested coordinated development of the discussed improvements. This
 plan sets the delivery order and safety gates. [IMPROVEMENTS.md](IMPROVEMENTS.md)

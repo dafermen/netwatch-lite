@@ -1,6 +1,6 @@
 # NetWatch-Lite
 
-NetWatch-Lite is a .NET 8 ASP.NET Core + Bootstrap network monitoring dashboard.
+NetWatch-Lite is a .NET 10 LTS ASP.NET Core + Bootstrap network monitoring dashboard.
 It stores local profiles in SQLite or compatible JSON, runs asynchronous ping,
 TCP and HTTP/HTTPS checks, groups results by region/facility/category and can be
 published as a portable Windows executable with the .NET runtime included.
@@ -23,14 +23,23 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 
 ## Portable Download
 
-Local candidate `0.8.0-rc.14` adds English/Spanish UI (English default), inclusive
+Local candidate `0.8.0-rc.15` moves the app, tests and portable to .NET 10 LTS
+(runtime 10.0.15), preserving the rc.14 features and SQLite schema 2.
+It also keeps Configuration actions read-only when search recreates rows during
+a pending inventory load, preventing premature editor closure in Normal/Bulk.
+See [runtime setup/servicing](docs/RUNTIME.md) and [migration validation](docs/VALIDATION_DOTNET10_2026-11-12.md).
+GitHub publication remains on hold; the public download below is still rc.13.
+Published rc.13 bundles the now-unsupported .NET 8 runtime. Keep it as a historical
+evaluation build; use the new local rc.15 ZIP for supported-runtime evaluation.
+
+Preceding local candidate `0.8.0-rc.14` adds English/Spanish UI (English default), inclusive
 device/website forms, shared Configuration filters and Facility/Device Type
 grouping, quick pause/resume, exact filtered manual/automatic monitoring,
 last-execution detail and private diagnostics/export. These rules supersede
 rc.13's global automatic runs and presentation-only search. See
 [filters](docs/DASHBOARD_FILTERS.md), [languages](docs/UI_LANGUAGES.md),
 [diagnostics](docs/DIAGNOSTICS.md) and [validation](docs/VALIDATION_MULTILINGUAL_2026-11-12.md).
-**GitHub publication is on hold for rc.14.** The download below remains the
+**GitHub publication remains on hold.** The download below remains the
 previous published rc.13. New local ZIP/SHA receipts are in CURRENT_STATUS;
 stable/other-PC acceptance is separate.
 
@@ -533,7 +542,8 @@ The project also enables XML documentation generation in `NetWatch.csproj`:
 
 ## Build and Run
 
-Install the .NET 8 SDK, then run:
+Install the .NET 10 SDK 10.0.404 or newer .NET 10 SDK and ASP.NET Core runtime
+10.0.15 or newer 10.0 patch, then run (see [private local SDK](docs/RUNTIME.md)):
 
 ```bash
 dotnet restore netwatch.sln

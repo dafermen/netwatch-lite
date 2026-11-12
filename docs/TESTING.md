@@ -1,6 +1,16 @@
 # NetWatch Lite Testing Guide
 
-Current scope/receipts: [multilingual monitoring validation](VALIDATION_MULTILINGUAL_2026-11-12.md).
+Current runtime scope/receipts: [.NET 10 validation](VALIDATION_DOTNET10_2026-11-12.md).
+Use the [matching SDK/runtime](RUNTIME.md) before running commands below.
+The per-test isolated application fixture has a separate 30-second preparation/
+cleanup budget, with copy/startup/setup metrics attached. Workflow timeout stays
+30 seconds, UI assertions 8 seconds and server readiness 15 seconds. This avoids
+charging cold runtime/file-copy preparation against UI behavior; it does not
+establish a production performance SLO. See [Playwright fixture timeouts](https://playwright.dev/docs/test-fixtures#fixture-timeout).
+Windows fixtures use bounded, copy-only Robocopy for public wwwroot/docs assets
+(no mirroring, purging or junction copying); other platforms retain Node's copy.
+Runtime databases/configuration remain fresh private copies, never shared links.
+Feature baseline: [multilingual monitoring validation](VALIDATION_MULTILINGUAL_2026-11-12.md).
 New browser suites cover exact/shared filters, pause/resume, both languages,
 draft-safe switching and Diagnostics consultation/export. Pure seeded predicates:
 
@@ -107,6 +117,13 @@ Legacy Reports presentation mocks explicitly select the JSON adapter.
 `scripts/test-relational-pilot.ps1` takes a consistent private read-only snapshot,
 compares eight schema-1/2 APIs, checks exact document bytes and restores the old
 snapshot with the older binary. Never run mutations on operator data.
+It requires a retained schema-1 database/binary (pass `-SourceRoot` and
+`-LegacyDll` explicitly), not the current schema-2 service. `-LegacyDotnet` and
+`-CandidateDotnet` select separate hosts across framework generations. Use
+`scripts/test-runtime-upgrade.ps1` for the current .NET 8-to-10/schema-2 pilot.
+The schema-1 copy is warmed with its legacy binary before freezing the baseline:
+first-run theme/integration default backups are not mistaken for migration edits.
+All baseline document bytes/counts must still match exactly after upgrading.
 
 For Windows file-I/O diagnosis, run projects and xUnit collections sequentially:
 
@@ -262,7 +279,7 @@ monitoring, report filters/export/targeted deletion, docs search/theme,
 mobile menu, and return navigation. The report deletion test uses real UI
 interaction against the backend, not an API stub.
 
-Install/run from the repository root with .NET 8 and Node.js available:
+Install/run from the repository root with .NET 10 and Node.js available:
 
 ```powershell
 dotnet restore netwatch.sln

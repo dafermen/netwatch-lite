@@ -2,7 +2,35 @@
 
 Last updated: 2026-11-12
 
-## Final Local Delivery - 0.8.0-rc.14
+## Supported Runtime - rc.15 Validated For Packaging
+
+Owner authorized IMP-009 on 2026-11-12. App/tests/CI now target .NET 10 LTS,
+runtime 10.0.15, SDK 10.0.404 (official SHA-512 verified private installation at
+artifacts/tools/dotnet-10.0.404). No machine-wide runtime/environment replacement.
+SQLite stays schema 2. GitHub publication is ON HOLD; local commits/neutral
+folder/ZIP/SHA only. Historical artifacts and operator data must remain intact.
+
+- Final .NET: 416 passed (34 unit/28 integration/354 contract); zero skips.
+  Final solution build: zero warnings/errors; 35 HTTP/TLS retests passed.
+- Final browser: 444 passed (222 JSON/222 SQLite), desktop/mobile and both
+  languages; zero failures/skips/retries. A controlled-delay regression exposed
+  and fixed premature Configuration editing after search rerenders in Normal/Bulk.
+- Eight monitoring/six storage sampled mutants killed; 2000 seeded JS cases;
+  70 package guards each on PS5.1/7; syntax/links/translations and audits passed.
+- Private runtime pilot 9054ef0bf79243d49da7804796638ab7 matched eight APIs,
+  raw document bytes/SQL counts, net8 rollback and original JSON. Historical
+  schema-1 synthetic cross-runtime upgrade/restore also passed.
+- Browser preparation is separately bounded/measured; Windows copy-only Robocopy
+  replaces slow Node asset copies. Final max setup: JSON 8409 ms/SQLite 6491 ms.
+  Failed/aborted earlier attempts and traces remain as evidence, not final passes.
+
+Pending: backed-up local activation on port 5000 (initially stopped), new immutable
+rc.15 folder/ZIP/SHA, native ZIP/folder checks and 5781 protected historical/original
+hashes. Evidence: artifacts/verification/dotnet10-20261112; see
+[runtime validation](docs/VALIDATION_DOTNET10_2026-11-12.md).
+Other-PC/proxy/SSO/sustained-load acceptance and stable approval remain separate.
+
+## Historical Local Delivery - 0.8.0-rc.14
 
 COMPLETE: the eight feature changes, regression, documentation and immutable
 portable folder/ZIP/SHA are delivered locally. GitHub publication is ON HOLD;

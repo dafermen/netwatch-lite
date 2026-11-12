@@ -3205,6 +3205,14 @@ function renderConfigDevices() {
       }).join("")}`;
     })
     .join("");
+  keepConfigRowsReadOnly();
+}
+
+function keepConfigRowsReadOnly() {
+  if (!configurationBusy) return;
+  for (const root of [configDevicesBody, bulkEditPanel]) {
+    root.querySelectorAll('input, select, textarea, button').forEach(element => { element.disabled = true; });
+  }
 }
 
 function renderConfigView() {
@@ -3246,6 +3254,7 @@ function renderBulkEditDevices() {
         <td colspan="10" class="text-center text-secondary py-4">${NetWatchI18n.text(hasSearch || hasBulkFilters ? "No devices match the current filters." : "No devices configured.")}</td>
       </tr>`;
     updateBulkSelectionControls();
+    keepConfigRowsReadOnly();
     return;
   }
 
@@ -3254,6 +3263,7 @@ function renderBulkEditDevices() {
     .join("");
   pruneBulkSelection();
   updateBulkSelectionControls();
+  keepConfigRowsReadOnly();
 }
 
 /**
@@ -3843,12 +3853,14 @@ function toggleConfigFacility(toggleButton) {
 }
 
 function startAddDevice() {
+  if (configurationBusy) return;
   resetDeviceForm();
   showDeviceForm();
   deviceNameInput.focus();
 }
 
 function editDevice(index) {
+  if (configurationBusy) return;
   const device = configState.devices[index];
 
   if (!device) {
@@ -3864,6 +3876,7 @@ function editDevice(index) {
 }
 
 function copyDevice(index) {
+  if (configurationBusy) return;
   const device = configState.devices[index];
 
   if (!device) {
@@ -4267,6 +4280,7 @@ function updateDeviceAddressRequirement() {
 }
 
 function requestDeleteDevice(index) {
+  if (configurationBusy) return;
   const device = configState.devices[index];
 
   if (!device) {
@@ -5355,6 +5369,7 @@ checksList.addEventListener("click", event => {
   }
 });
 configDevicesBody.addEventListener("click", event => {
+  if (configurationBusy) return;
   const facilityToggle = event.target.closest("[data-config-facility-toggle]");
   const categoryToggle = event.target.closest("[data-config-category-toggle]");
   const editButton = event.target.closest("[data-edit-device]");
@@ -5386,6 +5401,7 @@ configDevicesBody.addEventListener("click", event => {
   }
 });
 bulkDevicesBody.addEventListener("input", event => {
+  if (configurationBusy) return;
   const row = event.target.closest("[data-bulk-index]");
 
   if (row) {
@@ -5393,6 +5409,7 @@ bulkDevicesBody.addEventListener("input", event => {
   }
 });
 bulkDevicesBody.addEventListener("change", event => {
+  if (configurationBusy) return;
   const selectInput = event.target.closest("[data-bulk-select]");
 
   if (selectInput) {
@@ -5407,6 +5424,7 @@ bulkDevicesBody.addEventListener("change", event => {
   }
 });
 bulkDevicesBody.addEventListener("click", event => {
+  if (configurationBusy) return;
   const facilityToggle = event.target.closest("[data-bulk-facility-toggle]");
   const saveButton = event.target.closest("[data-bulk-save]");
   const revertButton = event.target.closest("[data-bulk-revert]");

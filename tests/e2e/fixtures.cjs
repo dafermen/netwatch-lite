@@ -4,16 +4,34 @@ const { mkdtemp, rm, cp, copyFile } = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 
+async function copyPublicTree(source, destination) {
+  if (process.platform !== 'win32') return cp(source, destination, { recursive: true });
+  // Copy only into the fresh test root; never mirror, purge or share writable data.
+  await new Promise((resolve, reject) => {
+    const child = spawn('robocopy.exe', [source, destination, '/E', '/COPY:DAT', '/R:0', '/W:0',
+      '/MT:8', '/XJ', '/NJH', '/NJS', '/NFL', '/NDL', '/NP'], { windowsHide: true, stdio: 'ignore' });
+    const timer = setTimeout(() => { child.kill(); reject(new Error('Public test asset copy timed out.')); }, 15000);
+    child.once('error', error => { clearTimeout(timer); reject(error); });
+    child.once('close', code => {
+      clearTimeout(timer);
+      if (code !== null && code >= 0 && code < 8) resolve();
+      else reject(new Error(`Public test asset copy failed: ${code}`));
+    });
+  });
+}
+
 const test = base.extend({
-  app: async ({}, use, testInfo) => {
+  app: [async ({}, use, testInfo) => {
+    const setupStarted = Date.now();
     const runtime = await mkdtemp(path.join(os.tmpdir(), 'netwatch-e2e-'));
     const publishedRoot = path.resolve(__dirname, '../.app');
     const contentRoot = runtime;
     // Profiles are resolved relative to the content root, not just the registry path.
-    await cp(path.join(publishedRoot, 'wwwroot'), path.join(contentRoot, 'wwwroot'), { recursive: true });
-    await cp(path.join(publishedRoot, 'docs'), path.join(contentRoot, 'docs'), { recursive: true });
+    await copyPublicTree(path.join(publishedRoot, 'wwwroot'), path.join(contentRoot, 'wwwroot'));
+    await copyPublicTree(path.join(publishedRoot, 'docs'), path.join(contentRoot, 'docs'));
     await copyFile(path.join(publishedRoot, 'config.sample.json'), path.join(contentRoot, 'config.sample.json'));
     await copyFile(path.join(publishedRoot, 'appsettings.json'), path.join(contentRoot, 'appsettings.json'));
+    const copyCompleted = Date.now();
     const env = { ...process.env, ASPNETCORE_ENVIRONMENT: 'Testing' };
     env.Storage__Provider = process.env.NETWATCH_TEST_STORAGE || 'json';
     for (const [setting, file] of Object.entries({
@@ -25,6 +43,7 @@ const test = base.extend({
       path.join(publishedRoot, 'NetWatch-Lite.dll'), '--contentRoot', contentRoot,
       '--urls', 'http://127.0.0.1:0'
     ], { env, cwd: contentRoot, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const spawnStarted = Date.now();
     let logs = '';
     const exited = new Promise(resolve => child.once('close', resolve));
     child.stderr.on('data', chunk => { logs += chunk; });
@@ -39,6 +58,11 @@ const test = base.extend({
           if (match) { clearTimeout(timer); resolve(match[1]); }
         });
       });
+      const ready = Date.now();
+      await testInfo.attach('isolated-runtime-metrics', {
+        body: JSON.stringify({ copyMs: copyCompleted - setupStarted, startupMs: ready - spawnStarted,
+          setupMs: ready - setupStarted, provider: env.Storage__Provider }), contentType: 'application/json'
+      });
       await use({ url });
     } finally {
       if (child.exitCode === null && !child.killed) child.kill();
@@ -51,7 +75,7 @@ const test = base.extend({
       }
       await rm(runtime, { recursive: true, force: true });
     }
-  },
+  }, { timeout: 30000 }],
   baseURL: async ({ app }, use) => use(app.url),
   localAssets: [async ({ context }, use) => {
     await context.route('https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/**', route => {

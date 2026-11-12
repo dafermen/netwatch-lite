@@ -142,16 +142,23 @@ function Write-PortableManifest([string]$Root) {
     Write-NewPortableText (Join-Path $Root 'portable-manifest.json') (([ordered]@{ schemaVersion = 1; files = $files } | ConvertTo-Json -Depth 8) + "`n")
 }
 
+function Assert-PortableRuntime($Runtime) {
+    $frameworks = @($Runtime.runtimeOptions.includedFrameworks)
+    if ($Runtime.runtimeOptions.tfm -ne 'net10.0' -or $frameworks.Count -ne 2 -or
+        @($frameworks | Where-Object { $_.name -eq 'Microsoft.NETCore.App' -and $_.version -eq '10.0.15' }).Count -ne 1 -or
+        @($frameworks | Where-Object { $_.name -eq 'Microsoft.AspNetCore.App' -and $_.version -eq '10.0.15' }).Count -ne 1 -or
+        $Runtime.runtimeOptions.framework -or $Runtime.runtimeOptions.frameworks) {
+        throw 'The .NET 10.0.15 and ASP.NET Core 10.0.15 self-contained runtimes must be included.'
+    }
+}
+
 function Assert-PortablePackage([string]$Root) {
     $actualFiles = @(Get-PortableFiles $Root)
     $metadata = Get-Content -LiteralPath (Join-Path $Root 'portable-release.json') -Raw | ConvertFrom-Json
     Assert-PortableVersion $metadata.version
     if ($metadata.schemaVersion -ne 1 -or $metadata.runtime -ne 'win-x64' -or $metadata.selfContained -ne $true) { throw 'Invalid release metadata.' }
     $runtime = Get-Content -LiteralPath (Join-Path $Root 'NetWatch-Lite.runtimeconfig.json') -Raw | ConvertFrom-Json
-    $frameworks = @($runtime.runtimeOptions.includedFrameworks)
-    if ($runtime.runtimeOptions.tfm -ne 'net8.0' -or $frameworks.Count -ne 2 -or
-        -not ($frameworks | Where-Object name -eq 'Microsoft.NETCore.App') -or
-        -not ($frameworks | Where-Object name -eq 'Microsoft.AspNetCore.App') -or $runtime.runtimeOptions.framework) { throw 'The .NET and ASP.NET Core runtimes must be included.' }
+    Assert-PortableRuntime $runtime
     $productVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $Root 'NetWatch-Lite.dll')).ProductVersion
     if (($productVersion -split '\+')[0] -ne $metadata.version) { throw 'Assembly and package versions differ.' }
     $allowed = Get-PortableRuntimeFiles $Root

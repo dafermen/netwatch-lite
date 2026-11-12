@@ -2,6 +2,10 @@
 
 ## Start And Health Check
 
+Use the [matching .NET 10 SDK/runtime](RUNTIME.md); the local validated SDK lives
+under artifacts/tools and is selected with process-scoped environment variables.
+The rc.15 portable includes runtime 10.0.15 and needs no installed .NET.
+
 See [administration](ADMINISTRATION.md) for the searchable Support Groups/Themes
 lists and confirmation rules. Selecting a record does not activate it. Theme
 color edits are drafts until Save Colors; naming operations save immediately.

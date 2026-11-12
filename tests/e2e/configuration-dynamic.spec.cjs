@@ -19,6 +19,52 @@ test('Configuration keeps editing disabled until the initial profile and invento
   await expect(page.locator('#device-name')).toHaveValue('Draft survives loading');
 });
 
+test('Search rerenders keep Normal and Bulk actions blocked until inventory loading settles', async ({ page, request }) => {
+  await request.post('/api/config', { data: { devices: [desk('Loading desk')] } });
+  const gates = [];
+  const gate = () => {
+    let enter, release;
+    const entered = new Promise(resolve => { enter = resolve; });
+    const wait = new Promise(resolve => { release = resolve; });
+    const value = { enter, release, entered, wait }; gates.push(value); return value;
+  };
+  await page.route('**/api/monitor/inventory', async route => {
+    const pending = gates.shift();
+    if (pending) { pending.enter(); await pending.wait; }
+    await route.continue();
+  });
+  const initial = gate();
+  try {
+    await page.goto('/config');
+    await initial.entered;
+    await page.locator('#config-device-search').fill('Loading desk');
+    const edit = page.locator('[data-edit-device="0"]');
+    await expect(edit).toBeVisible();
+    for (const action of ['edit', 'copy', 'delete']) await expect(page.locator(`[data-${action}-device="0"]`)).toBeDisabled();
+    await edit.dispatchEvent('click');
+    await expect(page.locator('#device-form-modal')).toBeHidden();
+  } finally { initial.release(); }
+  await expect(page.locator('#add-device')).toBeEnabled();
+  await page.locator('[data-edit-device="0"]').click();
+  await page.locator('#device-name').fill('Draft after loading');
+  await expect(page.locator('#device-form-modal')).toBeVisible();
+  await page.locator('#device-form-modal .btn-close').click();
+  await page.locator('#config-bulk-view').click();
+  const reload = gate();
+  try {
+    await page.locator('#reload-config').click();
+    await reload.entered;
+    await page.locator('#config-device-search').fill('Loading');
+    await expect(page.locator('[data-bulk-field="name"]')).toBeDisabled();
+    await expect(page.locator('[data-bulk-advanced="0"]')).toBeDisabled();
+    await page.locator('[data-bulk-advanced="0"]').dispatchEvent('click');
+    await expect(page.locator('#device-form-modal')).toBeHidden();
+  } finally { reload.release(); }
+  await expect(page.locator('[data-bulk-field="name"]')).toBeEnabled();
+  expect((await (await request.get('/api/config')).json()).devices[0].name).toBe('Loading desk');
+  expect((await (await request.get('/api/history')).json()).runs).toHaveLength(0);
+});
+
 test('Configuration search reveals matching parents, preserves actions and resets collapse state', async ({ page, request }) => {
   await request.post('/api/config', { data: { devices: [desk('Desk one'), desk('Desk two', 'Office')] } });
   await page.goto('/config');

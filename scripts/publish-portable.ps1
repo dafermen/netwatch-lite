@@ -27,7 +27,7 @@ try {
     try {
         dotnet publish $project -c Release -r win-x64 --self-contained true --artifacts-path $build -o $raw `
             "-p:Version=$Version" -p:NetWatchPortable=true -p:PublishSingleFile=false -p:PublishTrimmed=false `
-            -p:PublishReadyToRun=false -p:DebugType=None -p:GenerateDocumentationFile=false -p:RuntimeFrameworkVersion=8.0.34
+            -p:PublishReadyToRun=false -p:DebugType=None -p:GenerateDocumentationFile=false
         if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed. No version was promoted.' }
     } finally { Pop-Location }
     New-Item -ItemType Directory -Path $package | Out-Null
@@ -90,7 +90,7 @@ try {
     Write-NewPortableText (Join-Path $package 'portable-release.json') (($metadata | ConvertTo-Json -Depth 5) + "`n")
     Write-NewPortableText (Join-Path $package 'Start-NetWatch.cmd') "@echo off`r`nsetlocal`r`ncd /d `"%~dp0`"`r`n`"%~dp0NetWatch-Lite.exe`" --urls http://localhost:5000 --contentRoot `"%~dp0.`" %*`r`n"
     Write-NewPortableText (Join-Path $package 'START-HERE.txt') (@(
-        "NetWatch Lite $Version - Windows x64 evaluation package. .NET 8 and ASP.NET Core are included.",
+        "NetWatch Lite $Version - Windows x64 evaluation package. .NET 10 LTS and ASP.NET Core are included.",
         'Extract the COMPLETE ZIP into a new, ordinary local folder. Keep all DLLs and assets together.',
         'Run Start-NetWatch.cmd and open http://localhost:5000. Stop another listener first; never kill an unknown process.',
         'The launcher sets the content root; direct EXE use from another folder requires --contentRoot <package-folder>.',

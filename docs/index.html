@@ -241,7 +241,7 @@
       <div class="grid">
         <div class="card">
           <h3>Backend</h3>
-          <p>ASP.NET Core minimal API en .NET 8. Expone endpoints para configuracion, temas, ejecuciones progresivas, recarga JSON y consultas de dispositivos.</p>
+          <p>ASP.NET Core minimal API en .NET 10 LTS. Expone endpoints para configuracion, temas, ejecuciones progresivas, recarga JSON y consultas de dispositivos. <a href="RUNTIME.md">Runtime, SDK y mantenimiento</a>.</p>
         </div>
         <div class="card">
           <h3>Monitor</h3>
@@ -548,15 +548,15 @@ dotnet run</pre>
       <p>Las instalaciones nuevas usan SQLite esquema 2. La actualizacion desde esquema 1 crea primero un respaldo verificado y conserva los documentos compatibles; volver al binario anterior requiere restaurar ese respaldo en una carpeta nueva. Configuration &gt; Data &amp; backups administra retencion, respaldos y cambios locales. Los JSON existentes requieren migracion explicita; no se importan por copiar archivos sobre una base ya creada. <a href="STORAGE.md">Migracion, respaldo y reversion</a>. <a href="ROADMAP.md">Estado del plan de desarrollo</a>.</p>
       <p>Comando recomendado:</p>
       <pre>.\scripts\test-packaging.ps1
-.\scripts\publish-portable.ps1 -Version 0.8.0-rc.13</pre>
+.\scripts\publish-portable.ps1 -Version 0.8.0-rc.15</pre>
       <p>Resultado esperado:</p>
       <pre>artifacts/
-|-- portable/NetWatch-Lite-v0.8.0-rc.13-win-x64/
-|-- packages/NetWatch-Lite-v0.8.0-rc.13-win-x64.zip
-|-- packages/NetWatch-Lite-v0.8.0-rc.13-win-x64.zip.sha256
+|-- portable/NetWatch-Lite-v0.8.0-rc.15-win-x64/
+|-- packages/NetWatch-Lite-v0.8.0-rc.15-win-x64.zip
+|-- packages/NetWatch-Lite-v0.8.0-rc.15-win-x64.zip.sha256
 `-- verification/{run-id}/</pre>
       <p>Las versiones anteriores no se sobrescriben. El ZIP exacto se valida en una copia aislada; no incluye inventarios privados ni ajustes locales. <a href="/docs/PORTABLE.md">Guia completa de portables</a>.</p>
-      <p>rc.14 incorpora interfaz ingles/espanol, filtros compartidos, ejecucion exacta, pausas y diagnosticos. Actualizar juntos backend y archivos web. Esta entrega es local y no autoriza publicar en GitHub. <a href="DASHBOARD_FILTERS.md">Filtros</a>, <a href="UI_LANGUAGES.md">idiomas</a>, <a href="DIAGNOSTICS.md">diagnosticos</a> y <a href="VALIDATION_MULTILINGUAL_2026-11-12.md">validacion</a>.</p>
+      <p>rc.15 actualiza a .NET 10 LTS (runtime 10.0.15 incluido) y conserva las funciones de rc.14: idiomas, filtros compartidos, ejecucion exacta, pausas y diagnosticos. No cambia SQLite esquema 2. Actualizar juntos backend y archivos web. Esta entrega es local y no autoriza publicar en GitHub. <a href="RUNTIME.md">Runtime</a> y <a href="VALIDATION_DOTNET10_2026-11-12.md">validacion</a>. <a href="DASHBOARD_FILTERS.md">Filtros</a>, <a href="UI_LANGUAGES.md">idiomas</a> y <a href="DIAGNOSTICS.md">diagnosticos</a>.</p>
       <p>Uso en Windows:</p>
       <ol>
         <li>Descomprimir el ZIP.</li>

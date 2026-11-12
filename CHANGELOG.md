@@ -1,5 +1,25 @@
 # Changelog
 
+## Supported .NET 10 LTS And Portable 0.8.0-rc.15 - 2026-11-12
+
+- Migrated app/tests/CI to net10.0, SDK 10.0.404 and pinned runtime 10.0.15.
+- Updated Microsoft.Data.Sqlite/Mvc.Testing to 10.0.15 and required SQLitePCLRaw
+  to 2.1.13. Updated the TLS test certificate loader for the supported API.
+- Portable guards reject unsupported, old-patch or framework-dependent runtimes;
+  every new package still includes both runtimes, folder, ZIP and SHA-256.
+- Added a private-copy runtime compatibility/rollback pilot and servicing guide.
+  The historical schema-1 pilot now selects separate legacy/candidate hosts and
+  rejects an incorrect schema baseline before attempting an upgrade.
+- Browser fixtures separately bound/measure isolated runtime preparation instead
+  of exhausting the workflow budget; UI/assertion/readiness limits are unchanged.
+- Fixed a Configuration loading race exposed by mobile SQLite regression: search
+  rerenders no longer unlock Normal/Bulk actions before the inventory read settles.
+  Delegated/programmatic actions also retain the busy guard; no premature editor
+  can be opened and then closed by a pending load. Added a controlled-delay case.
+  No SQLite schema change, inventory/history rewrite or machine-wide replacement.
+- GitHub publication remains on hold. See CURRENT_STATUS and runtime validation
+  for actual tests, activation, immutable artifact receipts and acceptance limits.
+
 ## Multilingual Monitoring And Portable 0.8.0-rc.14 - 2026-11-12
 
 - English-default/Spanish interface, remembered browser choice and draft-safe
