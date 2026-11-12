@@ -16,8 +16,9 @@ gates are in [ROADMAP.md](ROADMAP.md); queued work is not implemented work.
   Configuration shared facets and Facility/Device Type grouping, Type-only Run,
   exact filtered manual/automatic monitoring, pause/resume, last-execution detail,
   and internal/probe diagnostics with private query/export.
-- Validation: 416 .NET passes, seeded JS properties and eight killed monitoring
-  mutants. Full browser/package/cutover validation remains in progress.
+- Validation: Completed locally: 416 .NET, 424 full browser and 80 final targeted
+  passes; eight monitoring/six storage mutants, native rc.14 ZIP/folder/SHA and
+  private-data/historical preservation verified. Owner/other-PC acceptance remains.
 - Compatibility: No schema migration or private-data rewrite; legacy calls with
   no exact selection token retain previous behavior. Old portables are immutable.
 - Evidence/limits: [Current validation](VALIDATION_MULTILINGUAL_2026-11-12.md).

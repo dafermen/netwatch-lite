@@ -5,8 +5,9 @@ Last updated: 2026-11-12
 Current delivery: [multilingual monitoring / IMP-008](IMPROVEMENTS.md), tracked in
 [validation](VALIDATION_MULTILINGUAL_2026-11-12.md). English/Spanish UI, shared
 filters/grouping, exact filtered runs, monitoring pauses and private Diagnostics
-are implemented. The source runs rc.14 with SQLite schema 2 on port 5000; the
-new neutral portable is the remaining delivery step. GitHub publication is on hold.
+are implemented. Source rc.14 runs with SQLite schema 2 on port 5000; its neutral
+folder/ZIP/SHA and native validation are complete. GitHub publication is on hold.
+Next gates: operator/other-PC acceptance and the supported-runtime follow-up IMP-009.
 
 The user requested coordinated development of the discussed improvements. This
 plan sets the delivery order and safety gates. [IMPROVEMENTS.md](IMPROVEMENTS.md)

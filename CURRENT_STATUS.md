@@ -2,9 +2,49 @@
 
 Last updated: 2026-11-12
 
-## Multilingual Monitoring Work Order - 2026-11-11
+## Final Local Delivery - 0.8.0-rc.14
 
-IN PROGRESS. The owner authorized eight connected changes: English/Spanish UI
+COMPLETE: the eight feature changes, regression, documentation and immutable
+portable folder/ZIP/SHA are delivered locally. GitHub publication is ON HOLD;
+nothing from this work order was pushed, released or deployed remotely.
+
+- English-default/Spanish UI; inclusive device/website forms; shared filters,
+  Facility/Device Type grouping, exact filtered manual/automatic checks,
+  pause/resume, last-execution detail and private Diagnostics/export.
+- Tests: 416 .NET passes; 424 full browser passes (212/provider) and 80 final
+  targeted passes (40/provider), no failures/skips/retries in those receipts.
+  Eight monitoring/six storage sampled mutants; 2000 seeded JS filter cases;
+  58 package guards on each of PS 5.1/7; syntax/links and dependency audits passed.
+- Package source: clean local commit `6812892d8ab8b40a461051d4c9c4d2739d6e26da`.
+  Folder: `artifacts/portable/NetWatch-Lite-v0.8.0-rc.14-win-x64/`.
+  ZIP: `artifacts/packages/NetWatch-Lite-v0.8.0-rc.14-win-x64.zip`, adjacent `.sha256`.
+  Size: 49239005 bytes; 432 package files / 88 public source assets.
+  SHA-256: `3ea0a12229b556de816f4a3a01c3ba680389c4c32fc1aa648642bdd8eccdcebf`.
+- Native generation/ZIP/folder-copy checks each passed 35 routes/eight negative
+  checks; extra native exact-selection/pause/diagnostic cases passed. All 5347
+  protected historical/original files, including 15 Data JSON, matched.
+- Source: rc.14, PID 29836, port 5000, SQLite schema 2. Private pre-restart backup
+  and before/after document bytes/eight APIs matched; no migration. Backend
+  assembly records commit 3a39dac; later read-only UI fixes are served from the
+  current content root and covered by the targeted regressions.
+
+Evidence: `artifacts/verification/workorder-20261111/`; native receipts
+`7e9e8f3bab2c47629541bc0d676ce668`, `67d10e33e8aa44e78df701f3f99cdbfe`,
+`9e50621ed46f465d966812d418f95ba2` under artifacts/verification.
+Extra native: `native-workorder-9af2a4c7cafc4282892dd87e166b55c2/`.
+`package-audit.json` records build-time public source matches. The ZIP is a frozen
+checkpoint; these later source receipts do not rewrite its docs or bytes.
+
+Next: owner/other-PC acceptance and IMP-009 runtime migration before stable
+deployment. .NET 8 is out of support; the portable contains its final 8.0.34 patch,
+while source uses installed shared 8.0.28. No machine-wide runtime was replaced.
+CDN reachability, corporate proxy/SSO and sustained load remain environment checks.
+No authentication or stable-deployment approval is implied.
+
+## Multilingual Work Order Checkpoints - Historical
+
+These implementation checkpoints precede the final delivery above.
+The owner authorized eight connected changes: English/Spanish UI
 (English default, no mixed product copy), inclusive device/website entry names,
 Configuration grouping by Facility or Device Type, Run using all selected filters,
 quick per-entry monitoring enable/pause, shared Dashboard/Configuration filters,

@@ -1,5 +1,29 @@
 # Multilingual Monitoring Work Order - 2026-11-12
 
+## Final Package Receipt
+
+Local delivery is complete; GitHub remains unchanged. Immutable rc.14 was built
+from clean commit `6812892d8ab8b40a461051d4c9c4d2739d6e26da`, with .NET/ASP.NET
+8.0.34 included. Folder and ZIP/SHA are under artifacts/portable and
+artifacts/packages respectively. ZIP: `NetWatch-Lite-v0.8.0-rc.14-win-x64.zip`.
+Size: 49239005 bytes; 432 files / 88 public assets.
+SHA-256: `3ea0a12229b556de816f4a3a01c3ba680389c4c32fc1aa648642bdd8eccdcebf`.
+
+Generation, final ZIP (PS 5.1) and folder copy (PS 7) each passed 35 routes,
+eight negative checks, clean SQLite-2 startup and immutable artifact hashes.
+Receipts: `7e9e8f3bab2c47629541bc0d676ce668`, `67d10e33e8aa44e78df701f3f99cdbfe`,
+`9e50621ed46f465d966812d418f95ba2` under artifacts/verification.
+Extra native selections, single-use token, pause/resume preservation, redaction,
+separate failures and language assets passed in
+`native-workorder-9af2a4c7cafc4282892dd87e166b55c2/` under the work-order root.
+The audit matched all 5347 protected files and 15 original Data JSON, all 88
+build-time sources, manifest/checksum and absence of publisher lock. No private
+database, operational JSON or backup was packaged. Source remains on port 5000.
+
+This receipt follows the immutable build checkpoint. Earlier references below
+to pending native packaging describe that checkpoint, not an unvalidated delivery.
+Stable deployment/other-PC acceptance and runtime-support gates remain open.
+
 ## Scope And State
 
 Local rc.14 implements eight requested improvements: English-default/Spanish UI,
