@@ -53,11 +53,11 @@ function configureManagementModalFocus(modal, preferredSelector) {
 
 function confirmManagementAction({ title, message, confirmLabel = 'Delete', destructive = true }) {
   if (managementConfirmation || !managementConfirmModal) return Promise.resolve(false);
-  document.querySelector('#management-confirm-title').textContent = title;
-  document.querySelector('#management-confirm-message').textContent = message;
+  document.querySelector('#management-confirm-title').textContent = NetWatchI18n.text(title);
+  document.querySelector('#management-confirm-message').textContent = NetWatchI18n.text(message);
   const button = document.querySelector('#management-confirm');
   button.className = `btn ${destructive ? 'btn-danger' : 'btn-primary'}`;
-  button.textContent = confirmLabel;
+  button.textContent = NetWatchI18n.text(confirmLabel);
   managementConfirmed = false;
   managementConfirmationFocus = document.activeElement;
   managementConfirmElement.querySelectorAll('button').forEach(element => { element.disabled = true; });
@@ -87,9 +87,9 @@ function disposeManagementMenus(container) {
 }
 
 function renderManagementActions(kind, id, name, actions) {
-  return `<div class="dropdown management-row-menu">
+  return NetWatchI18n.html`<div class="dropdown management-row-menu">
     <button class="btn btn-outline-secondary btn-sm management-menu-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" aria-label="Actions for ${escapeAttribute(name)}" title="Actions for ${escapeAttribute(name)}"><i class="fa-solid fa-ellipsis-vertical"></i></button>
-    <ul class="dropdown-menu dropdown-menu-end">${actions.map(action => `<li><button class="dropdown-item ${action.danger ? 'text-danger' : ''}" type="button" data-management-kind="${kind}" data-management-id="${escapeAttribute(id)}" data-management-action="${action.key}" ${action.disabled ? 'disabled' : ''} title="${escapeAttribute(action.title || action.label)}"><i class="fa-solid ${action.icon} me-2" aria-hidden="true"></i>${action.label}</button></li>`).join('')}</ul>
+    <ul class="dropdown-menu dropdown-menu-end">${actions.map(action => NetWatchI18n.html`<li><button class="dropdown-item ${action.danger ? 'text-danger' : ''}" type="button" data-management-kind="${kind}" data-management-id="${escapeAttribute(id)}" data-management-action="${action.key}" ${action.disabled ? 'disabled' : ''} title="${escapeAttribute(NetWatchI18n.text(action.title || action.label))}"><i class="fa-solid ${action.icon} me-2" aria-hidden="true"></i>${NetWatchI18n.text(action.label)}</button></li>`).join('')}</ul>
   </div>`;
 }
 
@@ -103,7 +103,7 @@ async function loadRegions({ showErrors = false } = {}) {
   if (regionManagerBusy) return false;
   regionManagerLoaded = false;
   disposeManagementMenus(regionsBody);
-  regionsBody.innerHTML = '<tr><td colspan="3" class="management-empty">Loading support groups...</td></tr>';
+  regionsBody.innerHTML = NetWatchI18n.markup('<tr><td colspan="3" class="management-empty">Loading support groups...</td></tr>');
   setRegionBusy(true);
   regionLoadPromise = (async () => {
     try {
@@ -114,9 +114,9 @@ async function loadRegions({ showErrors = false } = {}) {
       applyRegionState(payload);
       return true;
     } catch (error) {
-      regionsBody.innerHTML = '<tr><td colspan="3" class="management-empty">Unable to load support groups.</td></tr>';
+      regionsBody.innerHTML = NetWatchI18n.markup('<tr><td colspan="3" class="management-empty">Unable to load support groups.</td></tr>');
       document.querySelector('#active-region-summary').textContent = 'Active support group unavailable';
-      document.querySelector('#regions-count').textContent = '';
+      document.querySelector('#regions-count').textContent = NetWatchI18n.text('');
       if (showErrors || currentRoute === '/regions') showRegionAlert('danger', error.message);
       return false;
     } finally { regionLoadPromise = null; setRegionBusy(false); }
@@ -132,7 +132,7 @@ function applyRegionState(payload, preferredEditingId = '') {
   const filter = document.querySelector('#regions-region-filter');
   const value = filter.value;
   const names = [...new Set(regionState.profiles.map(profile => profile.region || 'Unassigned'))].sort((a, b) => a.localeCompare(b));
-  filter.innerHTML = '<option value="">All regions</option>' + names.map(name => `<option value="${escapeAttribute(name)}">${escapeHtml(name)}</option>`).join('');
+  filter.innerHTML = NetWatchI18n.markup('<option value="">All regions</option>') + names.map(name => NetWatchI18n.html`<option value="${escapeAttribute(name)}">${escapeHtml(name)}</option>`).join('');
   filter.value = names.includes(value) ? value : '';
   renderRegionsTable();
   renderDashboardRegionTitle();
@@ -164,17 +164,17 @@ function renderRegionsTable() {
     .sort((a, b) => (a.region || '').localeCompare(b.region || '') || a.name.localeCompare(b.name));
   const active = getActiveRegion();
   document.querySelector('#active-region-summary').textContent = `${active?.name || 'None'} / ${active?.region || 'Unassigned'}`;
-  document.querySelector('#regions-count').textContent = `${profiles.length} of ${regionState.profiles.length} support groups`;
+  document.querySelector('#regions-count').textContent = NetWatchI18n.text(`${profiles.length} of ${regionState.profiles.length} support groups`);
   let previousRegion = null;
   disposeManagementMenus(regionsBody);
   regionsBody.innerHTML = profiles.map(profile => {
     const group = profile.region || 'Unassigned';
-    const heading = group !== previousRegion ? `<tr class="management-group"><th colspan="3" scope="rowgroup"><i class="fa-solid fa-diagram-project me-2"></i>${escapeHtml(group)}</th></tr>` : '';
+    const heading = group !== previousRegion ? NetWatchI18n.html`<tr class="management-group"><th colspan="3" scope="rowgroup"><i class="fa-solid fa-diagram-project me-2"></i>${escapeHtml(group)}</th></tr>` : '';
     previousRegion = group;
     const active = profile.id === regionState.activeProfileId;
-    return `${heading}<tr data-region-row="${escapeAttribute(profile.id)}" class="${profile.id === editingRegionId ? 'management-selected' : ''}">
+    return NetWatchI18n.html`${heading}<tr data-region-row="${escapeAttribute(profile.id)}" class="${profile.id === editingRegionId ? 'management-selected' : ''}">
       <td class="management-name-cell"><button class="management-name" type="button" data-select-region="${escapeAttribute(profile.id)}" aria-pressed="${profile.id === editingRegionId}">${escapeHtml(profile.name)}</button><div class="small text-secondary text-break">${escapeHtml(profile.id)}</div></td>
-      <td class="management-status-cell">${active ? '<span class="badge text-bg-success">Active</span>' : '<span class="badge text-bg-light">Available</span>'}${profile.id === editingRegionId ? '<span class="badge management-selection-label">Selected</span>' : ''}${profile.builtIn ? '<span class="badge text-bg-secondary"><i class="fa-solid fa-lock me-1"></i>Protected</span>' : ''}</td>
+      <td class="management-status-cell">${active ? NetWatchI18n.markup('<span class="badge text-bg-success">Active</span>') : NetWatchI18n.markup('<span class="badge text-bg-light">Available</span>')}${profile.id === editingRegionId ? NetWatchI18n.markup('<span class="badge management-selection-label">Selected</span>') : ''}${profile.builtIn ? NetWatchI18n.markup('<span class="badge text-bg-secondary"><i class="fa-solid fa-lock me-1"></i>Protected</span>') : ''}</td>
       <td class="management-actions-cell">${renderManagementActions('region', profile.id, profile.name, [
         { key: 'open', label: 'Open configuration', icon: 'fa-sliders' },
         { key: 'activate', label: 'Set active', icon: 'fa-check', disabled: active },
@@ -182,7 +182,7 @@ function renderRegionsTable() {
         { key: 'rename', label: 'Rename', icon: 'fa-pen' },
         { key: 'delete', label: 'Delete', icon: 'fa-trash', danger: true, disabled: profile.builtIn || regionState.profiles.length <= 1, title: profile.builtIn ? 'Protected profile cannot be deleted' : 'Delete profile' }
       ])}</td></tr>`;
-  }).join('') || '<tr><td colspan="3" class="management-empty">No support groups match these filters.</td></tr>';
+  }).join('') || NetWatchI18n.markup('<tr><td colspan="3" class="management-empty">No support groups match these filters.</td></tr>');
   updateRegionControls();
 }
 
@@ -215,11 +215,11 @@ function setRegionBusy(busy) {
 function startNewRegion() {
   if (!regionManagerLoaded || regionManagerBusy) return;
   pendingRegionAction = 'new'; pendingRegionSourceId = '';
-  regionFormTitle.textContent = 'New Support Group'; submitRegionButton.textContent = 'Create and activate';
+  regionFormTitle.textContent = NetWatchI18n.text('New Support Group'); submitRegionButton.textContent = NetWatchI18n.text('Create and activate');
   regionNameInput.value = ''; regionValueInput.value = getActiveRegion()?.region || '';
   regionCopyWrapper.hidden = false; regionCopyActiveInput.checked = true;
   document.querySelector('#region-copy-source').textContent = getActiveRegion()?.name || '';
-  document.querySelector('#region-form-alert').textContent = '';
+  document.querySelector('#region-form-alert').textContent = NetWatchI18n.text('');
   regionFormModal?.show();
 }
 
@@ -227,10 +227,10 @@ function startRenameRegion() {
   const profile = getEditingRegion();
   if (!profile || regionManagerBusy) return;
   pendingRegionAction = 'rename'; pendingRegionSourceId = profile.id;
-  regionFormTitle.textContent = 'Rename Support Group'; submitRegionButton.textContent = 'Save changes';
+  regionFormTitle.textContent = NetWatchI18n.text('Rename Support Group'); submitRegionButton.textContent = NetWatchI18n.text('Save changes');
   regionNameInput.value = profile.name; regionValueInput.value = profile.region || '';
   regionCopyWrapper.hidden = true;
-  document.querySelector('#region-form-alert').textContent = '';
+  document.querySelector('#region-form-alert').textContent = NetWatchI18n.text('');
   regionFormModal?.show();
 }
 
@@ -251,7 +251,7 @@ async function mutateRegion(url, options, successMessage, preferred = '') {
     hideRegionForm();
     return true;
   } catch (error) {
-    if (regionFormModalElement.classList.contains('show')) document.querySelector('#region-form-alert').textContent = error.message;
+    if (regionFormModalElement.classList.contains('show')) document.querySelector('#region-form-alert').textContent = NetWatchI18n.error(error.message);
     else showRegionAlert('danger', error.message);
     return false;
   } finally { setRegionBusy(false); }
@@ -347,7 +347,7 @@ async function loadThemes({ showErrors = false, confirmDiscard = false } = {}) {
   if (themeManagerBusy || (confirmDiscard && !await discardThemeChanges())) return false;
   themeManagerLoaded = false; setThemeBusy(true);
   disposeManagementMenus(document.querySelector('#themes-body'));
-  document.querySelector('#themes-body').innerHTML = '<tr><td colspan="4" class="management-empty">Loading themes...</td></tr>';
+  document.querySelector('#themes-body').innerHTML = NetWatchI18n.markup('<tr><td colspan="4" class="management-empty">Loading themes...</td></tr>');
   themeLoadPromise = (async () => {
     try {
       const response = await fetch('/api/themes'); const payload = await readJsonResponse(response);
@@ -356,9 +356,9 @@ async function loadThemes({ showErrors = false, confirmDiscard = false } = {}) {
       applyThemeState(payload);
       return true;
     } catch (error) {
-      document.querySelector('#themes-body').innerHTML = '<tr><td colspan="4" class="management-empty">Unable to load themes.</td></tr>';
+      document.querySelector('#themes-body').innerHTML = NetWatchI18n.markup('<tr><td colspan="4" class="management-empty">Unable to load themes.</td></tr>');
       document.querySelector('#active-theme-summary').textContent = 'Active theme unavailable';
-      document.querySelector('#themes-count').textContent = '';
+      document.querySelector('#themes-count').textContent = NetWatchI18n.text('');
       document.querySelector('#theme-editor').hidden = true;
       if (showErrors || currentRoute === '/themes') showThemeAlert('danger', error.message);
       return false;
@@ -383,19 +383,19 @@ function renderThemesTable() {
       || (status === 'protected' && theme.builtIn) || (status === 'custom' && !theme.builtIn)))
     .sort((a, b) => a.name.localeCompare(b.name));
   document.querySelector('#active-theme-summary').textContent = themeState.themes.find(theme => theme.id === themeState.activeThemeId)?.name || 'None';
-  document.querySelector('#themes-count').textContent = `${themes.length} of ${themeState.themes.length} themes`;
+  document.querySelector('#themes-count').textContent = NetWatchI18n.text(`${themes.length} of ${themeState.themes.length} themes`);
   disposeManagementMenus(document.querySelector('#themes-body'));
-  document.querySelector('#themes-body').innerHTML = themes.map(theme => `<tr data-theme-row="${escapeAttribute(theme.id)}" class="${theme.id === editingThemeId ? 'management-selected' : ''}">
+  document.querySelector('#themes-body').innerHTML = themes.map(theme => NetWatchI18n.html`<tr data-theme-row="${escapeAttribute(theme.id)}" class="${theme.id === editingThemeId ? 'management-selected' : ''}">
     <td class="management-name-cell"><button type="button" class="management-name" data-select-theme="${escapeAttribute(theme.id)}" aria-pressed="${theme.id === editingThemeId}">${escapeHtml(theme.name)}</button><div class="small text-secondary text-break">${escapeHtml(theme.id)}</div></td>
-    <td class="management-palette-cell"><div class="theme-swatches" aria-label="Theme palette">${['appBackground', 'sidebarBackground', 'primary', 'success', 'danger'].map(key => `<span class="theme-swatch" style="--swatch:${/^#[0-9a-f]{6}$/i.test(theme.colors[key]) ? theme.colors[key] : '#000000'}" title="${key}: ${escapeAttribute(theme.colors[key])}"></span>`).join('')}</div></td>
-    <td class="management-status-cell">${theme.id === themeState.activeThemeId ? '<span class="badge text-bg-success">Active</span>' : '<span class="badge text-bg-light">Available</span>'}${theme.id === editingThemeId ? '<span class="badge management-selection-label">Selected</span>' : ''}${theme.builtIn ? '<span class="badge text-bg-secondary"><i class="fa-solid fa-lock me-1"></i>Protected</span>' : ''}</td>
+    <td class="management-palette-cell"><div class="theme-swatches" aria-label="Theme palette">${['appBackground', 'sidebarBackground', 'primary', 'success', 'danger'].map(key => NetWatchI18n.html`<span class="theme-swatch" style="--swatch:${/^#[0-9a-f]{6}$/i.test(theme.colors[key]) ? theme.colors[key] : '#000000'}" title="${key}: ${escapeAttribute(theme.colors[key])}"></span>`).join('')}</div></td>
+    <td class="management-status-cell">${theme.id === themeState.activeThemeId ? NetWatchI18n.markup('<span class="badge text-bg-success">Active</span>') : NetWatchI18n.markup('<span class="badge text-bg-light">Available</span>')}${theme.id === editingThemeId ? NetWatchI18n.markup('<span class="badge management-selection-label">Selected</span>') : ''}${theme.builtIn ? NetWatchI18n.markup('<span class="badge text-bg-secondary"><i class="fa-solid fa-lock me-1"></i>Protected</span>') : ''}</td>
     <td class="management-actions-cell">${renderManagementActions('theme', theme.id, theme.name, [
       { key: 'edit', label: theme.builtIn ? 'Preview colors' : 'Edit colors', icon: 'fa-palette' },
       { key: 'activate', label: 'Set active', icon: 'fa-check', disabled: theme.id === themeState.activeThemeId },
       { key: 'copy', label: 'Copy', icon: 'fa-copy' },
       { key: 'rename', label: 'Rename', icon: 'fa-pen', disabled: theme.builtIn, title: theme.builtIn ? 'Protected theme cannot be renamed' : 'Rename theme' },
       { key: 'delete', label: 'Delete', icon: 'fa-trash', danger: true, disabled: theme.builtIn, title: theme.builtIn ? 'Protected theme cannot be deleted' : 'Delete theme' }
-    ])}</td></tr>`).join('') || '<tr><td colspan="4" class="management-empty">No themes match these filters.</td></tr>';
+    ])}</td></tr>`).join('') || NetWatchI18n.markup('<tr><td colspan="4" class="management-empty">No themes match these filters.</td></tr>');
   updateThemeControls();
 }
 
@@ -465,7 +465,7 @@ async function persistThemeState(candidate, message, preferred = editingThemeId,
     applyThemeState(payload.configuration, preferred);
     showThemeAlert('success', message); return true;
   } catch (error) {
-    if (themeFormModalElement.classList.contains('show')) document.querySelector('#theme-form-alert').textContent = error.message;
+    if (themeFormModalElement.classList.contains('show')) document.querySelector('#theme-form-alert').textContent = NetWatchI18n.error(error.message);
     else showThemeAlert('danger', error.message);
     return false;
   } finally { setThemeBusy(false); }
@@ -505,10 +505,10 @@ async function openThemeNameForm(action, id = editingThemeId) {
   const source = themeState.themes.find(theme => theme.id === id);
   if (action !== 'new' && (!source || (action === 'rename' && source.builtIn))) return;
   pendingThemeAction = action; pendingThemeSourceId = id;
-  themeFormTitle.textContent = action === 'new' ? 'New Theme' : action === 'copy' ? 'Copy Theme' : 'Rename Theme';
-  submitThemeButton.textContent = action === 'rename' ? 'Save changes' : 'Create theme';
+  themeFormTitle.textContent = NetWatchI18n.text(action === 'new' ? 'New Theme' : action === 'copy' ? 'Copy Theme' : 'Rename Theme');
+  submitThemeButton.textContent = NetWatchI18n.text(action === 'rename' ? 'Save changes' : 'Create theme');
   themeNameInput.value = action === 'new' ? '' : `${source.name}${action === 'copy' ? ' Copy' : ''}`;
-  document.querySelector('#theme-form-alert').textContent = ''; themeFormModal?.show();
+  document.querySelector('#theme-form-alert').textContent = NetWatchI18n.text(''); themeFormModal?.show();
 }
 
 async function submitThemeForm(event) {

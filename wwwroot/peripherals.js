@@ -39,27 +39,27 @@ function renderPeripheralCatalog() {
   const query = document.querySelector('#peripheral-catalog-search').value.trim().toLowerCase();
   const models = (configState.peripheralCatalog ?? []).filter(model => (!kind || model.kind === kind)
     && `${model.manufacturer} ${model.model}`.toLowerCase().includes(query));
-  document.querySelector('#peripheral-profile-label').textContent = `Support group: ${getActiveRegion()?.name || 'Active inventory'}`;
+  document.querySelector('#peripheral-profile-label').textContent = NetWatchI18n.text(`Support group: ${getActiveRegion()?.name || 'Active inventory'}`);
   peripheralCatalogBody.innerHTML = models.map(model => {
     const uses = peripheralUses(model.id);
-    return `<tr data-peripheral-model-row="${escapeAttribute(model.id)}">
-      <td data-label="Type">${model.kind === 'printer' ? 'Printer' : 'Scanner'}</td>
+    return NetWatchI18n.html`<tr data-peripheral-model-row="${escapeAttribute(model.id)}">
+      <td data-label="Type">${NetWatchI18n.text(model.kind === 'printer' ? 'Printer' : 'Scanner')}</td>
       <td data-label="Manufacturer">${escapeHtml(model.manufacturer)}</td><td data-label="Model"><a href="/workstations?model=${encodeURIComponent(model.id)}" data-view-model-workstations="${escapeAttribute(model.id)}" title="View workstations using this model">${escapeHtml(model.model)}</a></td><td data-label="Assignments">${uses}</td>
       <td class="text-end text-nowrap" data-label="Actions">
         <button class="btn btn-outline-primary btn-sm" type="button" data-edit-peripheral-model="${escapeAttribute(model.id)}" aria-label="Edit model" title="Edit model"><i class="fa-solid fa-pen-to-square"></i></button>
-        <button class="btn btn-outline-danger btn-sm" type="button" data-delete-peripheral-model="${escapeAttribute(model.id)}" aria-label="Delete model" title="${uses ? 'Remove assignments before deleting this model' : 'Delete model'}" ${uses ? 'disabled' : ''}><i class="fa-solid fa-trash"></i></button>
+        <button class="btn btn-outline-danger btn-sm" type="button" data-delete-peripheral-model="${escapeAttribute(model.id)}" aria-label="Delete model" title="${NetWatchI18n.text(uses ? 'Remove assignments before deleting this model' : 'Delete model')}" ${uses ? 'disabled' : ''}><i class="fa-solid fa-trash"></i></button>
       </td></tr>`;
-  }).join('') || '<tr><td colspan="5" class="text-center text-secondary py-4">No models found.</td></tr>';
+  }).join('') || NetWatchI18n.markup('<tr><td colspan="5" class="text-center text-secondary py-4">No models found.</td></tr>');
 }
 
 async function loadPeripheralCatalog() {
   if (peripheralCatalogBusy) return;
   peripheralCatalogLoaded = false;
-  peripheralCatalogBody.innerHTML = '<tr><td colspan="5" class="text-center text-secondary py-4">Loading catalog...</td></tr>';
-  document.querySelector('#peripheral-profile-label').textContent = '';
+  peripheralCatalogBody.innerHTML = NetWatchI18n.markup('<tr><td colspan="5" class="text-center text-secondary py-4">Loading catalog...</td></tr>');
+  document.querySelector('#peripheral-profile-label').textContent = NetWatchI18n.text('');
   setPeripheralCatalogBusy(true);
   const alert = document.querySelector('#peripheral-catalog-alert');
-  alert.textContent = '';
+  alert.textContent = NetWatchI18n.text('');
   try {
     if (!await loadRegions({ showBusy: false, showErrors: false })) throw new Error('Unable to verify the active support group. Retry loading the catalog.');
     const response = await fetch('/api/config');
@@ -69,8 +69,8 @@ async function loadPeripheralCatalog() {
     renderPeripheralCatalog();
     peripheralCatalogLoaded = true;
   } catch (error) {
-    alert.textContent = error.message;
-    peripheralCatalogBody.innerHTML = '<tr><td colspan="5" class="text-center text-secondary py-4">Unable to load catalog.</td></tr>';
+    alert.textContent = NetWatchI18n.error(error.message);
+    peripheralCatalogBody.innerHTML = NetWatchI18n.markup('<tr><td colspan="5" class="text-center text-secondary py-4">Unable to load catalog.</td></tr>');
   }
   finally { setPeripheralCatalogBusy(false); }
 }
@@ -78,9 +78,9 @@ async function loadPeripheralCatalog() {
 function openPeripheralModel(id = '') {
   const model = configState.peripheralCatalog?.find(entry => entry.id === id);
   peripheralModelForm.reset();
-  document.querySelector('#peripheral-model-alert').textContent = '';
+  document.querySelector('#peripheral-model-alert').textContent = NetWatchI18n.text('');
   document.querySelector('#peripheral-model-id').value = id;
-  document.querySelector('#peripheral-model-title').textContent = model ? 'Edit Model' : 'Add Model';
+  document.querySelector('#peripheral-model-title').textContent = NetWatchI18n.text(model ? 'Edit Model' : 'Add Model');
   document.querySelector('#peripheral-model-kind').value = model?.kind || 'printer';
   document.querySelector('#peripheral-model-kind').disabled = Boolean(model && peripheralUses(id));
   document.querySelector('#peripheral-manufacturer').value = model?.manufacturer || '';
@@ -120,7 +120,7 @@ peripheralModelForm.addEventListener('submit', async event => {
     if (index < 0) catalog.push(model); else catalog[index] = model;
     await savePeripheralCatalog(catalog);
     hideManagementModal(peripheralModelElement);
-  } catch (error) { document.querySelector('#peripheral-model-alert').textContent = error.message; }
+  } catch (error) { document.querySelector('#peripheral-model-alert').textContent = NetWatchI18n.error(error.message); }
   finally { save.disabled = false; }
 });
 
@@ -134,7 +134,7 @@ peripheralCatalogBody.addEventListener('click', async event => {
   remove.disabled = true;
   try { await savePeripheralCatalog(configState.peripheralCatalog.filter(model => model.id !== remove.dataset.deletePeripheralModel)); }
   catch (error) {
-    document.querySelector('#peripheral-catalog-alert').textContent = error.message;
+    document.querySelector('#peripheral-catalog-alert').textContent = NetWatchI18n.error(error.message);
     renderPeripheralCatalog();
   }
 });
@@ -148,7 +148,11 @@ function peripheralGroupElement(key) {
 }
 
 function peripheralLinkLabel(value) {
-  return value === 'wireless' ? 'Wireless' : value === 'cabled' ? 'Cabled' : 'Link not recorded';
+  return NetWatchI18n.text(value === 'wireless' ? 'Wireless' : value === 'cabled' ? 'Cabled' : 'Link not recorded');
+}
+
+function peripheralConnectionLabel(value) {
+  return NetWatchI18n.text(value === 'usb' ? 'USB' : value === 'network' ? 'Network' : 'Other');
 }
 
 function readPeripheralGroup(key) {
@@ -169,15 +173,15 @@ function renderPeripheralGroup(key, group = { status: 'unrecorded', items: [] })
   const element = peripheralGroupElement(key);
   element.querySelector('select').value = group.status;
   const models = (configState.peripheralCatalog ?? []).filter(model => model.kind === (key === 'printers' ? 'printer' : 'scanner'));
-  element.querySelector('[data-peripheral-items]').innerHTML = (group.items ?? []).map(item => `
+  element.querySelector('[data-peripheral-items]').innerHTML = (group.items ?? []).map(item => NetWatchI18n.html`
     <fieldset class="peripheral-assignment" data-peripheral-assignment>
-      <legend class="visually-hidden">${key === 'printers' ? 'Printer' : 'Scanner'} assignment</legend>
+      <legend class="visually-hidden">${NetWatchI18n.text(key === 'printers' ? 'Printer' : 'Scanner')} assignment</legend>
       <div class="peripheral-assignment-grid">
         <label class="form-label peripheral-model">Model<select class="form-select" data-assignment-model required>
-          <option value="">Select model</option>${models.map(model => `<option value="${escapeAttribute(model.id)}" ${model.id === item.modelId ? 'selected' : ''}>${escapeHtml(model.manufacturer)} ${escapeHtml(model.model)}</option>`).join('')}
+          <option value="">Select model</option>${models.map(model => NetWatchI18n.html`<option value="${escapeAttribute(model.id)}" ${model.id === item.modelId ? 'selected' : ''}>${escapeHtml(model.manufacturer)} ${escapeHtml(model.model)}</option>`).join('')}
         </select></label>
-        <label class="form-label">Connection<select class="form-select" data-assignment-connection>${['usb', 'network', 'other'].map(value => `<option value="${value}" ${item.connection === value ? 'selected' : ''}>${value === 'usb' ? 'USB' : value === 'network' ? 'Network' : 'Other'}</option>`).join('')}</select></label>
-        <label class="form-label">Link type<select class="form-select" data-assignment-link-type>${['unrecorded', 'wireless', 'cabled'].map(value => `<option value="${value}" ${(item.linkType || 'unrecorded') === value ? 'selected' : ''}>${value === 'unrecorded' ? 'Not recorded' : peripheralLinkLabel(value)}</option>`).join('')}</select></label>
+        <label class="form-label">Connection<select class="form-select" data-assignment-connection>${['usb', 'network', 'other'].map(value => NetWatchI18n.html`<option value="${value}" ${item.connection === value ? 'selected' : ''}>${NetWatchI18n.text(value === 'usb' ? 'USB' : value === 'network' ? 'Network' : 'Other')}</option>`).join('')}</select></label>
+        <label class="form-label">Link type<select class="form-select" data-assignment-link-type>${['unrecorded', 'wireless', 'cabled'].map(value => NetWatchI18n.html`<option value="${value}" ${(item.linkType || 'unrecorded') === value ? 'selected' : ''}>${value === 'unrecorded' ? NetWatchI18n.text('Not recorded') : peripheralLinkLabel(value)}</option>`).join('')}</select></label>
         <label class="form-label">Name / Asset ID<input class="form-control" data-assignment-identifier maxlength="200" value="${escapeAttribute(item.identifier || '')}"></label>
         <label class="form-label">Network address<input class="form-control" data-assignment-address maxlength="253" value="${escapeAttribute(item.address || '')}" ${item.connection === 'network' ? '' : 'disabled'}></label>
         <label class="form-label peripheral-notes">Notes<textarea class="form-control" rows="2" data-assignment-notes maxlength="1000">${escapeHtml(item.notes || '')}</textarea></label>
@@ -187,7 +191,7 @@ function renderPeripheralGroup(key, group = { status: 'unrecorded', items: [] })
   const add = element.querySelector('[data-add-peripheral]');
   add.hidden = group.status !== 'assigned';
   add.disabled = models.length === 0 || group.items.length >= 50;
-  add.title = models.length === 0 ? 'Add a model to the catalog first' : 'Add assignment';
+  add.title = NetWatchI18n.text(models.length === 0 ? 'Add a model to the catalog first' : 'Add assignment');
 }
 
 function populatePeripheralForm(device) {
@@ -195,7 +199,7 @@ function populatePeripheralForm(device) {
   const isWorkstation = deviceTypeSelect.value === 'workstation';
   workstationPeripheralFields.hidden = !isWorkstation;
   workstationPeripheralFields.disabled = !isWorkstation;
-  document.querySelector('#device-peripheral-alert').textContent = '';
+  document.querySelector('#device-peripheral-alert').textContent = NetWatchI18n.text('');
   renderPeripheralGroup('printers', device.workstationPeripherals?.printers);
   renderPeripheralGroup('scanners', device.workstationPeripherals?.scanners);
 }
@@ -264,7 +268,7 @@ function readPeripheralDeviceFields() {
   const inventory = { printers: readPeripheralGroup('printers'), scanners: readPeripheralGroup('scanners') };
   for (const group of Object.values(inventory)) {
     if (group.status === 'assigned' && (!group.items.length || group.items.some(item => !item.modelId))) {
-      document.querySelector('#device-peripheral-alert').textContent = 'Select at least one catalog model for each assigned peripheral type.';
+      document.querySelector('#device-peripheral-alert').textContent = NetWatchI18n.text('Select at least one catalog model for each assigned peripheral type.');
       return null;
     }
   }
@@ -277,7 +281,7 @@ function renderWorkstationInventory(device) {
   const count = key => inventory?.[key]?.status === 'assigned' ? inventory[key].items.length : inventory?.[key]?.status === 'none' ? 'None' : 'Not recorded';
   const lines = ['printers', 'scanners'].flatMap(key => (inventory?.[key]?.items ?? []).map(item => {
     const model = configState.peripheralCatalog?.find(entry => entry.id === item.modelId);
-    return `<li>${key === 'printers' ? 'Printer' : 'Scanner'}: ${escapeHtml(model ? `${model.manufacturer} ${model.model}` : item.modelId)} (${escapeHtml(item.connection.toUpperCase())} &middot; ${peripheralLinkLabel(item.linkType)})${item.identifier ? ` &middot; ${escapeHtml(item.identifier)}` : ''}${item.address ? ` &middot; ${escapeHtml(item.address)}` : ''}${item.notes ? `<div>${escapeHtml(item.notes)}</div>` : ''}</li>`;
+    return NetWatchI18n.html`<li>${NetWatchI18n.text(key === 'printers' ? 'Printer' : 'Scanner')}: ${escapeHtml(model ? `${model.manufacturer} ${model.model}` : item.modelId)} (${escapeHtml(peripheralConnectionLabel(item.connection))} &middot; ${peripheralLinkLabel(item.linkType)})${item.identifier ? ` &middot; ${escapeHtml(item.identifier)}` : ''}${item.address ? ` &middot; ${escapeHtml(item.address)}` : ''}${item.notes ? NetWatchI18n.html`<div>${escapeHtml(item.notes)}</div>` : ''}</li>`;
   }));
-  return `<details class="workstation-inventory small fw-normal"><summary title="Recorded peripheral inventory">Printers: ${count('printers')} &middot; Scanners: ${count('scanners')}</summary>${lines.length ? `<ul class="mb-0 mt-1">${lines.join('')}</ul>` : ''}</details>`;
+  return NetWatchI18n.html`<details class="workstation-inventory small fw-normal"><summary title="Recorded peripheral inventory">Printers: ${count('printers')} &middot; Scanners: ${count('scanners')}</summary>${lines.length ? NetWatchI18n.html`<ul class="mb-0 mt-1">${lines.join('')}</ul>` : ''}</details>`;
 }

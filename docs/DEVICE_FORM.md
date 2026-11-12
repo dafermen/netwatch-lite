@@ -1,5 +1,11 @@
 # Device Form And Configuration Search
 
+Buttons/forms now say Add/Edit/Copy device or website (localized in Spanish).
+Normal and Bulk share Facility, Device Type, Category, status, participation and
+search filters. Group by Facility/Device Type is view-only; monitoring switches
+pause/resume without deleting a record. See [filters](DASHBOARD_FILTERS.md) and
+[interface languages](UI_LANGUAGES.md). This extends the search behavior below.
+
 ## Search Visibility
 
 A nonempty Configuration search opens the matching Facility/category groups so
@@ -38,7 +44,7 @@ preset. Additional Ping/TCP/HTTP checks can be combined on any device type.
 
 The Shortcuts legend has no extra note, keeping the section compact. Command
 retains its aria-describedby description about clipboard-only text. HTTP Timeout
-and Expected text have associated Spanish descriptions about per-attempt waiting,
+and Expected text have associated English/Spanish descriptions about per-attempt waiting,
 retry settings and optional literal response matching, without JavaScript or
 browser sessions. Unique IDs keep descriptions attached to their own check.
 These notes do not become saved values. Small screens stack the HTTP fields.
@@ -69,7 +75,7 @@ Facility/category. A text or Bulk filter is cleared only if it excludes that
 record. The next Dashboard visit reveals its enabled, not-yet-checked row and
 opens its parents; no monitoring runs automatically. This reveal is scoped to
 the current support group. Disabled devices remain disabled and the success
-message explains why they are not shown on Dashboard.
+message explains how to select paused inventory on Dashboard.
 
 Required-field validation and API error details appear inside the device modal.
 A failed save retains the draft and restores type-specific disabled controls;

@@ -67,7 +67,7 @@ public sealed class HttpCheckService(IHttpClientFactory clientFactory)
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeoutMs);
 
-        CheckResult Result(bool available, string status, string message) => new()
+        CheckResult Result(bool available, string status, string message, string? diagnosticCode = null) => new()
         {
             Type = "http",
             Label = $"{uri.Scheme.ToUpperInvariant()} {target}",
@@ -78,13 +78,17 @@ public sealed class HttpCheckService(IHttpClientFactory clientFactory)
             ExpectedStatusCode = expectedCode,
             TimeoutMs = timeoutMs,
             DurationMs = clock.ElapsedMilliseconds,
-            Message = message
+            Message = message,
+            DiagnosticCode = diagnosticCode,
+            Attempts = 1
         };
 
         try
         {
             using var client = clientFactory.CreateClient(ClientName);
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            request.Version = HttpVersion.Version11;
+            request.VersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
             request.Headers.UserAgent.ParseAdd("NetWatch-Lite/1.0");
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
             statusCode = (int)response.StatusCode;
@@ -138,9 +142,13 @@ public sealed class HttpCheckService(IHttpClientFactory clientFactory)
                 HttpRequestError.NameResolutionError => ("DnsError", "DNS name could not be resolved."),
                 HttpRequestError.SecureConnectionError => ("TlsError", "TLS negotiation or certificate validation failed."),
                 HttpRequestError.ConnectionError => ("ConnectionError", "Could not connect to the web server."),
+                HttpRequestError.ResponseEnded => ("HttpError", "The web server or proxy closed the connection before a complete HTTP response."),
+                HttpRequestError.VersionNegotiationError => ("HttpError", "HTTP version negotiation failed. Check server and proxy protocol support."),
+                HttpRequestError.HttpProtocolError => ("HttpError", "The server or proxy returned an invalid HTTP protocol response."),
+                HttpRequestError.ProxyTunnelError => ("ConnectionError", "The proxy could not establish a connection to the web server."),
                 _ => ("HttpError", "The server returned an invalid or incomplete HTTP response.")
             };
-            return Result(false, status, message);
+            return Result(false, status, message, ex.HttpRequestError.ToString());
         }
         catch (IOException)
         {

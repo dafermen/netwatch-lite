@@ -30,7 +30,7 @@ test('command description stays accessible without the removed Shortcuts note', 
   await expect(shortcuts).not.toHaveAttribute('aria-describedby', 'device-shortcuts-help');
   await expect(page.locator('#device-shortcuts-help')).toHaveCount(0);
   await expect(page.locator('#device-command')).toHaveAttribute('aria-describedby', 'device-command-help');
-  await expect(help).toHaveText('Comando para copiar al portapapeles. No se ejecuta autom\u00e1ticamente.');
+  await expect(help).toHaveText('Command to copy to the clipboard. It is never executed automatically.');
   await expect(page.locator('#device-command')).toHaveValue('');
   await shortcuts.scrollIntoViewIfNeeded();
   await expect(help).toBeVisible();
@@ -115,9 +115,7 @@ test('command remains available after execution and copying does not collapse it
   await expect(page.locator('#run-facility-check')).toBeEnabled();
   await page.locator('#run-facility-check').click();
   await expect(page.locator('#last-check')).toContainText('Last execution:');
-  await page.locator('.facility-title').click();
   await expect(page.locator('.facility-section > .collapse')).toHaveClass(/collapse show/);
-  await page.locator('.category-header h2').click();
   await expect(page.locator('.category-section > .collapse')).toHaveClass(/collapse show/);
   const button = page.locator('[data-copy-command]');
   await button.click();

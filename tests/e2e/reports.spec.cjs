@@ -273,7 +273,8 @@ test('an older delayed read cannot replace a newer report snapshot', async ({ pa
   await page.evaluate(() => new Promise(requestAnimationFrame));
   await expect(page.locator('#reports-row-count')).toHaveText('7');
   await expect(page.locator('#reports-export-menu')).toBeEnabled();
-  await expect(page.locator('.topbar-actions')).toBeHidden();
+  await expect(page.locator('.topbar-status')).toBeHidden();
+  await expect(page.locator('#app-language')).toBeVisible();
   if (isMobile) await page.locator('#sidebar-toggle').click();
   await page.locator('a.nav-link[data-route="/"]').click();
   await expect(page.locator('.topbar-actions')).toBeVisible();

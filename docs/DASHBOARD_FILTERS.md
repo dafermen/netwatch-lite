@@ -1,58 +1,71 @@
-# Dashboard Device Type And Execution Scope
+# Inventory Filters And Exact Execution
 
-## Device Type
+## Shared Filters
 
-Device Type sits immediately before Category in the Dashboard toolbar. All
-device types is the default. Options come from the active support group's
-catalog, including protected types and custom names; absent legacy classifications
-use Not specified. This is independent of Category and never inferred from it.
+Dashboard and Configuration combine search, Facility, Device Type, Category,
+status and monitoring participation with AND. Catalog IDs and operator-entered
+names are never translated or inferred. Search includes names, IP, hostname,
+Facility/category, Location, Notes, website shortcut and each HTTP check URL.
+It works before monitoring; Pending is not an outage. Paused items are neutral
+and excluded from checks and availability. Dashboard defaults to enabled;
+Configuration defaults to all participation states so paused records stay manageable.
 
-Changing the selection filters pending and checked inventory and updates counts.
-It combines with Facility, search and the Show All/Online/Offline/Problems view.
-It does not save configuration, start checks or write history. Disabled inventory
-does not enter Dashboard. Clear filters also resets Device Type and Category.
+Filter changes do not write data or start checks. Clear resets all facets.
+Unknown/removed selections remain unavailable rather than becoming All. Zero
+matches disable Run selection. Configuration filters reveal their parent groups.
 
-Facility choices remain available even when a selected type has no devices there.
-The selection is retained, zero/no-match results are shown, and the scoped Run is
-disabled. The application must not silently switch to all facilities in that case.
-Category options are scoped by Facility and type; a no-longer-valid Category is
-cleared and Run Group stays disabled until another category is selected.
+## Execution (rc.14 And Later)
 
-## Execution Rules
+Every modern UI run captures exactly the **visible enabled inventory records**:
 
-| Action | Scope |
+| Action | Additional intersection |
 | --- | --- |
-| Run Facility / Run All Facilities | Selected type and requested Facility, or all Facilities |
-| Run Group / Category header Run | Selected type, Category and requested Facility |
-| Device row Run | That row's type, Facility, Category, name and address |
-| Run Failed | Failed records in the visible Facility/type scope |
-| Global automatic monitoring | All enabled inventory; view filters do not change its global scope |
+| Main/toolbar Run selection | None; Device Type alone is sufficient |
+| Facility Run | That facility |
+| Category Run | That facility/category |
+| Row Run | That exact inventory row |
+| Run Failed | Failed records in the current selection |
+| Automatic monitoring | The same filters at each interval |
 
-Full Check / Ping Only chooses which checks run, not a different classification
-scope. Search and status buttons are presentation filters, not a list of targets
-for Run Group. Individual row Run remains the way to check one found device.
-The type selector is disabled while a stream is running. Clearing view filters
-does not retarget an execution already captured by the server.
+This supersedes rc.13 presentation-only search/status and global automatic runs.
+Clear filters for a complete enabled-inventory run. Full Check/Ping Only changes
+the checks, not the targets. Ping Only does not validate HTTP application health.
 
-The stream accepts optional `deviceType=<catalog-id>`, intersected server-side
-with other scope parameters before executing probes. Unknown/removed type IDs
-match zero devices; they never fall back to all devices. A selected type removed
-by another editor remains explicitly unavailable until cleared or changed.
+The browser obtains a fresh `/api/monitor/inventory` snapshot and posts opaque
+keys to `/api/monitor/plans`. The backend validates profile/revision, Enabled and
+type/facility/category. Plans are single-use, expire after two minutes and are
+bounded to 128 pending plans. The execution lock is acquired before consumption.
+Expired/reused/stale/unknown/paused scopes never fall back to global. Empty plans
+mean zero targets; the UI does not start them. Changed inventory requires review
+of the refreshed view and a new click before probing.
 
-## Results And Compatibility
+Filters are frozen during execution and cannot retarget it. Partial runs keep
+unselected measurements. Last execution shows actual checked records/mode/targets/
+outcomes and opens completed groups. The receipt is local session state; Reports
+and Diagnostics consult persisted history.
 
-New monitor results capture `deviceType`; a type-scoped run also captures the
-optional type ID in history scope. Dashboard identity includes type so equal
-names/addresses in different classifications do not share measured results.
-This does not change the existing historical report identity or invent a type
-for old executions. Legacy results without classification join current inventory
-only when the old identity has one unambiguous match.
+## Configuration And Pausing
 
-Existing API requests without the parameter retain global/previous scope behavior.
-Old history remains byte-preserved; optional null type fields are omitted when
-read, and there is no database/schema migration. JSON and SQLite stay supported.
-Back up before using an older binary: versions without classification snapshots
-can discard that optional metadata when rewriting newer history.
+Normal and Bulk Edit share the same filters. Group by Facility or Device Type
+changes only presentation, remembered per browser. Original row indexes and
+stored grouping/classification remain unchanged. Draft-discard guards apply when
+changing filters/grouping/language would replace unsaved edits.
 
-See [device types](DEVICE_TYPES.md), [API](API.md), [testing](TESTING.md) and
-[delivery validation](VALIDATION_DASHBOARD_TYPES_2026-11-11.md).
+Monitoring switches use a narrow profile/revision-checked update of the existing
+`enabled` property only. They never delete the item, change checks, clear private
+inventory or automatically probe. Bulk retains its explicit per-row Enabled/save
+workflow. Resume restores participation.
+
+## Compatibility
+
+No SQLite migration or old-history rewrite. Optional result `inventoryKey` is a
+per-snapshot identity, not a persistent ID; scope `selectionCount` records count,
+not search text/private Notes/Command. Ordinals separate identical records. Legacy
+results join only unambiguous inventory identities. Changed definitions invalidate
+their measured browser projection instead of showing stale health.
+
+Legacy API requests without `selection` retain prior server scope semantics.
+A present invalid/empty token is rejected. Deploy matching frontend and backend,
+not new static assets over an old binary. See [API](API.md),
+[diagnostics](DIAGNOSTICS.md), [languages](UI_LANGUAGES.md) and
+[validation](VALIDATION_MULTILINGUAL_2026-11-12.md).

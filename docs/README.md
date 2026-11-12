@@ -11,6 +11,9 @@ other development tools.
 
 ## Core Documents
 
+- [Interface languages](UI_LANGUAGES.md): English default, Spanish preference and data boundaries.
+- [Diagnostics](DIAGNOSTICS.md): references, internal errors versus probe failures and private exports.
+
 - [Dashboard filters](DASHBOARD_FILTERS.md): Device Type, scope, resets and safe execution.
 
 - [Local storage and SQLite](STORAGE.md): provider selection, migration, backup and reversal.
@@ -33,6 +36,8 @@ other development tools.
 - [Architecture Decisions](adr/README.md): decisions that materially affect the system.
 
 ## Other Documentation
+
+- [Multilingual monitoring and local rc.14 - 2026-11-12](VALIDATION_MULTILINGUAL_2026-11-12.md)
 
 - [Dashboard Device Type and rc.13 - 2026-11-11](VALIDATION_DASHBOARD_TYPES_2026-11-11.md)
 

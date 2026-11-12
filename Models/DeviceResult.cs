@@ -44,6 +44,10 @@ public sealed class DeviceResult
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public string? DeviceType { get; init; }
 
+    /// <summary>Opaque identity within the inventory snapshot used by an explicit selection.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? InventoryKey { get; init; }
+
     /// <summary>
     /// Region copied from configuration and useful for historical reporting.
     /// </summary>

@@ -7,7 +7,7 @@ Run from the repository with the .NET 8 SDK and Windows PowerShell 5.1 or newer:
 ```powershell
 cd C:\Projects\netwatch-lite
 .\scripts\test-packaging.ps1
-.\scripts\publish-portable.ps1 -Version 0.8.0-rc.13
+.\scripts\publish-portable.ps1 -Version 0.8.0-rc.14
 ```
 
 `-Version` is required. Use a new full version on every build, including a new
@@ -15,7 +15,13 @@ prerelease suffix when rebuilding a candidate. The version is passed to .NET
 publish and checked against the resulting assembly metadata. It is not inferred
 from the last directory name. The initial supported target is Windows x64.
 
-The current candidate is `0.8.0-rc.13`. It includes the dashboard inventory
+The current local candidate is `0.8.0-rc.14`, adding English/Spanish UI, inclusive
+device/website forms, shared filters/grouping, exact filtered manual/automatic
+checks, pause/resume and private diagnostics. GitHub publication is ON HOLD for
+this candidate. rc.13 is the preceding public prerelease. See
+[current validation](VALIDATION_MULTILINGUAL_2026-11-12.md).
+
+The preceding rc.13 includes the dashboard inventory
 preview/search, copy-only Command, individual checks and filter/header controls,
 plus the updated neutral Configuration headers and aligned device action icons.
 It also includes the redesigned Reports Summary/Runs/Devices views, historical

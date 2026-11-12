@@ -79,7 +79,8 @@ accepts 0-10000 milliseconds between failed attempts. Use **Save Settings**.
 These settings belong to the active support group and apply to Ping, TCP and
 HTTP; they are not a per-URL retry override. A successful attempt stops retries.
 
-The HTTP editor has concise Spanish helper text below Timeout and Expected text.
+The HTTP editor has concise English/Spanish helper text below Timeout and Expected text,
+following the explicit UI language (English by default).
 Timeout is a per-attempt duration, not a ping count; blank expected text checks
 only the expected HTTP status. Literal text is case-sensitive and comes from
 the anonymous backend response, not a JavaScript-rendered/authenticated browser.
@@ -92,6 +93,13 @@ the legacy synthetic ping is still used when no ping was configured. A
 successful Ping Only run is not evidence that a web application works.
 
 ## Results And Diagnostics
+
+Open Diagnostics for separate internal/browser errors and recorded monitoring
+failures, searchable references and private filtered exports. Dashboard details
+explain 404/redirect/timeout/DNS/TLS/incomplete-response cases without bypassing
+security or automatically accepting a failed expectation. New HTTP records include
+actual `attempts` and optional transport `diagnosticCode`; old records remain unknown.
+See [diagnostics](DIAGNOSTICS.md) and [exact filter execution](DASHBOARD_FILTERS.md).
 
 Dashboard's TCP / HTTP column shows actual status, elapsed time, target and
 failure message. Reports show the recorded HTTP checks beside device health;

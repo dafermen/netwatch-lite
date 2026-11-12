@@ -10,6 +10,7 @@ public sealed class MonitorExecutionService
     private readonly JsonDeviceRepository _deviceRepository;
     private readonly NetworkMonitorService _monitorService;
     private readonly JsonMonitorHistoryRepository _historyRepository;
+    private readonly MonitorPlans _plans;
     private readonly SemaphoreSlim _executionLock = new(1, 1);
 
     /// <summary>
@@ -18,14 +19,17 @@ public sealed class MonitorExecutionService
     /// <param name="deviceRepository">Repository that provides settings used in the response.</param>
     /// <param name="monitorService">Service that performs the actual ping and TCP checks.</param>
     /// <param name="historyRepository">Repository that stores completed monitoring executions.</param>
+    /// <param name="plans">Revision-checked explicit selections for modern clients.</param>
     public MonitorExecutionService(
         JsonDeviceRepository deviceRepository,
         NetworkMonitorService monitorService,
-        JsonMonitorHistoryRepository historyRepository)
+        JsonMonitorHistoryRepository historyRepository,
+        MonitorPlans? plans = null)
     {
         _deviceRepository = deviceRepository;
         _monitorService = monitorService;
         _historyRepository = historyRepository;
+        _plans = plans ?? new MonitorPlans(deviceRepository);
     }
 
     /// <summary>
@@ -67,6 +71,7 @@ public sealed class MonitorExecutionService
     /// <param name="checkMode">Execution mode: Full or PingOnly.</param>
     /// <param name="cancellationToken">Token used to cancel waiting, checks, or writes.</param>
     /// <param name="deviceType">Optional classification ID intersected with the other scope filters.</param>
+    /// <param name="selectionToken">Optional exact, single-use selection; empty never implies all targets.</param>
     /// <returns>True when streaming started; false when another execution is already running.</returns>
     public async Task<bool> TryStreamFullCheckAsync(
         Func<MonitorStreamEvent, CancellationToken, Task> writeEventAsync,
@@ -76,7 +81,8 @@ public sealed class MonitorExecutionService
         IReadOnlyCollection<string>? deviceIps = null,
         string checkMode = NetworkMonitorService.FullCheckMode,
         CancellationToken cancellationToken = default,
-        string? deviceType = null)
+        string? deviceType = null,
+        string? selectionToken = null)
     {
         if (!await _executionLock.WaitAsync(0, cancellationToken))
         {
@@ -85,8 +91,22 @@ public sealed class MonitorExecutionService
 
         try
         {
-            var loadedConfiguration = await _deviceRepository.GetConfigurationAsync();
-            var configuration = FilterConfiguration(loadedConfiguration, facilityName, categoryName, deviceName, deviceIps, deviceType);
+            MonitorConfiguration configuration;
+            MonitoringSelectionRequest? selection = null;
+            if (selectionToken is not null)
+            {
+                (configuration, selection) = await _plans.ConsumeAsync(selectionToken, cancellationToken);
+                facilityName = selection.Facility;
+                categoryName = selection.Category;
+                deviceType = selection.DeviceType;
+                deviceName = null;
+                deviceIps = null;
+            }
+            else
+            {
+                var loadedConfiguration = await _deviceRepository.GetConfigurationAsync();
+                configuration = FilterConfiguration(loadedConfiguration, facilityName, categoryName, deviceName, deviceIps, deviceType);
+            }
             var normalizedCheckMode = NetworkMonitorService.NormalizeCheckMode(checkMode);
             var startedAt = DateTimeOffset.Now;
             var settings = configuration.Settings;
@@ -127,7 +147,7 @@ public sealed class MonitorExecutionService
             var response = CreateResponse(settings, results, "Completed", normalizedCheckMode, completedAt);
             await _historyRepository.AppendAsync(
                 response,
-                CreateHistoryScope(configuration, facilityName, categoryName, deviceName, deviceIps, deviceType),
+                CreateHistoryScope(configuration, facilityName, categoryName, deviceName, deviceIps, deviceType, selection),
                 startedAt,
                 completedAt,
                 cancellationToken);
@@ -295,7 +315,8 @@ public sealed class MonitorExecutionService
         string? categoryName = null,
         string? deviceName = null,
         IReadOnlyCollection<string>? deviceIps = null,
-        string? deviceType = null)
+        string? deviceType = null,
+        MonitoringSelectionRequest? selection = null)
     {
         var firstDevice = configuration.Devices.FirstOrDefault();
 
@@ -306,6 +327,7 @@ public sealed class MonitorExecutionService
             Facility = string.IsNullOrWhiteSpace(facilityName) ? null : facilityName,
             Category = string.IsNullOrWhiteSpace(categoryName) ? null : categoryName,
             DeviceType = string.IsNullOrWhiteSpace(deviceType) ? null : deviceType.Trim().ToLowerInvariant(),
+            SelectionCount = selection is null ? null : configuration.Devices.Count,
             DeviceName = string.IsNullOrWhiteSpace(deviceName) ? null : deviceName,
             DeviceIps = deviceIps?
                 .Where(ip => !string.IsNullOrWhiteSpace(ip))

@@ -75,4 +75,7 @@ public sealed class AppErrorEntry
     /// User agent header sent by the client, when available.
     /// </summary>
     public string? UserAgent { get; init; }
+    /// <summary>Request correlation identity, absent from legacy entries.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? TraceId { get; init; }
 }

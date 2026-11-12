@@ -24,7 +24,7 @@ test.beforeEach(async ({ request }) => {
 test('type filter combines with facility/search/status without writes or widening an empty selection', async ({ page, request }) => {
   const before = await (await request.get('/api/config')).json();
   let executions = 0;
-  page.on('request', req => { if (new URL(req.url()).pathname.startsWith('/api/monitor/')) executions++; });
+  page.on('request', req => { if (new URL(req.url()).pathname === '/api/monitor/stream') executions++; });
   await page.goto('/');
   await expect(rows(page)).toHaveCount(7);
   await page.locator('#dashboard-device-type').selectOption('workstation');
@@ -43,7 +43,7 @@ test('type filter combines with facility/search/status without writes or widenin
   await expect(page.locator('#run-group-check')).toBeDisabled();
   await page.locator('#dashboard-device-type').selectOption('web-app');
   await expect(rows(page)).toHaveCount(1);
-  await expect(page.locator('#group-check-select option')).toHaveText(['Select group', 'Websites']);
+  await expect(page.locator('#group-check-select option')).toHaveText(['All categories', 'Websites']);
   await expect(page.locator('#dashboard-device-type option[value="web-app"]')).toHaveText(customTypeName);
   await expect(page.locator('#dashboard-device-type img')).toHaveCount(0);
   await page.locator('label[for="filter-offline"]').click();
@@ -64,7 +64,7 @@ test('group execution intersects type/facility/category and does not mark an ide
   await page.locator('#dashboard-device-type').selectOption('workstation');
   await page.locator('[data-facility-filter="Alpha"]').click();
   await page.locator('#group-check-select').selectOption('Shared');
-  await page.locator('#device-search').fill('unrelated text is presentation only');
+  await page.locator('#device-search').fill('Mirror');
   const requestEvent = page.waitForRequest(req => new URL(req.url()).pathname === '/api/monitor/stream');
   await page.locator('#run-group-check').click();
   const query = new URL((await requestEvent).url()).searchParams;
@@ -104,19 +104,19 @@ test('facility, individual and failed checks retain the type scope with shared a
   expect(retried.results[0].name).toBe('Mirror');
 });
 
-test('automatic global executions remain global while type-filtered results stay visible', async ({ page, request }) => {
+test('automatic executions intersect the current type and facility filters', async ({ page, request }) => {
   await page.goto('/');
   await page.locator('#dashboard-device-type').selectOption('server');
   await page.locator('[data-facility-filter="Alpha"]').click();
   const requestEvent = page.waitForRequest(req => new URL(req.url()).pathname === '/api/monitor/stream');
   await page.locator('#auto-refresh-toggle').click();
   const query = new URL((await requestEvent).url()).searchParams;
-  expect(query.has('deviceType')).toBe(false);
-  expect(query.has('facility')).toBe(false);
+  expect(query.get('deviceType')).toBe('server');
+  expect(query.get('facility')).toBe('Alpha');
   await expect.poll(async () => (await runs(request)).length).toBe(1);
   await page.locator('#auto-refresh-toggle').click();
-  expect((await runs(request))[0].results).toHaveLength(7);
-  expect((await runs(request))[0].scope.deviceType).toBeUndefined();
+  expect((await runs(request))[0].results).toHaveLength(1);
+  expect((await runs(request))[0].scope.deviceType).toBe('server');
   await expect(rows(page)).toHaveCount(1);
   await expect(typedRows(page, 'server')).toContainText('Down');
 });
@@ -129,9 +129,8 @@ test('a removed type never expands a pending filtered run to all devices', async
   config.deviceTypes = config.deviceTypes.filter(type => type.id !== 'web-app');
   expect((await request.post('/api/config', { data: config })).ok()).toBeTruthy();
   await page.locator('#run-facility-check').click();
-  await expect.poll(async () => (await runs(request)).length).toBe(1);
-  expect((await runs(request))[0].results).toHaveLength(0);
-  expect((await runs(request))[0].scope.deviceType).toBe('web-app');
+  await expect(page.locator('#last-check')).toContainText('Review the refreshed selection');
+  expect(await runs(request)).toHaveLength(0);
   await expect(page.locator('#metric-total')).toHaveText('0');
   await expect(page.locator('#dashboard-device-type')).toHaveValue('web-app');
   await expect(page.locator('#run-facility-check')).toBeDisabled();

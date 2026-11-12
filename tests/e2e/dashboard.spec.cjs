@@ -22,14 +22,14 @@ test.beforeEach(async ({ request }) => {
 test('dashboard searches untested inventory without executions, false failures or inventory writes', async ({ page, request }, testInfo) => {
   const before = await (await request.get('/api/config')).json();
   let executions = 0;
-  page.on('request', req => { if (new URL(req.url()).pathname.startsWith('/api/monitor/')) executions++; });
+  page.on('request', req => { if (new URL(req.url()).pathname === '/api/monitor/stream') executions++; });
   await page.goto('/');
   await expect(rows(page)).toHaveCount(4);
   await expect(page.locator('#metric-total')).toHaveText('4');
   await expect(page.locator('#metric-offline')).toHaveText('0');
   await expect(page.locator('#metric-availability')).toHaveText('-');
   await expect(page.locator('#results-body .fa-spin')).toHaveCount(0);
-  await expect(page.locator('[data-facility-filter="Hidden site"]')).toHaveCount(0);
+  await expect(page.locator('[data-facility-filter="Hidden site"]')).toContainText('0 devices');
   await page.locator('#device-search').fill('desk b');
   await expect(rows(page)).toHaveCount(1);
   await expect(row(page, 'Desk B')).toBeVisible();
@@ -65,7 +65,7 @@ test('dashboard searches untested inventory without executions, false failures o
   expect(await (await request.get('/api/config')).json()).toEqual(before);
 });
 
-test('group runs intersect facility and category, not the textbox, and preserve untested facilities', async ({ page, request }) => {
+test('group runs intersect facility, category and textbox, preserving all unselected inventory', async ({ page, request }) => {
   await page.goto('/');
   await expect(rows(page)).toHaveCount(4);
   await page.locator('[data-facility-filter="Alpha"]').click();
@@ -80,7 +80,7 @@ test('group runs intersect facility and category, not the textbox, and preserve 
   await expect(page.locator('#last-check')).toContainText('Last Alpha / Workstations execution:');
   let runs = await history(request);
   expect(runs).toHaveLength(1);
-  expect(runs[0].results.map(result => result.name).sort()).toEqual(['Desk A one', 'Desk A two']);
+  expect(runs[0].results.map(result => result.name).sort()).toEqual(['Desk A one']);
   expect(runs[0].scope.facility).toBe('Alpha');
   expect(runs[0].scope.category).toBe('Workstations');
   await page.locator('[data-facility-filter="Beta"]').click();
@@ -90,6 +90,7 @@ test('group runs intersect facility and category, not the textbox, and preserve 
   await expect(row(page, 'Desk B')).toContainText('Not checked');
   await expect(page.locator('#metric-offline')).toHaveText('0');
   await page.locator('[data-facility-filter=""]').click();
+  await page.locator('#device-search').fill('');
   await page.locator('#group-check-select').selectOption('Workstations');
   const allRequest = page.waitForRequest(req => new URL(req.url()).pathname === '/api/monitor/stream');
   await page.locator('#run-group-check').click();
@@ -167,17 +168,21 @@ test('facility and category header bands toggle once while run controls remain i
   await expect(page.locator('#last-check')).toContainText('Last execution:');
   const alpha = page.locator('.facility-section').filter({ has: page.locator('.facility-title', { hasText: 'Alpha' }) });
   const facilityBody = alpha.locator(':scope > .collapse');
-  await expect(facilityBody).not.toHaveClass(/show/);
+  await expect(facilityBody).toHaveClass(/show/);
   await alpha.locator('.facility-run-button').click();
   await expect(page.locator('#last-check')).toContainText('Last Alpha execution:');
-  await expect(facilityBody).not.toHaveClass(/show/);
+  await expect(facilityBody).toHaveClass(/show/);
+  await alpha.locator('.facility-title').click();
+  await expect(facilityBody).toHaveClass('collapse');
   await alpha.locator('.facility-title').click();
   await expect(facilityBody).toHaveClass(/collapse show/);
   const category = alpha.locator('.category-section').filter({ has: page.getByRole('heading', { name: 'Workstations', exact: true }) });
   const categoryBody = category.locator(':scope > .collapse');
   await category.locator('.category-run-button').click();
   await expect(page.locator('#last-check')).toContainText('Last Alpha / Workstations execution:');
-  await expect(categoryBody).not.toHaveClass(/show/);
+  await expect(categoryBody).toHaveClass(/show/);
+  await category.locator('.category-header h2').click();
+  await expect(categoryBody).toHaveClass('collapse');
   await category.locator('.category-header h2').click();
   await expect(categoryBody).toHaveClass(/collapse show/);
   await category.locator('.category-toggle').click();

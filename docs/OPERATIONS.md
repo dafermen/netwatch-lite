@@ -29,17 +29,25 @@ Confirm:
 
 Dashboard search works before checks and after partial runs. Not checked is
 not an outage; Offline/Problems require actual results. Group runs respect the
-selected facility, while All Facilities applies the category across the active
-support group. The search textbox changes display only, not execution scope.
+selected facility and all other active filters. Search, Device Type, Category,
+status and participation affect both display and execution, including automatic
+monitoring. Clear filters for every enabled record. This supersedes rc.13's
+presentation-only search/global automatic runs.
 
 The filter-reset icon beside search restores All Facilities, Show All, empty
 search and no group selection. It retains measured results and history and
 does not start monitoring. Run in a device row checks only that row, even if
-it is already healthy. Global/facility/group buttons keep their own scope.
+it is already healthy. Facility/category controls further narrow the selection.
+Last execution lists actual checked items. Monitoring switches pause/resume
+without deletion; select Paused to find paused inventory. See [filters](DASHBOARD_FILTERS.md).
 Facility/category header bands toggle their sections; Run, links and other
 interactive controls do not toggle them. The arrow buttons work with keyboard.
 
 ## Reports
+
+Use [Diagnostics](DIAGNOSTICS.md) for internal/browser error references and stored
+probe failures. Logs/exports remain private. The [language selector](UI_LANGUAGES.md)
+stays available on every application page.
 
 Configuration > Data & backups controls global run/age retention, pre-prune export,
 automatic SQLite snapshots and local change history. Back up now verifies a new

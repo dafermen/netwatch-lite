@@ -16,7 +16,7 @@ configure an HTTP/HTTPS check to monitor its URL.
 Dashboard also offers Device Type immediately before Category. It reads this
 profile's catalog and filters both pending and checked inventory; scoped runs
 enforce the selection before executing checks. See [dashboard filters](DASHBOARD_FILTERS.md)
-for Facility intersections, global automatic runs and no-match behavior. New
+for shared filter intersections, filtered automatic runs and no-match behavior. New
 results snapshot their classification and scoped history records the selected
 type ID; missing legacy classifications remain unknown, without rewriting history.
 

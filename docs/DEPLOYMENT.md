@@ -3,6 +3,12 @@
 Use this checklist before tagging, packaging, demoing, committing a stable
 milestone, or deploying the application.
 
+rc.14 requires its matching backend and UI for snapshot/plan execution, monitoring
+switches and Diagnostics. Do not deploy its JS alone over rc.13. Its automatic
+runs intentionally use all active filters. SQLite remains schema 2; back up before
+updating. Only a local evaluation portable is authorized; GitHub publication is
+on hold. See [current validation](VALIDATION_MULTILINGUAL_2026-11-12.md).
+
 A deployment is not ready until every quality gate below has recorded evidence.
 If a gate cannot be executed, document the reason, risk, compensating control,
 and project-owner approval before deployment.

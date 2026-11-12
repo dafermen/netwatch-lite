@@ -41,6 +41,13 @@ jobs:
           node --check wwwroot/workstations.js
           node --check wwwroot/reports-sql.js
           node --check wwwroot/storage.js
+          node --check wwwroot/i18n.js
+          node --check wwwroot/i18n-es.js
+          node --check wwwroot/inventory-filters.js
+          node --check wwwroot/monitoring-ui.js
+          node --check wwwroot/http-diagnostics.js
+          node --check wwwroot/diagnostics.js
+          node --test tests/javascript/monitoring.test.cjs
           node --check docs/app.js
           node --check docs/docs-reading-tools.js
           node --check docs/docs-reading-init.js

@@ -97,7 +97,8 @@ try {
         Start-Sleep -Milliseconds 100
     }
     if (-not $ready) { throw 'Packaged executable did not become ready within 30 seconds.' }
-    $routes = @('/', '/config', '/regions', '/themes', '/device-types', '/peripherals', '/workstations', '/reports', '/integrations', '/docs/',
+    $routes = @('/', '/config', '/regions', '/themes', '/device-types', '/peripherals', '/workstations', '/reports', '/integrations', '/diagnostics', '/docs/',
+        '/i18n.js', '/i18n-es.js', '/inventory-filters.js', '/monitoring-ui.js', '/http-diagnostics.js', '/diagnostics.js', '/api/monitor/inventory', '/api/diagnostics',
         '/management.js', '/docs/PORTABLE.md', '/docs/STORAGE.md', '/api/storage', '/api/config', '/api/regions', '/api/themes', '/api/history', '/api/integrations')
     if ($ExpectedStorageSchema -eq 2) { $routes += @('/reports-sql.js','/storage.js','/api/reports/query','/api/inventory/query','/api/storage/policy','/api/storage/audit','/api/storage/backups') }
     foreach ($route in $routes) {

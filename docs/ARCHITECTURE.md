@@ -1,5 +1,20 @@
 # NetWatch Lite Architecture
 
+## rc.14 Additions
+
+`MonitorPlans` captures an exact, bounded, short-lived, single-use selection from
+fresh profile/revision snapshots. The execution lock precedes consumption; no
+invalid explicit scope can become a global run. `inventory-filters.js` supplies
+one pure view predicate to Dashboard/Configuration; grouping remains presentation.
+Narrow participation writes change only Enabled, without schema changes.
+
+`DiagnosticPages` projects internal errors and failed history separately, using
+SQL report pages on SQLite and compatible JSON reads. Redaction/bounds/references
+are defense in depth, not authentication. `i18n.js` translates owned literal UI
+before data interpolation; locale is a browser choice, not persisted inventory.
+See [filters](DASHBOARD_FILTERS.md), [diagnostics](DIAGNOSTICS.md) and
+[languages](UI_LANGUAGES.md). Existing storage decisions remain unchanged.
+
 ## Purpose
 
 NetWatch Lite is an internal network-monitoring dashboard. It loads local

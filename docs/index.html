@@ -481,7 +481,7 @@
     <section class="doc-section" id="frontend">
       <h2>Frontend</h2>
       <p><code>wwwroot/index.html</code> define el layout compartido: sidebar hamburguesa, topbar, dashboard, pagina de configuracion, pagina de temas, metricas, busqueda, filtros y contenedor de resultados. El dashboard inicia en modo manual por defecto. Cuando hay problemas aparece <code>Run Failed</code> para repetir solo los dispositivos fallidos, y cada fila muestra <code>Run</code> junto al timestamp para comprobar solo ese dispositivo, incluso si esta pendiente o saludable.</p>
-      <p>La busqueda incluye el inventario habilitado antes de ejecutar y conserva los equipos pendientes despues de una ejecucion parcial. Not checked no significa caido. Run Group combina Facility y categoria; con All Facilities comprueba esa categoria en todas las sedes del perfil activo. El textbox solo filtra la vista, no el alcance del chequeo.</p>
+      <p>La busqueda funciona antes de ejecutar y conserva los equipos pendientes despues de una ejecucion parcial. Sin comprobar no significa caido. Desde rc.14, busqueda, instalacion, tipo, categoria, estado y monitoreo delimitan tanto la vista como las ejecuciones manuales y automaticas. Limpiar filtros permite seleccionar todo el inventario habilitado. Ultima ejecucion muestra lo realmente comprobado.</p>
       <p>El dashboard muestra botones de facility para enfocar una sede y habilitar <code>Run Facility</code>. En vista general, las tablas se agrupan por facility y luego por categoria, por lo que dos equipos con el mismo nombre en sedes distintas se ven como registros diferentes.</p>
       <p>La pagina <code>/regions</code> permite crear, copiar, renombrar, activar y eliminar perfiles JSON independientes. La pagina <code>/config</code> trabaja sobre la region activa y agrupa los dispositivos por facility y categoria, con grupos colapsados por defecto para facilitar la edicion de inventarios grandes. El modo <code>Bulk Edit</code> muestra una tabla estilo hoja de calculo para actualizar campos comunes y guardar una fila a la vez; incluye filtros por facility/categoria, botones para colapsar o expandir todas las facilities visibles, y separadores visuales para evitar listas masivas dificiles de leer. Las acciones de agregar, copiar, actualizar y eliminar dispositivos guardan inmediatamente en el JSON activo, y el boton <code>Save Settings</code> guarda ajustes generales como intervalo, timeout, reintentos, pausa entre reintentos y concurrencia maxima. <code>Export JSON</code> descarga la configuracion activa e <code>Import JSON</code> valida un archivo antes de reemplazar esa configuracion.</p>
       <p>La pagina <code>/themes</code> muestra templates con paletas, busqueda, filtros y acciones por fila. Crear, copiar y renombrar guarda al confirmar el modal. Los colores se editan en un borrador separado y se persisten con Save Colors; seleccionar o previsualizar no activa un tema. La paleta global cambia solo cuando el servidor confirma la operacion.</p>
@@ -500,7 +500,7 @@
         <li>Manejar modo manual por defecto, auto refresh ON/OFF, selector <code>Full Check</code>/<code>Ping Only</code> y el boton principal <code>Run All Facilities</code>/<code>Run Facility</code>.</li>
         <li>Administrar dispositivos y checks desde la ruta <code>/config</code>.</li>
         <li>Administrar templates de color desde la ruta <code>/themes</code>.</li>
-        <li>Filtrar por Device Type antes de Category, texto, facility, online, offline y problemas. El tipo limita los Run por sede/categoria; la ejecucion automatica global conserva su alcance. Consulte <a href="DASHBOARD_FILTERS.md">la guia de filtros</a>.</li>
+        <li>Los filtros compartidos delimitan todas las ejecuciones modernas; una seleccion vacia u obsoleta nunca se amplia automaticamente. Configuracion permite agrupar por instalacion o tipo y pausar el monitoreo sin eliminar registros. Consulte <a href="DASHBOARD_FILTERS.md">la guia de filtros</a>.</li>
       </ul>
     </section>
 
@@ -556,7 +556,7 @@ dotnet run</pre>
 |-- packages/NetWatch-Lite-v0.8.0-rc.13-win-x64.zip.sha256
 `-- verification/{run-id}/</pre>
       <p>Las versiones anteriores no se sobrescriben. El ZIP exacto se valida en una copia aislada; no incluye inventarios privados ni ajustes locales. <a href="/docs/PORTABLE.md">Guia completa de portables</a>.</p>
-      <p>rc.13 incorpora Device Type antes de Category en Dashboard. Actualizar juntos backend y archivos web; publicar en GitHub no despliega el backend alojado aparte. <a href="DASHBOARD_FILTERS.md">Alcance de filtros y ejecuciones</a>.</p>
+      <p>rc.14 incorpora interfaz ingles/espanol, filtros compartidos, ejecucion exacta, pausas y diagnosticos. Actualizar juntos backend y archivos web. Esta entrega es local y no autoriza publicar en GitHub. <a href="DASHBOARD_FILTERS.md">Filtros</a>, <a href="UI_LANGUAGES.md">idiomas</a>, <a href="DIAGNOSTICS.md">diagnosticos</a> y <a href="VALIDATION_MULTILINGUAL_2026-11-12.md">validacion</a>.</p>
       <p>Uso en Windows:</p>
       <ol>
         <li>Descomprimir el ZIP.</li>

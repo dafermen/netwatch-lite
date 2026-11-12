@@ -47,4 +47,10 @@ public sealed class CheckResult
     public long? DurationMs { get; init; }
     /// <summary>Safe HTTP diagnostic, without response bodies or query values.</summary>
     public string? Message { get; init; }
+    /// <summary>Safe transport reason code, without exception messages, credentials or response bodies.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? DiagnosticCode { get; init; }
+    /// <summary>Actual HTTP attempt count; absent in legacy history and checks without this measurement.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public int? Attempts { get; set; }
 }

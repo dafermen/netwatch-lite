@@ -7,6 +7,9 @@ namespace NetWatch.Models;
 /// </summary>
 public sealed class Device
 {
+    [JsonIgnore]
+    internal string? RuntimeKey { get; set; }
+
     /// <summary>Explicit inventory type; legacy devices remain unspecified.</summary>
     [JsonPropertyName("deviceType")]
     public string DeviceType { get; init; } = "unspecified";

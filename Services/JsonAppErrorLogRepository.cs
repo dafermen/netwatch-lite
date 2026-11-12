@@ -89,13 +89,14 @@ public sealed class JsonAppErrorLogRepository
                 Timestamp = DateTimeOffset.Now,
                 Source = source,
                 ExceptionType = exception.GetType().FullName ?? exception.GetType().Name,
-                Message = exception.Message,
-                StackTrace = exception.ToString(),
+                Message = DiagnosticSanitizer.Text(exception.Message, 4096) ?? "Application error",
+                StackTrace = DiagnosticSanitizer.Text(exception.ToString(), 32768),
                 HttpMethod = request?.Method,
                 Path = request?.Path.Value,
-                QueryString = request?.QueryString.Value,
+                QueryString = null,
                 StatusCode = statusCode,
-                UserAgent = request?.Headers.UserAgent.ToString()
+                UserAgent = DiagnosticSanitizer.Text(request?.Headers.UserAgent.ToString(), 256),
+                TraceId = httpContext?.TraceIdentifier
             };
 
             store.Errors.Add(entry);

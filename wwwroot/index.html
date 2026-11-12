@@ -7,7 +7,7 @@
   <link rel="icon" type="image/png" href="/netwatch-lite-favicon.png">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
-  <link href="/styles.css?v=device-type-filter-20261111-final" rel="stylesheet">
+  <link href="/styles.css?v=rc14-20261112" rel="stylesheet">
 </head>
 <body>
   <div class="app-shell">
@@ -45,6 +45,7 @@
           <i class="fa-solid fa-chart-column"></i>
           Reports
         </a>
+        <a class="nav-link" href="/diagnostics" data-route="/diagnostics"><i class="fa-solid fa-bug" aria-hidden="true"></i>Diagnostics</a>
         <a class="nav-link" href="/integrations" data-route="/integrations">
           <i class="fa-solid fa-plug-circle-bolt"></i>
           Integrations
@@ -83,6 +84,7 @@
         </div>
 
         <div class="topbar-actions">
+          <div class="input-group input-group-sm language-control"><label class="input-group-text" for="app-language" title="Language"><i class="fa-solid fa-language" aria-hidden="true"></i><span class="visually-hidden">Language</span></label><select class="form-select" id="app-language" aria-label="Language"><option value="en" data-i18n-skip>English</option><option value="es" data-i18n-skip>Espa&ntilde;ol</option></select></div>
           <div class="topbar-status text-end">
             <div class="text-secondary small" id="execution-mode">Manual mode</div>
             <div class="text-secondary small" id="last-check">Waiting for first check...</div>
@@ -183,7 +185,7 @@
                 <button class="btn btn-outline-primary btn-sm" type="button" id="run-facility-check">
                   <span class="spinner-border spinner-border-sm me-1 d-none" id="run-facility-check-spinner" aria-hidden="true"></span>
                   <i class="fa-solid fa-play me-1" id="run-facility-check-icon"></i>
-                  <span id="run-facility-check-label">Run All Facilities</span>
+                  <span id="run-facility-check-label">Run selection</span>
                 </button>
               </div>
             </div>
@@ -229,15 +231,18 @@
                   <i class="fa-solid fa-layer-group"></i>
                 </label>
                 <select class="form-select" id="group-check-select" aria-label="Category">
-                  <option value="">Select group</option>
+                  <option value="">All categories</option>
                 </select>
                 <button class="btn btn-outline-primary" type="button" id="run-group-check" disabled>
                   <span class="spinner-border spinner-border-sm me-1 d-none" id="run-group-check-spinner" aria-hidden="true"></span>
                   <i class="fa-solid fa-play me-1" id="run-group-check-icon"></i>
-                  Run Group
+                  Run selection
                 </button>
               </div>
 
+              <select class="form-select form-select-sm monitoring-filter-control" id="dashboard-monitoring" aria-label="Monitoring filter">
+                <option value="enabled">Monitoring on</option><option value="paused">Monitoring paused</option><option value="all">All items</option>
+              </select>
               <div class="btn-group btn-group-sm status-filter-group" role="group" aria-label="Device status filters">
                 <input type="radio" class="btn-check" name="status-filter" id="filter-all" value="all" checked>
                 <label class="btn btn-outline-secondary" for="filter-all">Show All</label>
@@ -254,6 +259,10 @@
             </div>
           </div>
 
+          <div id="last-run-receipt" class="last-run-receipt mb-3" hidden>
+            <span id="last-run-receipt-text" role="status"></span>
+            <button class="btn btn-outline-secondary btn-sm" type="button" id="show-last-run"><i class="fa-solid fa-list-check me-1" aria-hidden="true"></i>View last run</button>
+          </div>
           <div class="monitor-progress mb-3" id="monitor-progress" hidden>
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
               <div class="d-flex align-items-center gap-2">
@@ -273,6 +282,26 @@
           </div>
         </section>
 
+        <section id="diagnostics-page" data-page="/diagnostics" hidden>
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h2 class="h4 mb-0">Diagnostics</h2>
+            <div class="d-flex gap-2"><button class="btn btn-outline-secondary btn-sm icon-button" id="diagnostics-refresh" type="button" title="Refresh diagnostics" aria-label="Refresh diagnostics"><i class="fa-solid fa-rotate-right" aria-hidden="true"></i></button>
+              <div class="dropdown"><button class="btn btn-outline-primary btn-sm dropdown-toggle" id="diagnostics-export" type="button" data-bs-toggle="dropdown" disabled><i class="fa-solid fa-file-export me-1" aria-hidden="true"></i>Export</button><ul class="dropdown-menu dropdown-menu-end"><li><button class="dropdown-item" type="button" data-diagnostics-export="json">JSON</button></li><li><button class="dropdown-item" type="button" data-diagnostics-export="csv">CSV</button></li></ul></div></div>
+          </div>
+          <div id="diagnostics-alert" role="status" aria-live="polite"></div>
+          <div class="nav nav-tabs mb-3" role="tablist" aria-label="Diagnostic sources">
+            <button class="nav-link active" id="diagnostics-application" type="button" role="tab" aria-selected="true" data-diagnostics-source="application">Application errors</button>
+            <button class="nav-link" id="diagnostics-monitoring" type="button" role="tab" aria-selected="false" data-diagnostics-source="monitoring">Monitoring failures</button>
+          </div>
+          <div class="diagnostics-filters mb-3">
+            <label><span class="form-label small">Search</span><input class="form-control form-control-sm" id="diagnostics-search" type="search" maxlength="4096" placeholder="Name, address, source or reference"></label>
+            <label><span class="form-label small">From</span><input class="form-control form-control-sm" id="diagnostics-from" type="date"></label>
+            <label><span class="form-label small">To</span><input class="form-control form-control-sm" id="diagnostics-to" type="date"></label>
+            <button class="btn btn-outline-secondary btn-sm icon-button" id="diagnostics-clear" type="button" title="Clear diagnostic filters" aria-label="Clear diagnostic filters"><i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i></button>
+          </div>
+          <div class="table-responsive"><table class="table table-hover align-middle diagnostics-table"><thead><tr><th>Timestamp</th><th>Source</th><th>Summary</th><th>Reference</th><th><span class="visually-hidden">Details</span></th></tr></thead><tbody id="diagnostics-body"></tbody></table></div>
+          <div class="d-flex flex-wrap gap-2 align-items-center justify-content-end"><label class="d-flex align-items-center gap-2 small">Rows<select class="form-select form-select-sm" id="diagnostics-size"><option>10</option><option selected>25</option><option>50</option><option>100</option></select></label><span class="small text-secondary" id="diagnostics-page-summary"></span><button class="btn btn-outline-secondary btn-sm icon-button" id="diagnostics-prev" type="button" title="Previous page" aria-label="Previous page"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button><button class="btn btn-outline-secondary btn-sm icon-button" id="diagnostics-next" type="button" title="Next page" aria-label="Next page"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button></div>
+        </section>
         <section id="config-page" data-page="/config" hidden>
           <div class="config-toolbar config-page-toolbar mb-3">
             <div>
@@ -376,7 +405,7 @@
               <div class="card config-card">
                 <div class="card-header config-devices-header">
                   <div class="d-flex flex-wrap align-items-center gap-2">
-                    <span class="fw-semibold">Devices</span>
+                    <span class="fw-semibold">Devices and websites</span>
                     <div class="btn-group btn-group-sm" role="group" aria-label="Configuration edit mode">
                       <button class="btn btn-primary" type="button" id="config-normal-view">Normal</button>
                       <button class="btn btn-outline-primary" type="button" id="config-bulk-view">Bulk Edit</button>
@@ -396,9 +425,18 @@
                     </div>
                     <button class="btn btn-primary btn-sm" type="button" id="add-device">
                       <i class="fa-solid fa-plus me-1"></i>
-                      Add Device
+                      Add device or website
                     </button>
                   </div>
+                </div>
+                <div class="config-filter-bar" id="config-filter-bar">
+                  <select class="form-select form-select-sm" id="config-facility-filter" aria-label="Facility filter"><option value="">All facilities</option></select>
+                  <select class="form-select form-select-sm" id="config-device-type-filter" aria-label="Device Type filter"><option value="">All device types</option></select>
+                  <select class="form-select form-select-sm" id="config-category-filter" aria-label="Category filter"><option value="">All categories</option></select>
+                  <select class="form-select form-select-sm" id="config-status-filter" aria-label="Status filter"><option value="all">All statuses</option><option value="online">Online</option><option value="offline">Offline</option><option value="problems">Problems</option><option value="pending">Not checked</option></select>
+                  <select class="form-select form-select-sm" id="config-monitoring-filter" aria-label="Monitoring filter"><option value="all">All items</option><option value="enabled">Monitoring on</option><option value="paused">Monitoring paused</option></select>
+                  <div class="input-group input-group-sm config-grouping-control"><label class="input-group-text" for="config-grouping" title="Group by"><i class="fa-solid fa-object-group" aria-hidden="true"></i></label><select class="form-select" id="config-grouping" aria-label="Group by"><option value="facility">Group by facility</option><option value="deviceType">Group by device type</option></select></div>
+                  <button class="btn btn-outline-secondary btn-sm icon-button" id="clear-config-filters" type="button" title="Clear configuration filters" aria-label="Clear configuration filters"><i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i></button>
                 </div>
                 <div class="table-responsive" id="config-devices-table-wrapper">
                   <table class="table table-hover align-middle mb-0 config-devices-table">
@@ -432,24 +470,6 @@
                 <div id="bulk-edit-panel" hidden>
                   <div class="bulk-edit-controls border-bottom px-3 py-2">
                     <div class="bulk-edit-summary small text-secondary" id="bulk-edit-summary">0 devices shown</div>
-                    <div class="bulk-edit-filter-grid">
-                      <label class="form-label small mb-0">
-                        Facility
-                        <select class="form-select form-select-sm" id="bulk-facility-filter">
-                          <option value="">All facilities</option>
-                        </select>
-                      </label>
-                      <label class="form-label small mb-0">
-                        Category
-                        <select class="form-select form-select-sm" id="bulk-category-filter">
-                          <option value="">All categories</option>
-                        </select>
-                      </label>
-                      <button class="btn btn-outline-secondary btn-sm" type="button" id="bulk-clear-filters">
-                        <i class="fa-solid fa-filter-circle-xmark me-1"></i>
-                        Clear Filters
-                      </button>
-                    </div>
                   </div>
                   <div class="bulk-action-bar border-bottom px-3 py-2">
                     <div class="bulk-selection-tools">
@@ -878,7 +898,7 @@
             <div>
               <div class="text-secondary small text-uppercase fw-semibold mb-2">User Manual</div>
               <h2 class="display-6 fw-semibold mb-2">Operate NetWatch Lite with confidence</h2>
-              <p class="lead mb-0">Monitor devices, manage the JSON inventory, run full checks, and interpret health states from one lightweight dashboard.</p>
+              <p class="lead mb-0">Monitor devices and websites using the active support group inventory.</p>
             </div>
           </div>
 
@@ -888,13 +908,14 @@
               <p>The dashboard shows device health grouped by facility and category. Facility and category sections stay compact so large inventories remain easy to scan.</p>
               <ul>
                 <li>Use facility buttons to focus one site, then run only that facility when hundreds of devices are configured.</li>
-                <li>Use <strong>Run All Facilities</strong> to execute all configured ping, TCP and HTTP/HTTPS checks immediately.</li>
+                <li>All run controls intersect the current search, facility, device type, category, status and monitoring filters. Clear filters to select every enabled item.</li>
                 <li>Use <strong>Full Check</strong> for configured ping, TCP and HTTP/HTTPS checks, or <strong>Ping Only</strong> for a fast connectivity-only run.</li>
                 <li>Use <strong>Run Failed</strong> when it appears to retry only devices currently marked as Degraded or Down.</li>
                 <li>Use <strong>Run</strong> on any device row to check only that device, including healthy devices.</li>
-                <li>Use <strong>Auto Refresh</strong> to run a full check using the configured interval.</li>
+                <li>Automatic monitoring uses the same current filters at each interval.</li>
                 <li>Search configured devices before checking or after a partial run, by name, IP, hostname, facility, category or URL. Not checked is not an outage.</li>
-                <li><strong>Run Group</strong> checks the selected category within the selected facility, or across all sites with All Facilities. Search filters the view only.</li>
+                <li>Run selection also works with only a device type selected. Last execution lists the items actually checked.</li>
+                <li>Pause monitoring without deleting the item. Paused items are excluded from checks and availability calculations.</li>
                 <li>The reset icon beside search clears dashboard filters without deleting results or history. Click a facility/category header band or its arrow to expand or collapse it.</li>
                 <li>Configure <strong>Command</strong> beside Website URL in the device form. Dashboard Command copies the literal text for the operator to review and paste; the app never executes it.</li>
                 <li>Use status filters to show all devices, online devices, offline devices, or problems.</li>
@@ -923,12 +944,12 @@
 
             <section class="doc-panel">
               <h3><i class="fa-solid fa-sliders me-2 text-warning"></i>Configuration</h3>
-              <p>The Configuration page edits the active region JSON used by the backend.</p>
+              <p>Configuration edits the active support group in the selected local storage provider: SQLite or JSON.</p>
               <ul>
-                <li>Use <strong>Support Groups</strong> to switch between independent JSON profiles such as Support Team A, Support Team B, or Demo.</li>
+                <li>Support groups keep independent inventories and catalogs.</li>
                 <li>Search/filter the region-grouped list and use its row menu to activate, copy, rename, delete or open a profile's configuration. Selection alone does not activate it.</li>
                 <li>Dashboard and Configuration always use the active support group profile.</li>
-                <li>Devices are grouped by facility and category; both levels are collapsible by default.</li>
+                <li>Group Configuration by facility or device type without modifying stored records. Search and shared filters reveal matching rows in Normal and Bulk Edit.</li>
                 <li>Filter configured devices by name, address, hostname, facility, or category.</li>
                 <li>Add, copy, or edit name, facility, address, hostname, website URL, category, enabled state, and checks from a modal editor.</li>
                 <li>Manage custom classifications in <strong>Device Types</strong>. Protected system types keep existing behavior; types assigned to devices cannot be deleted. <a href="/docs/DEVICE_TYPES.md">Device type guide</a>.</li>
@@ -938,13 +959,13 @@
                 <li>Use <strong>Themes</strong> to create, rename, activate, delete, and color reusable GUI templates.</li>
                 <li>Theme naming operations save immediately; color edits remain in preview until <strong>Save Colors</strong>. Unsaved colors require confirmation before being discarded. <a href="/docs/ADMINISTRATION.md">Administration guide</a>.</li>
                 <li>Use <strong>Export JSON</strong> and <strong>Import JSON</strong> to back up or restore the full configuration.</li>
-                <li>Click <strong>Save Settings</strong> to persist settings and create <code>config.backup.json</code>.</li>
+                <li>Save Settings persists configuration with a local backup. JSON import and export remain available with either storage provider.</li>
               </ul>
             </section>
 
             <section class="doc-panel">
-              <h3><i class="fa-solid fa-file-code me-2 text-info"></i>JSON File</h3>
-              <p>The portable build keeps runtime JSON profiles beside <code>NetWatch-Lite.exe</code>, so operators can manage independent support group inventories.</p>
+              <h3><i class="fa-solid fa-file-code me-2 text-info"></i>Data &amp; backups</h3>
+              <p>New installations use a local SQLite database. Existing JSON installations remain compatible; changing provider requires an offline migration.</p>
               <ul>
                 <li>If support group profiles are missing, NetWatch Lite creates a <strong>Support Team A</strong> profile and a protected <strong>Demo</strong> profile.</li>
                 <li><strong>Reload</strong> reloads the active inventory without restarting the app.</li>
@@ -958,7 +979,7 @@
 
             <section class="doc-panel">
               <h3><i class="fa-solid fa-plug-circle-bolt me-2 text-primary"></i>Integrations</h3>
-              <p>The Integrations page stores future inbound inventory and outbound report endpoint settings in local runtime JSON.</p>
+              <p>Integration settings prepare future exchange workflows. Automatic external import and report delivery are not implemented.</p>
               <ul>
                 <li>Use <strong>Local JSON</strong> while the app is running without external systems.</li>
                 <li>Use <strong>External endpoint</strong> as the planned source mode for importing facilities, devices, and settings later.</li>
@@ -1063,7 +1084,7 @@
             <section class="doc-panel">
               <h3><i class="fa-solid fa-seedling me-2 text-success"></i>Project Philosophy</h3>
               <p>NetWatch Lite is designed to be simple to run, easy to understand, and useful without requiring a database server or complex deployment.</p>
-              <p>It uses an editable JSON inventory, asynchronous checks, and a clean web interface to provide immediate visibility into device availability.</p>
+              <p>Inventories, history and internal errors stay in local storage. New installations use SQLite; JSON remains compatible.</p>
             </section>
 
             <section class="doc-panel">
@@ -1181,7 +1202,7 @@
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
       <form class="modal-content" id="device-form">
         <div class="modal-header">
-          <h2 class="modal-title fs-5" id="device-form-title">Add Device</h2>
+          <h2 class="modal-title fs-5" id="device-form-title">Add device or website</h2>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
@@ -1231,7 +1252,7 @@
           <div class="mb-3" id="device-command-fields">
             <label class="form-label" for="device-command">Command</label>
             <input class="form-control" type="text" id="device-command" maxlength="4096" autocomplete="off" spellcheck="false" aria-describedby="device-command-help">
-            <div class="form-text" id="device-command-help">Comando para copiar al portapapeles. No se ejecuta autom&aacute;ticamente.</div>
+            <div class="form-text" id="device-command-help">Command to copy to the clipboard. It is never executed automatically.</div>
           </div>
           </fieldset>
           <div class="mb-3">
@@ -1267,7 +1288,7 @@
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline-secondary" type="button" id="reset-device-form">Cancel</button>
-          <button class="btn btn-primary" type="submit" id="submit-device">Add Device</button>
+          <button class="btn btn-primary" type="submit" id="submit-device">Add device or website</button>
         </div>
       </form>
     </div>
@@ -1307,13 +1328,26 @@
     </div>
   </div>
 
+  <div class="modal fade" id="last-run-modal" tabindex="-1" aria-labelledby="last-run-title" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+      <div class="modal-header"><h2 class="modal-title fs-5" id="last-run-title">Last execution</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close last execution"></button></div>
+      <div class="modal-body" id="last-run-body"></div>
+    </div></div>
+  </div>
+  <div class="modal fade" id="diagnostics-detail-modal" tabindex="-1" aria-labelledby="diagnostics-detail-title" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h2 class="modal-title fs-5" id="diagnostics-detail-title">Diagnostic details</h2><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close diagnostic details"></button></div><div class="modal-body" id="diagnostics-detail-body"></div></div></div></div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="/management.js?v=20261107"></script>
-  <script src="/peripherals.js?v=peripheral-link-20261109"></script>
-  <script src="/device-types.js?v=management-20261107"></script>
-  <script src="/workstations.js?v=peripheral-link-20261109"></script>
-  <script src="/reports-sql.js?v=url-crud-20261111-r2"></script>
-  <script src="/storage.js?v=sqlite2-20261110"></script>
-  <script src="/app.js?v=device-type-filter-20261111-final"></script>
+  <script src="/i18n-es.js?v=rc14-20261112"></script>
+  <script src="/i18n.js?v=rc14-20261112"></script>
+  <script src="/inventory-filters.js?v=rc14-20261112"></script>
+  <script src="/http-diagnostics.js?v=rc14-20261112"></script>
+  <script src="/management.js?v=rc14-20261112"></script>
+  <script src="/monitoring-ui.js?v=rc14-20261112"></script>
+  <script src="/diagnostics.js?v=rc14-20261112"></script>
+  <script src="/peripherals.js?v=rc14-20261112"></script>
+  <script src="/device-types.js?v=rc14-20261112"></script>
+  <script src="/workstations.js?v=rc14-20261112"></script>
+  <script src="/reports-sql.js?v=rc14-20261112"></script>
+  <script src="/storage.js?v=rc14-20261112"></script>
+  <script src="/app.js?v=rc14-20261112"></script>
 </body>
 </html>

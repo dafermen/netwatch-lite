@@ -1,5 +1,16 @@
 # NetWatch Lite Testing Guide
 
+Current scope/receipts: [multilingual monitoring validation](VALIDATION_MULTILINGUAL_2026-11-12.md).
+New browser suites cover exact/shared filters, pause/resume, both languages,
+draft-safe switching and Diagnostics consultation/export. Pure seeded predicates:
+
+```powershell
+node --test tests/javascript/monitoring.test.cjs
+```
+
+Eight sampled monitoring mutants cover exact keys, revision, expiry and paused
+state in addition to legacy scope/classification; this is not whole-app coverage.
+
 Use this document before an internal release or before asking another developer to continue the project.
 
 ## Current Review Scope

@@ -29,6 +29,16 @@ const runFacilityCheckIcon = document.querySelector("#run-facility-check-icon");
 const runFacilityCheckLabel = document.querySelector("#run-facility-check-label");
 const groupCheckSelect = document.querySelector("#group-check-select");
 const dashboardDeviceTypeSelect = document.querySelector('#dashboard-device-type');
+const dashboardMonitoringSelect = document.querySelector('#dashboard-monitoring');
+const configFilters = {
+  facility: document.querySelector('#config-facility-filter'),
+  deviceType: document.querySelector('#config-device-type-filter'),
+  category: document.querySelector('#config-category-filter'),
+  status: document.querySelector('#config-status-filter'),
+  monitoring: document.querySelector('#config-monitoring-filter')
+};
+const configGroupingSelect = document.querySelector('#config-grouping');
+const clearConfigFiltersButton = document.querySelector('#clear-config-filters');
 const runGroupCheckButton = document.querySelector("#run-group-check");
 const runGroupCheckSpinner = document.querySelector("#run-group-check-spinner");
 const runGroupCheckIcon = document.querySelector("#run-group-check-icon");
@@ -122,9 +132,8 @@ const configDevicesTableWrapper = document.querySelector("#config-devices-table-
 const bulkEditPanel = document.querySelector("#bulk-edit-panel");
 const bulkDevicesBody = document.querySelector("#bulk-devices-body");
 const bulkEditSummary = document.querySelector("#bulk-edit-summary");
-const bulkFacilityFilter = document.querySelector("#bulk-facility-filter");
-const bulkCategoryFilter = document.querySelector("#bulk-category-filter");
-const bulkClearFiltersButton = document.querySelector("#bulk-clear-filters");
+const bulkFacilityFilter = configFilters.facility;
+const bulkCategoryFilter = configFilters.category;
 const bulkSelectVisibleButton = document.querySelector("#bulk-select-visible");
 const bulkClearSelectionButton = document.querySelector("#bulk-clear-selection");
 const bulkCollapseAllButton = document.querySelector("#bulk-collapse-all");
@@ -215,6 +224,15 @@ let activeFilter = "all";
 let activeSearch = "";
 let activeFacility = "";
 let activeDashboardDeviceType = '';
+let activeDashboardMonitoring = 'enabled';
+let activeConfigFilters = { facility: '', deviceType: '', category: '', status: 'all', monitoring: 'all' };
+let activeConfigGrouping = 'facility';
+let monitorInventorySnapshot = null;
+let monitorPlanning = false;
+let monitoringMutationBusy = false;
+let configurationBusy = false;
+let inventoryDefinitions = new Map();
+let lastRunPayload = null;
 let activeRunDeviceType = '';
 let autoRefreshEnabled = false;
 let hasCompletedFullCheck = false;
@@ -223,6 +241,7 @@ let activeRunCategory = "";
 let activeRunDeviceName = "";
 let activeRunDeviceIp = "";
 let activeRunFailedIps = new Set();
+let activeRunSelectedIndexes = new Set();
 let activeRunCheckMode = "full";
 let activeRunKeepsDashboardStable = false;
 let activeRunPreservesDashboard = false;
@@ -306,20 +325,44 @@ const themeCssVariables = {
   runFullCheck: "--nw-run-full-check"
 };
 
-async function loadResults({ showErrors = true, facility = "", category = "", deviceType = '', device = null, devices = [], reloadConfig = true } = {}) {
-  if (!activeMonitorStream && reloadConfig) {
-    try {
-      await refreshConfigurationForRun();
-    } catch (error) {
-      if (showErrors) {
-        lastCheck.textContent = error.message || "Unable to refresh configuration before running checks.";
-      }
-      console.error(error);
+async function loadResults({ showErrors = true, facility = '', category = '', deviceType = '', device = null, devices = [] } = {}) {
+  if (activeMonitorStream || monitorPlanning || monitoringMutationBusy) return;
+  monitorPlanning = true;
+  setCheckModeInputsDisabled(true);
+  try {
+    await refreshConfigurationForRun();
+    let selected = getVisibleResults().filter(item => item.enabled !== false);
+    if (facility) selected = selected.filter(item => item.facility === facility);
+    if (category) selected = selected.filter(item => item.category === category);
+    if (deviceType) selected = selected.filter(item => item.deviceType === deviceType);
+    if (device) selected = selected.filter(item => device.inventoryIndex != null
+      ? item.inventoryIndex === device.inventoryIndex : createDeviceKey(item) === createDeviceKey(device));
+    if (devices.length) {
+      const indexes = new Set(devices.map(item => item.inventoryIndex));
+      selected = selected.filter(item => indexes.has(item.inventoryIndex));
+    }
+    if (!selected.length) {
+      lastCheck.textContent = NetWatchI18n.text('No enabled items match the current filters.');
       return;
     }
+    const scope = { profileId: monitorInventorySnapshot.profileId, revision: monitorInventorySnapshot.revision,
+      keys: selected.map(item => monitorInventorySnapshot.keys[item.inventoryIndex]),
+      deviceType: deviceType || activeDashboardDeviceType || null,
+      facility: facility || activeFacility || null, category: category || groupCheckSelect.value || null };
+    const response = await fetch('/api/monitor/plans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(scope) });
+    const plan = await readJsonResponse(response);
+    if (!response.ok) throw new Error(plan.error || plan.detail || 'Unable to prepare the filtered execution.');
+    await streamFullCheck({ showErrors, facility: scope.facility || '', category: scope.category || '',
+      deviceType: scope.deviceType || '', device, devices, selectionToken: plan.token,
+      selectedIndexes: selected.map(item => item.inventoryIndex) });
+  } catch (error) {
+    lastCheck.textContent = NetWatchI18n.error(error.message || 'Unable to prepare the filtered execution.');
+    if (showErrors) console.error(error);
+  } finally {
+    monitorPlanning = false;
+    setCheckModeInputsDisabled(false);
+    renderFilteredCategories();
   }
-
-  return streamFullCheck({ showErrors, facility, category, deviceType, device, devices });
 }
 
 /**
@@ -329,9 +372,9 @@ async function loadResults({ showErrors = true, facility = "", category = "", de
  * @param {{ showErrors?: boolean, facility?: string, category?: string, deviceType?: string, device?: object | null, devices?: Array<object>, checkMode?: string }} options Controls whether stream errors are displayed and optional execution scope.
  * @returns {Promise<void>} Resolves when the stream completes, reports busy, or fails.
  */
-function streamFullCheck({ showErrors = true, facility = "", category = "", deviceType = '', device = null, devices = [], checkMode = getSelectedCheckMode() } = {}) {
+function streamFullCheck({ showErrors = true, facility = "", category = "", deviceType = '', device = null, devices = [], selectionToken = '', selectedIndexes = [], checkMode = getSelectedCheckMode() } = {}) {
   if (activeMonitorStream) {
-    lastCheck.textContent = "A monitoring execution is already running.";
+    lastCheck.textContent = NetWatchI18n.text("A monitoring execution is already running.");
     return Promise.resolve();
   }
 
@@ -339,6 +382,7 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
     let settled = false;
     const normalizedCheckMode = normalizeCheckMode(checkMode);
     const streamParams = new URLSearchParams();
+    if (selectionToken) streamParams.set('selection', selectionToken);
 
     if (isPingOnlyMode(normalizedCheckMode)) {
       streamParams.set("checkMode", "ping");
@@ -384,8 +428,9 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
       activeRunDeviceName = device?.name || "";
       activeRunDeviceIp = device?.ip || "";
       activeRunFailedIps = new Set(devices.map(scopedDevice => scopedDevice.ip).filter(Boolean));
+      activeRunSelectedIndexes = new Set(selectedIndexes);
       activeRunKeepsDashboardStable = Boolean((device || devices.length > 0) && latestResults.length > 0);
-      activeRunPreservesDashboard = Boolean(latestResults.length > 0
+      activeRunPreservesDashboard = Boolean(selectionToken || latestResults.length > 0
         && ((facility || category || deviceType) || (!device && devices.length === 0 && autoRefreshEnabled)));
       activeRunCheckMode = normalizeCheckMode(payload.checkMode || normalizedCheckMode);
       resetStreamingDashboard(payload, getExecutionScopeLabel(facility, category, device, devices, deviceType));
@@ -414,7 +459,7 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
         renderScopedDevicesPayload(completedPayload, devices);
       } else if (device) {
         renderScopedDevicePayload(completedPayload, device);
-      } else if (facility || category || deviceType) {
+      } else if (facility || category || deviceType || selectionToken) {
         renderScopedMonitorPayload(completedPayload, { facility, category, deviceType });
       } else {
         hasCompletedFullCheck = true;
@@ -423,6 +468,8 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
         renderMonitorPayload(completedPayload);
       }
 
+      rememberCompletedRun(completedPayload);
+      activeRunSelectedIndexes.clear();
       activeRunFacility = "";
       activeRunCategory = "";
       activeRunDeviceType = '';
@@ -437,6 +484,7 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
     });
 
     source.addEventListener("busy", event => {
+      activeRunSelectedIndexes.clear();
       const payload = JSON.parse(event.data);
       closeMonitorStream();
       activeRunFacility = "";
@@ -448,7 +496,7 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
       activeRunCheckMode = getSelectedCheckMode();
       activeRunKeepsDashboardStable = false;
       activeRunPreservesDashboard = false;
-      lastCheck.textContent = payload.message || "A monitoring execution is already running.";
+      lastCheck.textContent = NetWatchI18n.error(payload.message || "A monitoring execution is already running.");
       settled = true;
       resolve();
     });
@@ -482,6 +530,7 @@ function streamFullCheck({ showErrors = true, facility = "", category = "", devi
 }
 
 function handleMonitorStreamFailure(message, scopeLabel, showErrors) {
+  activeRunSelectedIndexes.clear();
   const keepDashboardStable = activeRunKeepsDashboardStable
     || activeRunPreservesDashboard
     || Boolean(scopeLabel && latestResults.length > 0);
@@ -507,15 +556,15 @@ function handleMonitorStreamFailure(message, scopeLabel, showErrors) {
   }
 
   if (keepDashboardStable) {
-    lastCheck.textContent = `${message} Existing dashboard results were kept.`;
+    lastCheck.textContent = NetWatchI18n.text(`${message} Existing dashboard results were kept.`);
     return;
   }
 
-  resultsBody.innerHTML = `
+  resultsBody.innerHTML = NetWatchI18n.html`
     <div class="text-center text-danger py-4">
-      ${escapeHtml(message)}
+      ${escapeHtml(NetWatchI18n.error(message))}
     </div>`;
-  lastCheck.textContent = "Last execution failed";
+  lastCheck.textContent = NetWatchI18n.text("Last execution failed");
 }
 
 function renderMonitorPayload(payload) {
@@ -527,8 +576,8 @@ function renderMonitorPayload(payload) {
   renderFilteredCategories();
   updateRunFailedButton();
   scheduleRefresh();
-  executionMode.textContent = getDashboardExecutionText(payload.checkMode);
-  lastCheck.textContent = `Last execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
+  executionMode.textContent = NetWatchI18n.text(getDashboardExecutionText(payload.checkMode));
+  lastCheck.textContent = NetWatchI18n.text(`Last execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`);
   updateProgressPanel(payload.results?.length ?? 0, payload.results?.length ?? 0, "Completed", false);
 }
 
@@ -543,9 +592,9 @@ function renderScopedMonitorPayload(payload, { facility = "", category = "", dev
   renderSummary(createSummaryFromResults(getVisibleResults()));
   renderFilteredCategories();
   updateRunFailedButton();
-  executionMode.textContent = getDashboardExecutionText(payload.checkMode);
+  executionMode.textContent = NetWatchI18n.text(getDashboardExecutionText(payload.checkMode));
   const scope = [facility, category, deviceType ? dashboardDeviceTypeLabel(deviceType) : ''].filter(Boolean).join(' / ');
-  lastCheck.textContent = `Last ${scope} execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
+  lastCheck.textContent = NetWatchI18n.text(`Last ${scope} execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`);
   updateProgressPanel(scopedResults.length, scopedResults.length, "Completed", false);
   activeRunKeepsDashboardStable = false;
 }
@@ -558,8 +607,8 @@ function mergeScopedResults(currentResults, scopedResults) {
   const mergedResults = [...currentResults];
 
   for (const result of scopedResults) {
-    const resultKey = createDeviceKey(result);
-    const resultIndex = mergedResults.findIndex(device => createDeviceKey(device) === resultKey);
+    const resultKey = result.inventoryKey || createDeviceKey(result);
+    const resultIndex = mergedResults.findIndex(device => (device.inventoryKey || createDeviceKey(device)) === resultKey);
 
     if (resultIndex >= 0) {
       mergedResults[resultIndex] = result;
@@ -588,8 +637,8 @@ function renderScopedDevicesPayload(payload, requestedDevices) {
   renderSummary(createSummaryFromResults(getVisibleResults()));
   renderFilteredCategories();
   updateRunFailedButton();
-  executionMode.textContent = getDashboardExecutionText(payload.checkMode);
-  lastCheck.textContent = `Last failed-device retry: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`;
+  executionMode.textContent = NetWatchI18n.text(getDashboardExecutionText(payload.checkMode));
+  lastCheck.textContent = NetWatchI18n.text(`Last failed-device retry: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`);
   updateProgressPanel(scopedResults.length, requestedDevices.length, "Completed", false);
   activeRunKeepsDashboardStable = false;
 }
@@ -601,7 +650,7 @@ function renderScopedDevicePayload(payload, requestedDevice) {
   if (result) {
     upsertLatestResult(result);
   } else {
-    lastCheck.textContent = `No enabled device matched ${requestedDevice.name}.`;
+    lastCheck.textContent = NetWatchI18n.text(`No enabled device matched ${requestedDevice.name}.`);
   }
 
   latestCategories = groupResultsByCategory(latestResults);
@@ -612,10 +661,10 @@ function renderScopedDevicePayload(payload, requestedDevice) {
   activeRunDeviceIp = "";
   renderSummary(createSummaryFromResults(getVisibleResults()));
   renderFilteredCategories();
-  executionMode.textContent = getDashboardExecutionText(payload.checkMode);
-  lastCheck.textContent = result
+  executionMode.textContent = NetWatchI18n.text(getDashboardExecutionText(payload.checkMode));
+  lastCheck.textContent = NetWatchI18n.text(result
     ? `Last ${result.name} execution: ${formatDate(payload.lastExecutionTime ?? payload.lastCheck)}`
-    : lastCheck.textContent;
+    : lastCheck.textContent);
   updateProgressPanel(scopedResults.length, scopedResults.length, "Completed", false);
   activeRunKeepsDashboardStable = false;
 }
@@ -652,15 +701,15 @@ function resetStreamingDashboard(payload, scopeLabel = "") {
   if ((scopedRun && latestResults.length > 0) || activeRunPreservesDashboard) {
     renderFilteredCategories();
   } else {
-    resultsBody.innerHTML = `
+    resultsBody.innerHTML = NetWatchI18n.html`
       <div class="progress-panel text-secondary">
         <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
         Checking ${escapeHtml(targetLabel)} 0/${Number(payload.totalDevices) || 0}...
       </div>`;
   }
 
-  executionMode.textContent = getDashboardExecutionText(payload.checkMode || activeRunCheckMode);
-  lastCheck.textContent = `Checking ${targetLabel} 0/${Number(payload.totalDevices) || 0}...`;
+  executionMode.textContent = NetWatchI18n.text(getDashboardExecutionText(payload.checkMode || activeRunCheckMode));
+  lastCheck.textContent = NetWatchI18n.text(`Checking ${targetLabel} 0/${Number(payload.totalDevices) || 0}...`);
 }
 
 /**
@@ -695,7 +744,7 @@ function renderStreamingResult(payload) {
   }
   renderFilteredCategories();
   updateRunFailedButton();
-  lastCheck.textContent = activeRunFailedIps.size > 0
+  lastCheck.textContent = NetWatchI18n.text(activeRunFailedIps.size > 0
     ? `Checking failed devices ${payload.completedDevices}/${payload.totalDevices}...`
     : activeRunDeviceName
     ? `Checking ${activeRunDeviceName} ${payload.completedDevices}/${payload.totalDevices}...`
@@ -703,7 +752,7 @@ function renderStreamingResult(payload) {
     ? `Checking ${activeRunFacility} devices ${payload.completedDevices}/${payload.totalDevices}...`
     : activeRunCategory
     ? `Checking ${activeRunCategory} devices ${payload.completedDevices}/${payload.totalDevices}...`
-    : `Checking devices ${payload.completedDevices}/${payload.totalDevices}...`;
+    : `Checking devices ${payload.completedDevices}/${payload.totalDevices}...`);
 }
 
 /**
@@ -711,8 +760,8 @@ function renderStreamingResult(payload) {
  * @param {object} result Completed device result received from the backend stream.
  */
 function upsertLatestResult(result) {
-  const resultKey = createDeviceKey(result);
-  const resultIndex = latestResults.findIndex(device => createDeviceKey(device) === resultKey);
+  const resultKey = result.inventoryKey || createDeviceKey(result);
+  const resultIndex = latestResults.findIndex(device => (device.inventoryKey || createDeviceKey(device)) === resultKey);
 
   if (resultIndex >= 0) {
     latestResults[resultIndex] = result;
@@ -732,7 +781,7 @@ function updateRunFailedButton() {
   runFailedCheckButton.hidden = problemCount === 0;
 
   if (problemCount > 0) {
-    runFailedCheckButton.title = `Run ${problemCount} failed device${problemCount === 1 ? "" : "s"}`;
+    runFailedCheckButton.title = NetWatchI18n.text(`Run ${problemCount} failed device${problemCount === 1 ? "" : "s"}`);
   }
 }
 
@@ -755,23 +804,23 @@ function updateProgressPanel(completedDevices, totalDevices, label, isRunning) {
   }
 
   monitorProgress.hidden = false;
-  monitorProgressLabel.textContent = label;
-  monitorProgressPercent.textContent = `${percent}%`;
+  monitorProgressLabel.textContent = NetWatchI18n.text(label);
+  monitorProgressPercent.textContent = NetWatchI18n.text(`${percent}%`);
   monitorProgressBar.style.width = `${percent}%`;
-  monitorProgressBar.textContent = `${percent}%`;
+  monitorProgressBar.textContent = NetWatchI18n.text(`${percent}%`);
   monitorProgressBar.parentElement.setAttribute("aria-valuenow", String(percent));
-  monitorProgressDetail.textContent = `${completed} of ${total} devices checked`;
+  monitorProgressDetail.textContent = NetWatchI18n.text(`${completed} of ${total} devices checked`);
   monitorProgressSpinner.classList.toggle("d-none", !isRunning);
   monitorProgressBar.classList.toggle("progress-bar-animated", isRunning);
   monitorProgressBar.classList.toggle("progress-bar-striped", isRunning);
 }
 
 function renderSummary(summary) {
-  metricTotal.textContent = formatNumber(summary.totalDevices);
-  metricOnline.textContent = formatNumber(summary.onlineDevices);
-  metricOffline.textContent = formatNumber(summary.offlineDevices);
-  metricDegraded.textContent = formatNumber(summary.degradedDevices);
-  metricAvailability.textContent = summary.availabilityPercentage == null ? '-' : `${formatPercent(summary.availabilityPercentage)}%`;
+  metricTotal.textContent = NetWatchI18n.text(formatNumber(summary.totalDevices));
+  metricOnline.textContent = NetWatchI18n.text(formatNumber(summary.onlineDevices));
+  metricOffline.textContent = NetWatchI18n.text(formatNumber(summary.offlineDevices));
+  metricDegraded.textContent = NetWatchI18n.text(formatNumber(summary.degradedDevices));
+  metricAvailability.textContent = NetWatchI18n.text(summary.availabilityPercentage == null ? '-' : `${formatPercent(summary.availabilityPercentage)}%`);
 }
 
 function createSummaryFromCategories(categories) {
@@ -780,7 +829,7 @@ function createSummaryFromCategories(categories) {
 }
 
 function createSummaryFromResults(results) {
-  const checked = results.filter(result => result.status !== 'Pending');
+  const checked = results.filter(result => result.enabled !== false && result.status !== 'Pending' && result.status !== 'Paused');
   return { ...createProgressSummary(results, results.length),
     availabilityPercentage: checked.length ? createProgressSummary(checked).availabilityPercentage : null };
 }
@@ -811,7 +860,7 @@ function renderFilteredCategories() {
   const visibleResults = getVisibleResults();
   renderSummary(createSummaryFromResults(visibleResults));
   if (!dashboardInventoryAvailable) {
-    resultsBody.innerHTML = '<div class="text-center text-secondary py-4">Inventory unavailable.</div>';
+    resultsBody.innerHTML = NetWatchI18n.markup('<div class="text-center text-secondary py-4">Inventory unavailable.</div>');
     return;
   }
 
@@ -986,9 +1035,9 @@ function syncSelectOptions(select, values, defaultLabel, key) {
   const previousLabel = select.selectedOptions[0]?.textContent;
   const options = new Map(values.map(value => typeof value === 'object' ? [value.value, value.label] : [value, value]));
   const selected = reportsFilters[key];
-  select.innerHTML = `<option value="">${escapeHtml(defaultLabel)}</option>` + [...options]
+  select.innerHTML = NetWatchI18n.html`<option value="">${escapeHtml(NetWatchI18n.text(defaultLabel))}</option>` + [...options]
     .sort((a, b) => String(a[1]).localeCompare(String(b[1])))
-    .map(([value, label]) => `<option value="${escapeAttribute(value)}">${escapeHtml(label)}</option>`).join('');
+    .map(([value, label]) => NetWatchI18n.html`<option value="${escapeAttribute(value)}">${escapeHtml(label)}</option>`).join('');
   if (selected && !options.has(selected)) select.add(new Option(previousLabel?.startsWith('Unavailable:') ? previousLabel : `Unavailable: ${previousLabel || selected}`, selected));
   select.value = selected;
 }
@@ -1079,21 +1128,21 @@ function renderReportsSummary(rows) {
   const available = reportsAvailable && !reportsBusy && !invalidReportRange();
   const healthy = rows.filter(row => row.status === 'Healthy').length;
   const measured = rows.filter(row => ['Healthy', 'Degraded', 'Down'].includes(row.status)).length;
-  reportsRunCount.textContent = available ? formatNumber(getFilteredReportRuns(rows).length) : '-';
-  reportsDeviceCount.textContent = available ? formatNumber(new Set(rows.map(reportDeviceKey)).size) : '-';
-  reportsRowCount.textContent = available ? formatNumber(rows.length) : '-';
-  reportsProblemCount.textContent = available ? formatNumber(rows.filter(isProblemReportRow).length) : '-';
-  reportsAvgAvailability.textContent = available ? reportPercent(averageAvailabilityFromRows(rows)) : '-';
-  reportsAvgAvailability.title = 'Healthy / known-status evaluations; not time-based uptime';
-  reportsHealthyCount.textContent = available && measured ? `${formatNumber(healthy)} / ${formatNumber(measured)}` : '';
-  reportsTableSummary.textContent = `${formatNumber(rows.length)} evaluations`;
+  reportsRunCount.textContent = NetWatchI18n.text(available ? formatNumber(getFilteredReportRuns(rows).length) : '-');
+  reportsDeviceCount.textContent = NetWatchI18n.text(available ? formatNumber(new Set(rows.map(reportDeviceKey)).size) : '-');
+  reportsRowCount.textContent = NetWatchI18n.text(available ? formatNumber(rows.length) : '-');
+  reportsProblemCount.textContent = NetWatchI18n.text(available ? formatNumber(rows.filter(isProblemReportRow).length) : '-');
+  reportsAvgAvailability.textContent = NetWatchI18n.text(available ? reportPercent(averageAvailabilityFromRows(rows)) : '-');
+  reportsAvgAvailability.title = NetWatchI18n.text('Healthy / known-status evaluations; not time-based uptime');
+  reportsHealthyCount.textContent = NetWatchI18n.text(available && measured ? `${formatNumber(healthy)} / ${formatNumber(measured)}` : '');
+  reportsTableSummary.textContent = NetWatchI18n.text(`${formatNumber(rows.length)} evaluations`);
 }
 
 function renderReportContext(rows) {
   const available = reportsAvailable && !reportsBusy;
   const valid = !invalidReportRange();
   const hasData = reportsSqlEnabled ? Number(reportsSqlState?.devices.coverage.runs || 0) > 0 : reportsState.runs.length > 0;
-  document.querySelector('#reports-range-error').textContent = valid ? '' : 'From must be on or before To.';
+  document.querySelector('#reports-range-error').textContent = NetWatchI18n.text(valid ? '' : 'From must be on or before To.');
   reportsPage.querySelectorAll('.reports-filterbar input, .reports-filterbar select, #reports-custom-dates input')
     .forEach(control => { control.disabled = !available; });
   reportsExportMenu.disabled = !available || !valid || !(reportsSqlEnabled ? reportsSqlState?.devices.metrics.evaluations : rows.length);
@@ -1104,18 +1153,18 @@ function renderReportContext(rows) {
   reportsPage.querySelectorAll('.table-sort-button').forEach(control => { control.tabIndex = reportsMobileQuery.matches ? -1 : 0; });
   const dates = reportsSqlEnabled ? [reportsSqlState?.devices.coverage.earliest,reportsSqlState?.devices.coverage.latest].filter(time => time != null)
     : reportsState.runs.map(run => reportTime(run.completedAt)).filter(time => time !== null).sort((a, b) => a - b);
-  document.querySelector('#reports-coverage').textContent = reportsBusy ? 'Updating history...'
+  document.querySelector('#reports-coverage').textContent = NetWatchI18n.text(reportsBusy ? 'Updating history...'
     : !reportsAvailable ? 'History unavailable' : !hasData ? 'No recorded executions'
-      : dates.length ? `Recorded: ${reportDate(dates[0])} - ${reportDate(dates.at(-1))}` : 'Dates not recorded';
+      : dates.length ? `Recorded: ${reportDate(dates[0])} - ${reportDate(dates.at(-1))}` : 'Dates not recorded');
   const state = document.querySelector('#reports-state');
-  state.textContent = reportsBusy ? 'Loading history...' : !reportsAvailable ? 'Unable to load history. Refresh to retry.'
+  state.textContent = NetWatchI18n.text(reportsBusy ? 'Loading history...' : !reportsAvailable ? 'Unable to load history. Refresh to retry.'
     : !valid ? 'Invalid date range.' : !hasData ? 'No monitoring executions recorded.'
-      : !(reportsSqlEnabled ? reportsSqlState?.devices.metrics.runs : rows.length || getFilteredReportRuns(rows).length) ? 'No results match the selected filters.' : '';
+      : !(reportsSqlEnabled ? reportsSqlState?.devices.metrics.runs : rows.length || getFilteredReportRuns(rows).length) ? 'No results match the selected filters.' : '');
   if (available && !hasData) {
     const link = document.createElement('a');
     link.href = '/';
     link.className = 'ms-2';
-    link.textContent = 'Dashboard';
+    link.textContent = NetWatchI18n.text('Dashboard');
     state.append(link);
   }
   const chips = [];
@@ -1132,7 +1181,7 @@ function renderReportContext(rows) {
   if (reportsFilters.runKey) add('runKey', `Execution: ${reportDate(reportsState.runs.find((run, index) => reportRunKey(run, index) === reportsFilters.runKey)?.completedAt)}`);
   if (reportsFilters.deviceKey) add('deviceKey', `Device: ${reportsRows.find(row => reportDeviceKey(row) === reportsFilters.deviceKey)?.deviceName || 'Unavailable'}`);
   document.querySelector('#reports-active-filters').innerHTML = chips.map(chip =>
-    `<button type="button" class="report-filter-chip" data-report-remove-filter="${chip.key}" title="Remove ${escapeAttribute(chip.label)}" ${!available ? 'disabled' : ''}><span>${escapeHtml(chip.label)}</span><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>`).join('');
+    NetWatchI18n.html`<button type="button" class="report-filter-chip" data-report-remove-filter="${chip.key}" title="Remove ${escapeAttribute(chip.label)}" ${!available ? 'disabled' : ''}><span>${escapeHtml(chip.label)}</span><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>`).join('');
   resetReportFiltersButton.disabled = !available || chips.length === 0;
 }
 
@@ -1165,7 +1214,7 @@ function renderReportSortControls() {
     select.innerHTML = columns.flatMap(([key, label, type]) => ['asc', 'desc'].map(direction => {
       const order = type === 'date' ? direction === 'asc' ? 'oldest first' : 'newest first'
         : type === 'number' ? direction === 'asc' ? 'low to high' : 'high to low' : direction === 'asc' ? 'A-Z' : 'Z-A';
-      return `<option value="${key}:${direction}">${label}: ${order}</option>`;
+      return NetWatchI18n.html`<option value="${key}:${direction}">${NetWatchI18n.text(label)}: ${NetWatchI18n.text(order)}</option>`;
     })).join('');
     select.value = `${state.key}:${state.direction}`;
   };
@@ -1192,12 +1241,12 @@ function renderFacilityPerformance(rows) {
   updateReportSortButtons('[data-report-facility-sort]', reportsFacilitySort, 'reportFacilitySort');
   updateSummaryPagination(reportsFacilityPageSummary, reportsFacilityPrevPageButton, reportsFacilityNextPageButton,
     reportsFacilityPage, reportsFacilityPageSize, reportsSqlState?.facility.total ?? facilities.length, 'facility groups');
-  reportsFacilityPerformanceSummary.textContent = `${formatNumber(reportsSqlState?.facility.total ?? facilities.length)} facility groups`;
-  reportsFacilityExecutiveBody.innerHTML = facilities.length ? getPageRows(facilities, reportsFacilityPage, reportsFacilityPageSize).map(item => `
+  reportsFacilityPerformanceSummary.textContent = NetWatchI18n.text(`${formatNumber(reportsSqlState?.facility.total ?? facilities.length)} facility groups`);
+  reportsFacilityExecutiveBody.innerHTML = facilities.length ? getPageRows(facilities, reportsFacilityPage, reportsFacilityPageSize).map(item => NetWatchI18n.html`
     <tr><td><button type="button" class="report-link fw-semibold" data-report-facility="${escapeAttribute(item.facility)}" data-report-profile="${escapeAttribute(item.profile)}">${escapeHtml(item.facility)}</button><div class="small text-secondary">${escapeHtml(item.profileLabel)}</div></td>
     <td class="text-end" data-label="Evaluations">${formatNumber(item.rowCount)}</td><td class="text-end" data-label="Healthy %">${reportPercent(item.availability)}</td>
     <td class="text-end" data-label="Problems">${formatNumber(item.problemCount)}</td><td class="text-end" data-label="Avg ping">${reportMilliseconds(item.averageLatency)}</td></tr>`).join('')
-    : '<tr><td colspan="5" class="text-secondary py-4">No facility results.</td></tr>';
+    : NetWatchI18n.markup('<tr><td colspan="5" class="text-secondary py-4">No facility results.</td></tr>');
 }
 
 function renderCategoryPerformance(rows) {
@@ -1206,12 +1255,12 @@ function renderCategoryPerformance(rows) {
   updateReportSortButtons('[data-report-category-sort]', reportsCategorySort, 'reportCategorySort');
   updateSummaryPagination(reportsCategoryPageSummary, reportsCategoryPrevPageButton, reportsCategoryNextPageButton,
     reportsCategoryPage, reportsCategoryPageSize, reportsSqlState?.category.total ?? categories.length, 'category groups');
-  reportsCategoryPerformanceSummary.textContent = `${formatNumber(reportsSqlState?.category.total ?? categories.length)} category groups`;
-  reportsCategoryExecutiveBody.innerHTML = categories.length ? getPageRows(categories, reportsCategoryPage, reportsCategoryPageSize).map(item => `
+  reportsCategoryPerformanceSummary.textContent = NetWatchI18n.text(`${formatNumber(reportsSqlState?.category.total ?? categories.length)} category groups`);
+  reportsCategoryExecutiveBody.innerHTML = categories.length ? getPageRows(categories, reportsCategoryPage, reportsCategoryPageSize).map(item => NetWatchI18n.html`
     <tr><td><button type="button" class="report-link fw-semibold" data-report-category="${escapeAttribute(item.category)}" data-report-profile="${escapeAttribute(item.profile)}">${escapeHtml(item.category)}</button><div class="small text-secondary">${escapeHtml(item.profileLabel)}</div></td>
     <td class="text-end" data-label="Facilities">${formatNumber(item.facilityCount)}</td><td class="text-end" data-label="Evaluations">${formatNumber(item.rowCount)}</td>
     <td class="text-end" data-label="Healthy %">${reportPercent(item.availability)}</td><td class="text-end" data-label="Problems">${formatNumber(item.problemCount)}</td><td class="text-end" data-label="Avg ping">${reportMilliseconds(item.averageLatency)}</td></tr>`).join('')
-    : '<tr><td colspan="6" class="text-secondary py-4">No category results.</td></tr>';
+    : NetWatchI18n.markup('<tr><td colspan="6" class="text-secondary py-4">No category results.</td></tr>');
 }
 
 function renderRecentRunsExecutive(rows) {
@@ -1220,11 +1269,11 @@ function renderRecentRunsExecutive(rows) {
   updateReportSortButtons('[data-report-run-sort]', reportsRunSort, 'reportRunSort');
   updateSummaryPagination(reportsRunsPageSummary, reportsRunsPrevPageButton, reportsRunsNextPageButton,
     reportsRunPage, reportsRunPageSize, reportsSqlState?.runs.total ?? runs.length, 'executions');
-  reportsRunsSummary.textContent = `${formatNumber(reportsSqlState?.runs.total ?? runs.length)} executions`;
+  reportsRunsSummary.textContent = NetWatchI18n.text(`${formatNumber(reportsSqlState?.runs.total ?? runs.length)} executions`);
   disposeManagementMenus(reportsRecentRunsBody);
-  reportsRecentRunsBody.innerHTML = runs.length ? getPageRows(runs, reportsRunPage, reportsRunPageSize).map(run => `
+  reportsRecentRunsBody.innerHTML = runs.length ? getPageRows(runs, reportsRunPage, reportsRunPageSize).map(run => NetWatchI18n.html`
     <tr data-report-run="${escapeAttribute(run.runId)}">
-      <td data-label="Completed">${escapeHtml(reportDate(run.completedAt))}<div class="small text-secondary">${escapeHtml(getCheckModeLabel(run.checkMode))} / ${escapeHtml(run.executionStatus)}</div></td>
+      <td data-label="Completed">${escapeHtml(reportDate(run.completedAt))}<div class="small text-secondary">${escapeHtml(NetWatchI18n.text(getCheckModeLabel(run.checkMode)))} / ${escapeHtml(NetWatchI18n.text(run.executionStatus))}</div></td>
       <td data-label="Support group">${escapeHtml(run.profileLabel)}</td><td data-label="Original scope">${escapeHtml(run.scopeLabel)}<div class="small text-secondary">Run: ${reportMilliseconds(run.durationMs)}</div></td>
       <td class="text-end" data-label="Matching / recorded" title="Matching / recorded evaluations">${formatNumber(run.rowCount)} / ${formatNumber(run.totalCount)}</td><td class="text-end" data-label="Healthy %">${reportPercent(run.availability)}</td>
       <td class="text-end"><div class="reports-row-actions">
@@ -1233,7 +1282,7 @@ function renderRecentRunsExecutive(rows) {
           <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="dropdown" data-bs-config='{"popperConfig":{"strategy":"fixed"}}' title="Execution actions" aria-label="Actions for execution ${escapeAttribute(reportDate(run.completedAt))}" aria-expanded="false"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>
           <ul class="dropdown-menu dropdown-menu-end"><li><button class="dropdown-item text-danger" type="button" data-delete-report-run="${escapeAttribute(run.runId)}" ${run.ambiguousId ? 'disabled title="Duplicate legacy ID; deletion unavailable"' : ''}><i class="fa-solid fa-trash-can me-2" aria-hidden="true"></i>Delete execution</button></li></ul>
         </div></div></td></tr>`).join('')
-    : '<tr><td colspan="6" class="text-secondary py-4">No executions match these filters.</td></tr>';
+    : NetWatchI18n.markup('<tr><td colspan="6" class="text-secondary py-4">No executions match these filters.</td></tr>');
 }
 
 function createFacilityPerformanceRows(rows) {
@@ -1274,16 +1323,20 @@ function createRecentRunRows(rows) {
 }
 
 function getRunScopeLabel(scope) {
-  if (!scope) return 'Not recorded';
+  if (!scope) return NetWatchI18n.text('Not recorded');
+  if (scope.selectionCount != null) {
+    const base = getRunScopeLabel({ ...scope, selectionCount: null });
+    return NetWatchI18n.text(`${base} / Selected items: ${scope.selectionCount}`);
+  }
   if (scope.deviceType) {
     const base = getRunScopeLabel({ ...scope, deviceType: null });
-    return `${base} / Device type: ${scope.deviceType}`;
+    return NetWatchI18n.text(`${base} / Device type: ${scope.deviceType}`);
   }
-  if (scope.deviceName) return `Device: ${scope.deviceName}`;
-  if (scope.deviceIps?.length) return `Selected devices: ${scope.deviceIps.length}`;
-  if (scope.category) return scope.facility ? `${scope.facility} / ${scope.category}` : `Category: ${scope.category}`;
-  if (scope.facility) return `Facility: ${scope.facility}`;
-  return 'All facilities';
+  if (scope.deviceName) return NetWatchI18n.text(`Device: ${scope.deviceName}`);
+  if (scope.deviceIps?.length) return NetWatchI18n.text(`Selected devices: ${scope.deviceIps.length}`);
+  if (scope.category) return scope.facility ? `${scope.facility} / ${scope.category}` : NetWatchI18n.text(`Category: ${scope.category}`);
+  if (scope.facility) return NetWatchI18n.text(`Facility: ${scope.facility}`);
+  return NetWatchI18n.text('All facilities');
 }
 
 function sortReportSummaryRows(rows, sortState) {
@@ -1315,8 +1368,8 @@ function clampReportsPage(page, count, size) {
 
 function updateSummaryPagination(summary, previous, next, page, size, count, label) {
   const pages = Math.max(1, Math.ceil(count / size));
-  summary.textContent = count ? `${formatNumber((page - 1) * size + 1)}-${formatNumber(Math.min(page * size, count))} / ${formatNumber(count)} ${label}`
-    : `0 ${label}`;
+  summary.textContent = NetWatchI18n.text(count ? `${formatNumber((page - 1) * size + 1)}-${formatNumber(Math.min(page * size, count))} / ${formatNumber(count)} ${label}`
+    : `0 ${label}`);
   previous.disabled = page <= 1 || reportsBusy || !reportsAvailable;
   next.disabled = page >= pages || reportsBusy || !reportsAvailable;
 }
@@ -1348,13 +1401,13 @@ function averageAvailabilityFromRows(rows) {
 function renderReportsTable(rows) {
   reportsCurrentPage = clampReportsPage(reportsCurrentPage, rows.length, reportsPageSize);
   updateReportSortButtons('[data-report-sort]', reportsSort, 'reportSort');
-  reportsTableBody.innerHTML = rows.length ? getPageRows(rows, reportsCurrentPage, reportsPageSize).map(row => `
+  reportsTableBody.innerHTML = rows.length ? getPageRows(rows, reportsCurrentPage, reportsPageSize).map(row => NetWatchI18n.html`
     <tr data-report-evaluation="${escapeAttribute(row.rowId)}">
-      <td><button class="report-link fw-semibold" type="button" data-report-detail="${escapeAttribute(row.rowId)}">${escapeHtml(row.deviceName)}</button><div class="small text-secondary">${escapeHtml(row.hostname || row.ip || 'Address not recorded')}</div>${row.hostname && row.ip ? `<div class="small text-secondary">${escapeHtml(row.ip)}</div>` : ''}</td>
+      <td><button class="report-link fw-semibold" type="button" data-report-detail="${escapeAttribute(row.rowId)}">${escapeHtml(row.deviceName)}</button><div class="small text-secondary">${escapeHtml(row.hostname || row.ip || 'Address not recorded')}</div>${row.hostname && row.ip ? NetWatchI18n.html`<div class="small text-secondary">${escapeHtml(row.ip)}</div>` : ''}</td>
       <td data-label="Facility">${escapeHtml(row.facility)}<div class="small text-secondary">${escapeHtml(row.category)}</div><div class="small text-secondary">${escapeHtml(reportProfileLabel(row))}</div></td>
-      <td data-label="Recorded">${escapeHtml(reportDate(row.completedAt))}</td><td data-label="Result">${renderReportStatusBadge(row.status)}</td><td data-label="Mode">${escapeHtml(getCheckModeLabel(row.checkMode))}</td>
+      <td data-label="Recorded">${escapeHtml(reportDate(row.completedAt))}</td><td data-label="Result">${renderReportStatusBadge(row.status)}</td><td data-label="Mode">${escapeHtml(NetWatchI18n.text(getCheckModeLabel(row.checkMode)))}</td>
       <td class="text-end"><button class="btn btn-outline-secondary icon-button btn-sm" type="button" data-report-detail="${escapeAttribute(row.rowId)}" title="View evaluation" aria-label="View evaluation for ${escapeAttribute(row.deviceName)}"><i class="fa-solid fa-eye" aria-hidden="true"></i></button></td>
-    </tr>`).join('') : '<tr><td colspan="6" class="text-secondary py-4">No device evaluations.</td></tr>';
+    </tr>`).join('') : NetWatchI18n.markup('<tr><td colspan="6" class="text-secondary py-4">No device evaluations.</td></tr>');
   updateSummaryPagination(reportsPageSummary, reportsPrevPageButton, reportsNextPageButton,
     reportsCurrentPage, reportsPageSize, reportsSqlState?.devices.total ?? rows.length, 'evaluations');
 }
@@ -1363,14 +1416,14 @@ function renderReportStatusBadge(status) {
   const styles = { Healthy: ['success', 'circle-check'], Degraded: ['warning', 'triangle-exclamation'], Down: ['danger', 'circle-xmark'] };
   const known = Object.hasOwn(styles, status);
   const [color, icon] = known ? styles[status] : ['secondary', 'circle-question'];
-  return `<span class="badge text-bg-${color}"><i class="fa-solid fa-${icon} me-1" aria-hidden="true"></i>${escapeHtml(known ? status : 'Not recorded')}</span>`;
+  return NetWatchI18n.html`<span class="badge text-bg-${color}"><i class="fa-solid fa-${icon} me-1" aria-hidden="true"></i>${escapeHtml(NetWatchI18n.text(known ? status : 'Not recorded'))}</span>`;
 }
 
 function updateReportSortButtons(selector, sortState, key) {
   document.querySelectorAll(selector).forEach(button => {
     const selected = button.dataset[key] === sortState.key;
     const label = button.textContent.replace(/[ ↑↓]+$/u, '');
-    button.textContent = label + (selected ? sortState.direction === 'asc' ? ' ↑' : ' ↓' : '');
+    button.textContent = NetWatchI18n.text(label + (selected ? sortState.direction === 'asc' ? ' ↑' : ' ↓' : ''));
     button.classList.toggle('active', selected);
     button.closest('th').setAttribute('aria-sort', selected ? sortState.direction === 'asc' ? 'ascending' : 'descending' : 'none');
   });
@@ -1453,16 +1506,16 @@ function openReportDetail(id, trigger) {
     ['Original scope', escapeHtml(getRunScopeLabel(run?.scope))], ['Run duration', reportMilliseconds(row.durationMs)],
     ['Execution ID', escapeHtml(row.runId)]
   ];
-  document.querySelector('#reports-detail-body').innerHTML = `<dl class="report-detail-meta">${facts.map(([name, value]) => `<dt>${name}</dt><dd>${value}</dd>`).join('')}</dl>
+  document.querySelector('#reports-detail-body').innerHTML = NetWatchI18n.html`<dl class="report-detail-meta">${facts.map(([name, value]) => NetWatchI18n.html`<dt>${NetWatchI18n.text(name)}</dt><dd>${value}</dd>`).join('')}</dl>
     <h3 class="h6 mt-4">Recorded checks</h3><ul class="report-check-list">${row.checks.length ? row.checks.map(check => {
       const known = typeof check.isAvailable === 'boolean';
       const label = check.label || (check.type === 'tcp' ? `TCP ${check.port ?? ''}` : String(check.type || 'Check').toUpperCase());
-      return `<li><div class="report-check-heading"><strong>${escapeHtml(label)}</strong><span class="badge text-bg-${known ? check.isAvailable ? 'success' : 'danger' : 'secondary'}">${known ? check.isAvailable ? 'Passed' : 'Failed' : 'Not recorded'}</span></div>
-        ${check.url ? `<p>${escapeHtml(check.url)}</p>` : ''}
-        ${check.statusCode != null || check.expectedStatusCode != null ? `<p>HTTP ${escapeHtml(String(check.statusCode ?? 'Not received'))} / expected ${escapeHtml(String(check.expectedStatusCode ?? 'Not recorded'))}</p>` : ''}
-        ${check.message || check.status ? `<p>${escapeHtml(check.message || check.status)}</p>` : ''}
-        <p class="text-secondary">${check.type === 'ping' ? `Ping: ${reportMilliseconds(reportNumber(check.latencyMs))}` : check.type === 'http' ? `Duration: ${reportMilliseconds(reportNumber(check.durationMs))}` : check.port != null ? `Port: ${escapeHtml(String(check.port))}` : ''}</p></li>`;
-    }).join('') : '<li class="text-secondary">Checks not recorded.</li>'}</ul>`;
+      return NetWatchI18n.html`<li><div class="report-check-heading"><strong>${escapeHtml(label)}</strong><span class="badge text-bg-${known ? check.isAvailable ? 'success' : 'danger' : 'secondary'}">${NetWatchI18n.text(known ? check.isAvailable ? 'Passed' : 'Failed' : 'Not recorded')}</span></div>
+        ${check.url ? NetWatchI18n.html`<p>${escapeHtml(check.url)}</p>` : ''}
+        ${check.statusCode != null || check.expectedStatusCode != null ? NetWatchI18n.html`<p>HTTP ${escapeHtml(String(check.statusCode ?? 'Not received'))} / expected ${escapeHtml(String(check.expectedStatusCode ?? 'Not recorded'))}</p>` : ''}
+        ${check.type === 'http' ? NetWatchI18n.html`<p>${escapeHtml(NetWatchI18n.text(NetWatchHttpDiagnostics.describe(check).summary))}</p>` : check.status ? NetWatchI18n.html`<p><code>${escapeHtml(check.status)}</code></p>` : ''}
+        <p class="text-secondary">${NetWatchI18n.text(check.type === 'ping' ? `Ping: ${reportMilliseconds(reportNumber(check.latencyMs))}` : check.type === 'http' ? `Duration: ${reportMilliseconds(reportNumber(check.durationMs))}` : check.port != null ? `Port: ${escapeHtml(String(check.port))}` : '')}</p></li>`;
+    }).join('') : NetWatchI18n.markup('<li class="text-secondary">Checks not recorded.</li>')}</ul>`;
   document.querySelector('#reports-detail-run').disabled = false;
   document.querySelector('#reports-detail-device').disabled = false;
   reportsDetailModal.show();
@@ -1473,7 +1526,7 @@ function closeReportDetail(clear = false) {
   reportsSelectedRow = null;
   if (clear) {
     document.querySelector('#reports-detail-body').replaceChildren();
-    document.querySelector('#reports-detail-title').textContent = 'Evaluation unavailable';
+    document.querySelector('#reports-detail-title').textContent = NetWatchI18n.text('Evaluation unavailable');
     document.querySelector('#reports-detail-run').disabled = true;
     document.querySelector('#reports-detail-device').disabled = true;
   }
@@ -1710,12 +1763,12 @@ function updateIntegrationFormState() {
   reportIncludeSummaryInput.disabled = !isReportEnabled;
   reportIncludeRowsInput.disabled = !isReportEnabled;
 
-  inventorySourceStatus.textContent = isExternalInventory
+  inventorySourceStatus.textContent = NetWatchI18n.text(isExternalInventory
     ? "External inventory endpoint is configured for a future import workflow."
-    : "Using local JSON inventory.";
-  reportDestinationStatus.textContent = isReportEnabled
+    : "Using local JSON inventory.");
+  reportDestinationStatus.textContent = NetWatchI18n.text(isReportEnabled
     ? "Report endpoint is configured for a future outbound delivery workflow."
-    : "Outbound reports are disabled.";
+    : "Outbound reports are disabled.");
 }
 
 function setIntegrationsBusy(isBusy) {
@@ -1734,32 +1787,37 @@ function clearIntegrationsAlert() {
 }
 
 function getVisibleResults() {
-  const dashboardDevices = getDashboardDevices().filter(matchesDashboardDeviceType);
-  if (!activeFacility) {
-    return dashboardDevices;
-  }
+  return getDashboardDevices().filter(device => NetWatchFilters.matches(device, getDashboardFilters()));
+}
 
-  const selectedFacility = activeFacility.toLowerCase();
-  return dashboardDevices.filter(result =>
-    String(result.facility ?? "Unassigned").toLowerCase() === selectedFacility);
+function getDashboardFilters() {
+  return { facility: activeFacility, deviceType: activeDashboardDeviceType,
+    category: groupCheckSelect.value, search: searchInput.value, status: activeFilter, monitoring: activeDashboardMonitoring };
 }
 
 function getDashboardDevices() {
   if (!dashboardInventoryAvailable) return [];
   const configured = getConfiguredFacilityDevices();
+  const keyedResults = new Map(latestResults.filter(result => result.inventoryKey).map(result => [result.inventoryKey, result]));
   const results = new Map(latestResults.filter(result => result.deviceType).map(result => [createDeviceKey(result), result]));
   const legacyResults = new Map(latestResults.filter(result => !result.deviceType).map(result => [createDeviceKey(result), result]));
   const legacyCounts = new Map();
+  const typedCounts = new Map();
   for (const device of configured) {
     const key = createDeviceKey({ ...device, deviceType: null });
     legacyCounts.set(key, (legacyCounts.get(key) || 0) + 1);
+    const typedKey = createDeviceKey(device);
+    typedCounts.set(typedKey, (typedCounts.get(typedKey) || 0) + 1);
   }
   // Pending inventory is presentation only; latestResults/history contain measured results only.
   return configured.map(device => {
     const legacyKey = createDeviceKey({ ...device, deviceType: null });
-    const result = results.get(createDeviceKey(device))
+    const result = keyedResults.get(device.inventoryKey)
+      || (typedCounts.get(createDeviceKey(device)) === 1 ? results.get(createDeviceKey(device)) : null)
       || (legacyCounts.get(legacyKey) === 1 ? legacyResults.get(legacyKey) : null);
-    return { ...device, ...result, deviceType: device.deviceType || 'unspecified' };
+    return { ...device, ...result, inventoryIndex: device.inventoryIndex, inventoryKey: device.inventoryKey,
+      checks: result?.checks ?? device.checks, deviceType: device.deviceType || 'unspecified',
+      ...(device.enabled === false ? { status: 'Paused', isOnline: false, lastCheck: null } : {}) };
   });
 }
 
@@ -1768,18 +1826,19 @@ function matchesDashboardDeviceType(device) {
 }
 
 function dashboardDeviceTypeLabel(id) {
-  return configState.deviceTypes?.find(type => type.id === id)?.name || id;
+  const type = configState.deviceTypes?.find(type => type.id === id);
+  return type ? deviceTypeDisplayName(type) : id;
 }
 
 function renderDashboardDeviceTypeOptions() {
   const types = configState.deviceTypes ?? initialDeviceTypes;
-  dashboardDeviceTypeSelect.innerHTML = '<option value="">All device types</option>' + types.map(type =>
-    `<option value="${escapeAttribute(type.id)}">${escapeHtml(type.name)}</option>`).join('');
+  dashboardDeviceTypeSelect.innerHTML = NetWatchI18n.markup('<option value="">All device types</option>') + types.map(type =>
+    NetWatchI18n.html`<option value="${escapeAttribute(type.id)}">${escapeHtml(deviceTypeDisplayName(type))}</option>`).join('');
   if (activeDashboardDeviceType && !types.some(type => type.id === activeDashboardDeviceType)) {
-    dashboardDeviceTypeSelect.add(new Option(`Unavailable type: ${activeDashboardDeviceType}`, activeDashboardDeviceType));
+    dashboardDeviceTypeSelect.add(new Option(NetWatchI18n.text(`Unavailable type: ${activeDashboardDeviceType}`), activeDashboardDeviceType));
   }
   dashboardDeviceTypeSelect.value = activeDashboardDeviceType;
-  dashboardDeviceTypeSelect.disabled = !dashboardInventoryAvailable || Boolean(activeMonitorStream);
+  dashboardDeviceTypeSelect.disabled = !dashboardInventoryAvailable || !monitorInventorySnapshot || Boolean(activeMonitorStream);
 }
 
 function filterCategories(categories) {
@@ -1793,7 +1852,7 @@ function filterCategories(categories) {
       return {
         ...category,
         devices,
-        stateDevices: category.devices ?? [],
+        stateDevices: devices,
         totalDevices: devices.length,
         onlineDevices: devices.filter(device => device.isOnline).length,
         offlineDevices: devices.filter(device => device.status === 'Down').length
@@ -1803,44 +1862,31 @@ function filterCategories(categories) {
 }
 
 function matchesSearch(device, search) {
-  if (!search) {
-    return true;
-  }
-
-  return String(device.name ?? "").toLowerCase().includes(search)
-    || String(device.ip ?? "").toLowerCase().includes(search)
-    || String(device.hostname ?? "").toLowerCase().includes(search)
-    || String(device.facility ?? "").toLowerCase().includes(search)
-    || String(device.category ?? "").toLowerCase().includes(search)
-    || String(device.websiteUrl ?? "").toLowerCase().includes(search)
-    || String(device.notes ?? "").toLowerCase().includes(search)
-    || String(device.location ?? "").toLowerCase().includes(search)
-    || (device.checks ?? []).some(check => String(check.url ?? '').toLowerCase().includes(search));
+  return NetWatchFilters.search(device, search);
 }
 
 function renderFacilityTabs() {
   const facilitySource = getDashboardDevices();
-  const typedSource = facilitySource.filter(matchesDashboardDeviceType);
+  const typedSource = facilitySource.filter(device => NetWatchFilters.matches(device, { ...getDashboardFilters(), facility: '' }));
   const typedSummaries = new Map(getFacilitySummaries(typedSource).map(facility => [facility.name, facility]));
   const facilitySummaries = getFacilitySummaries(facilitySource).map(facility => typedSummaries.get(facility.name)
     || { ...facility, totalDevices: 0, onlineDevices: 0, pendingDevices: 0, problemDevices: 0 });
 
-  if (!facilitySummaries.some(facility => facility.name === activeFacility)) {
-    activeFacility = "";
+  if (activeFacility && !facilitySummaries.some(facility => facility.name === activeFacility)) {
+    facilitySummaries.push({ name: activeFacility, label: NetWatchI18n.text(`Unavailable facility: ${activeFacility}`),
+      totalDevices: 0, onlineDevices: 0, pendingDevices: 0, problemDevices: 0 });
   }
 
   const hasActiveFacility = Boolean(activeFacility);
-  activeFacilityLabel.textContent = activeFacility
+  activeFacilityLabel.textContent = NetWatchI18n.text(activeFacility
     ? `Showing ${activeFacility}`
-    : "Showing all facilities";
-  runFacilityCheckButton.disabled = !dashboardInventoryAvailable || Boolean(activeMonitorStream)
-    || !typedSource.some(device => !activeFacility || device.facility === activeFacility);
-  runFacilityCheckButton.title = activeFacility
-    ? `Run checks for ${activeFacility}`
-    : "Run checks for all facilities";
-  runFacilityCheckLabel.textContent = activeFacility
-    ? "Run Facility"
-    : "Run All Facilities";
+    : "Showing all facilities");
+  const canRun = dashboardInventoryAvailable && Boolean(monitorInventorySnapshot) && !activeMonitorStream && !monitorPlanning
+    && typedSource.some(device => device.enabled !== false && (!activeFacility || device.facility === activeFacility));
+  runFacilityCheckButton.disabled = !canRun;
+  runGroupCheckButton.disabled = !canRun;
+  runFacilityCheckButton.title = NetWatchI18n.text('Run the current filtered selection');
+  runFacilityCheckLabel.textContent = NetWatchI18n.text('Run selection');
 
   facilityTabs.innerHTML = [
     renderFacilityButton({
@@ -1857,9 +1903,11 @@ function renderFacilityTabs() {
 
 function getConfiguredFacilityDevices() {
   return (configState.devices ?? [])
-    .filter(device => device.enabled !== false)
-    .map(device => ({
+    .map((device, index) => ({
       ...device,
+      configuredChecks: device.checks,
+      inventoryIndex: index,
+      inventoryKey: monitorInventorySnapshot?.keys?.[index],
       facility: device.facility || "Unassigned",
       isOnline: false,
       status: "Pending",
@@ -1895,35 +1943,23 @@ function getFacilitySummaries(results) {
 
 function renderFacilityButton(facility, isActive) {
   const problemClass = facility.problemDevices > 0 ? 'facility-tab-problem'
-    : !facility.totalDevices || facility.pendingDevices > 0 ? 'facility-tab-pending' : 'facility-tab-healthy';
+    : !facility.totalDevices || facility.pendingDevices > 0 || !facility.onlineDevices ? 'facility-tab-pending' : 'facility-tab-healthy';
   const activeClass = isActive ? "active" : "";
   const value = facility.name || "";
 
-  return `
+  return NetWatchI18n.html`
     <button
       class="facility-tab ${activeClass} ${problemClass}"
       type="button"
       data-facility-filter="${escapeHtml(value)}">
-      <span class="facility-tab-name">${escapeHtml(facility.label)}</span>
+      <span class="facility-tab-name">${escapeHtml(value ? facility.label : NetWatchI18n.text('All Facilities'))}</span>
       <span class="facility-tab-meta">${facility.totalDevices} devices</span>
-      <span class="facility-tab-status">${facility.onlineDevices} online / ${facility.problemDevices} issues${facility.pendingDevices ? ` / ${facility.pendingDevices} not checked` : ''}</span>
+      <span class="facility-tab-status">${facility.onlineDevices} online / ${facility.problemDevices} issues${NetWatchI18n.text(facility.pendingDevices ? ` / ${facility.pendingDevices} not checked` : '')}</span>
     </button>`;
 }
 
 function matchesFilter(device, filter) {
-  if (filter === "online") {
-    return device.isOnline;
-  }
-
-  if (filter === "offline") {
-    return device.status === 'Down';
-  }
-
-  if (filter === "problems") {
-    return device.status === "Degraded" || device.status === "Down";
-  }
-
-  return true;
+  return NetWatchFilters.status(device, filter);
 }
 
 function renderFacilities(facilities) {
@@ -1935,7 +1971,7 @@ function renderFacilities(facilities) {
     .filter(facility => facility.categories.length > 0);
 
   if (filteredFacilities.length === 0) {
-    resultsBody.innerHTML = `
+    resultsBody.innerHTML = NetWatchI18n.html`
       <div class="text-center text-secondary py-4">
         No devices match the current filters.
       </div>`;
@@ -1951,7 +1987,7 @@ function renderFacilitySection(facility, facilityIndex) {
   const allDevices = facility.categories.flatMap(category => category.devices ?? []);
   const offlineDevices = allDevices.filter(device => device.status === 'Down').length;
   const pendingDevices = allDevices.filter(device => device.status === 'Pending').length;
-  const hasPendingState = facility.categories.some(category => (category.stateDevices ?? category.devices ?? []).some(device => device.status === 'Pending'));
+  const hasPendingState = allDevices.some(device => device.status === 'Pending' || device.status === 'Paused');
   const problemDevices = facility.categories
     .flatMap(category => category.stateDevices ?? category.devices ?? [])
     .filter(device => device.status === "Degraded" || device.status === "Down")
@@ -1975,7 +2011,7 @@ function renderFacilitySection(facility, facilityIndex) {
     ? "fa-spinner fa-spin"
     : hasPendingState && isHealthyFacility ? 'fa-clock' : isHealthyFacility ? "fa-circle-check" : "fa-triangle-exclamation";
 
-  return `
+  return NetWatchI18n.html`
     <section class="facility-section ${expandedClass} mb-2">
       <div class="facility-section-header">
         <div class="d-flex align-items-center gap-2 min-w-0">
@@ -1997,12 +2033,13 @@ function renderFacilitySection(facility, facilityIndex) {
         </div>
         <div class="facility-section-summary">
           <span class="badge ${statusClass}">
-            <i class="fa-solid ${statusIcon} me-1"></i>${statusText}
+            <i class="fa-solid ${statusIcon} me-1"></i>${NetWatchI18n.text(statusText)}
           </span>
-          <span class="facility-counts">${onlineDevices} online / ${offlineDevices} offline${pendingDevices ? ` / ${pendingDevices} not checked` : ''}</span>
+          <span class="facility-counts">${onlineDevices} online / ${offlineDevices} offline${NetWatchI18n.text(pendingDevices ? ` / ${pendingDevices} not checked` : '')}</span>
           <button
             class="btn btn-sm btn-outline-primary facility-run-button"
             type="button"
+            ${activeMonitorStream || monitorPlanning || !monitorInventorySnapshot || !allDevices.some(device => device.enabled !== false) ? 'disabled' : ''}
             data-run-facility-only="${escapeHtml(facility.name)}">
             <i class="fa-solid fa-play me-1"></i>Run
           </button>
@@ -2022,7 +2059,7 @@ function renderFacilitySection(facility, facilityIndex) {
 
 function renderCategories(categories, facilityName = "") {
   if (categories.length === 0) {
-    resultsBody.innerHTML = `
+    resultsBody.innerHTML = NetWatchI18n.html`
       <div class="text-center text-secondary py-4">
         No devices match the current filters.
       </div>`;
@@ -2040,11 +2077,12 @@ function renderCategory(category, index, facilityName = "") {
   const stateDevices = category.stateDevices ?? devices;
   const stateTotalDevices = stateDevices.length;
   const pendingDevices = stateDevices.filter(device => device.status === 'Pending').length;
+  const pausedDevices = stateDevices.filter(device => device.enabled === false).length;
   const visiblePendingDevices = devices.filter(device => device.status === 'Pending').length;
   const healthyDevices = stateDevices.filter(device => device.status === "Healthy").length;
   const problemDevices = stateDevices.filter(device => device.status === "Degraded" || device.status === "Down").length;
   const downDevices = stateDevices.filter(device => device.status === "Down").length;
-  const checkedDevices = stateTotalDevices - pendingDevices;
+  const checkedDevices = stateTotalDevices - pendingDevices - pausedDevices;
   const categoryPercent = checkedDevices ? `${Math.round(healthyDevices / checkedDevices * 100)}%` : '-';
   const isHealthyCategory = stateTotalDevices > 0 && problemDevices === 0 && healthyDevices === stateTotalDevices;
   const isDegradedCategory = problemDevices > 0 && downDevices === 0;
@@ -2054,14 +2092,15 @@ function renderCategory(category, index, facilityName = "") {
     && (!activeRunFacility || !categoryFacility || activeRunFacility.toLowerCase() === categoryFacility.toLowerCase());
   const stateClass = isRunningCategory
     ? "category-section-running"
-    : pendingDevices && !problemDevices ? 'category-section-pending'
+    : (pendingDevices || pausedDevices) && !problemDevices ? 'category-section-pending'
     : isHealthyCategory ? "category-section-healthy" : isDegradedCategory ? "category-section-degraded" : "category-section-problem";
   const stateIcon = isRunningCategory
     ? "fa-spinner fa-spin"
-    : pendingDevices && !problemDevices ? 'fa-clock'
+    : (pendingDevices || pausedDevices) && !problemDevices ? 'fa-clock'
     : isHealthyCategory ? "fa-circle-check" : isDegradedCategory ? "fa-triangle-exclamation" : "fa-circle-xmark";
   const stateLabel = isRunningCategory
     ? "Checking"
+    : pausedDevices === stateTotalDevices ? 'Paused'
     : pendingDevices && !problemDevices ? 'Not checked'
     : isHealthyCategory ? "Healthy" : "Needs attention";
   const categoryKey = createCategoryKey(categoryFacility, category.name);
@@ -2069,7 +2108,7 @@ function renderCategory(category, index, facilityName = "") {
   const isExpanded = expandedCategoryNames.has(categoryKey) || Boolean(activeSearch.trim());
   const expandedClass = isExpanded ? "category-section-expanded" : "";
 
-  return `
+  return NetWatchI18n.html`
     <section class="category-section ${stateClass} ${expandedClass} mb-3">
       <div class="category-header d-flex flex-wrap align-items-center justify-content-between gap-2">
         <div class="d-flex align-items-center gap-2 min-w-0">
@@ -2092,14 +2131,15 @@ function renderCategory(category, index, facilityName = "") {
         <div class="category-summary d-flex align-items-center justify-content-end gap-2 flex-wrap flex-sm-nowrap ms-auto">
           <span class="category-percent">${categoryPercent}</span>
           <span class="category-state">
-            <i class="fa-solid ${stateIcon} me-1"></i>${stateLabel}
+            <i class="fa-solid ${stateIcon} me-1"></i>${NetWatchI18n.text(stateLabel)}
           </span>
           <span class="category-counts">
-            ${onlineDevices} online / ${offlineDevices} offline${visiblePendingDevices ? ` / ${visiblePendingDevices} not checked` : ''}
+            ${onlineDevices} online / ${offlineDevices} offline${NetWatchI18n.text(visiblePendingDevices ? ` / ${visiblePendingDevices} not checked` : '')}
           </span>
           <button
             class="btn btn-sm btn-light category-run-button"
             type="button"
+            ${activeMonitorStream || monitorPlanning || !monitorInventorySnapshot || !devices.some(device => device.enabled !== false) ? 'disabled' : ''}
             data-run-category="${escapeHtml(category.name)}"
             data-run-facility="${escapeHtml(categoryFacility)}">
             <i class="fa-solid fa-play me-1"></i>Run
@@ -2115,7 +2155,7 @@ function renderCategory(category, index, facilityName = "") {
             <thead class="table-light">
               <tr>
                 <th scope="col">Name</th>
-                <th scope="col">Address</th>
+                <th scope="col">Target</th>
                 <th scope="col">Status</th>
                 <th scope="col">Ping status</th>
                 <th scope="col">TCP / HTTP</th>
@@ -2132,12 +2172,12 @@ function renderCategory(category, index, facilityName = "") {
 }
 
 function renderRow(result) {
-  const isPending = result.status === 'Pending';
+  const isPending = result.status === 'Pending' || result.enabled === false;
   const pingCheck = getPingCheck(result);
   const hasPingCheck = Boolean(pingCheck);
   const isPingAvailable = Boolean(pingCheck?.isAvailable);
   const isRunningDevice = isActiveRunDevice(result);
-  const isRunningFailedDevice = activeRunFailedIps.has(result.ip)
+  const isRunningFailedDevice = activeRunFailedIps.size > 0 && activeRunSelectedIndexes.has(result.inventoryIndex)
     && (!activeRunDeviceType || (result.deviceType || 'unspecified') === activeRunDeviceType);
   const statusClass = isPending || !hasPingCheck ? "text-bg-secondary" : isPingAvailable ? "text-bg-success" : "text-bg-danger";
   const statusIcon = isPending ? 'fa-clock' : !hasPingCheck ? "fa-minus" : isPingAvailable ? "fa-check" : "fa-xmark";
@@ -2148,30 +2188,31 @@ function renderRow(result) {
     ? `Target: ${result.pingTarget || result.ip}; Status: ${pingCheck.status || "Unknown"}; Timeout: ${configState.settings?.timeoutMs || "configured"} ms`
     : "No ping check is configured for this device.";
 
-  return `
+  return NetWatchI18n.html`
     <tr data-dashboard-device="${escapeAttribute(result.name)}" data-device-type="${escapeAttribute(result.deviceType || 'unspecified')}">
       <td class="fw-semibold">
         <div>${escapeHtml(result.name)}</div>
+        ${renderMonitoringToggle(result, result.inventoryIndex)}
         ${renderDeviceLocation(result)}
         ${renderDeviceNotes(result)}
-        ${renderWorkstationInventory(configState.devices.find(device => createDeviceKey(device) === createDeviceKey(result)))}
-        ${!activeFacility ? `<div class="text-secondary small">${escapeHtml(result.facility || "Unassigned")} · ${escapeHtml(result.category || "Uncategorized")}</div>` : ""}
+        ${renderWorkstationInventory(configState.devices[result.inventoryIndex])}
+        ${!activeFacility ? NetWatchI18n.html`<div class="text-secondary small">${escapeHtml(result.facility || "Unassigned")} · ${escapeHtml(result.category || "Uncategorized")}</div>` : ""}
         <div class="device-shortcuts">${renderWebsiteLink(result.websiteUrl)}${renderCommandButton(result.command)}</div>
       </td>
       <td>
-        <code>${escapeHtml(result.ip)}</code>
-        ${result.hostname ? `<div class="text-secondary small">${escapeHtml(result.hostname)}</div>` : ""}
+        <code class="text-break">${escapeHtml(primaryMonitoringTarget(result))}</code>
+        ${result.hostname ? NetWatchI18n.html`<div class="text-secondary small">${escapeHtml(result.hostname)}</div>` : ""}
       </td>
       <td>${renderDeviceStatus(result.status)}</td>
       <td>
-        <span class="badge ${statusClass} status-badge" title="${escapeHtml(pingTitle)}">
-          <i class="fa-solid ${statusIcon} me-1"></i>${statusText}
+        <span class="badge ${statusClass} status-badge" title="${escapeHtml(NetWatchI18n.text(pingTitle))}">
+          <i class="fa-solid ${statusIcon} me-1"></i>${NetWatchI18n.text(statusText)}
         </span>
       </td>
-      <td>${renderPorts(result)}${renderDeviceHttpChecks(result)}</td>
+      <td>${result.enabled === false ? NetWatchI18n.markup('<span class="badge text-bg-secondary">Monitoring paused</span>') : renderPorts(result) + renderDeviceHttpChecks(result)}</td>
       <td class="text-end">
         <div class="device-check-actions">
-          <span class="text-secondary small">${isPending ? 'Not checked' : formatDate(result.lastCheck)}</span>
+          <span class="text-secondary small">${isPending ? NetWatchI18n.text('Not checked') : formatDate(result.lastCheck)}</span>
           ${renderDeviceRunButton(result, isRunningDevice || isRunningFailedDevice)}
         </div>
       </td>
@@ -2179,25 +2220,27 @@ function renderRow(result) {
 }
 
 function renderDeviceRunButton(result, isRunning = false) {
-  return `
+  return NetWatchI18n.html`
     <button
       class="btn ${isRunning ? "btn-primary" : "btn-outline-primary"} btn-sm device-run-button"
       type="button"
-      title="${isRunning ? "This device is being checked" : "Run only this device"}"
-      ${isRunning || activeMonitorStream ? "disabled" : ""}
+      title="${NetWatchI18n.text(isRunning ? "This device is being checked" : "Run only this device")}"
+      ${isRunning || activeMonitorStream || monitorPlanning || !monitorInventorySnapshot || result.enabled === false ? "disabled" : ""}
+      data-run-device-index="${result.inventoryIndex}"
       data-run-device-name="${escapeHtml(result.name)}"
       data-run-device-ip="${escapeHtml(result.ip)}"
       data-run-device-type="${escapeAttribute(result.deviceType || 'unspecified')}"
       data-run-device-facility="${escapeHtml(result.facility || "")}"
       data-run-device-category="${escapeHtml(result.category || "")}">
       ${isRunning
-        ? `<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Checking`
-        : `<i class="fa-solid fa-rotate-right me-1"></i>Run`}
+        ? NetWatchI18n.html`<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Checking`
+        : NetWatchI18n.html`<i class="fa-solid fa-rotate-right me-1"></i>Run`}
     </button>`;
 }
 
 function isActiveRunDevice(result) {
   return Boolean(activeRunDeviceName && activeRunDeviceIp)
+    && (!activeRunSelectedIndexes.size || activeRunSelectedIndexes.has(result.inventoryIndex))
     && result.name === activeRunDeviceName
     && result.ip === activeRunDeviceIp
     && (!activeRunDeviceType || (result.deviceType || 'unspecified') === activeRunDeviceType)
@@ -2216,12 +2259,12 @@ function formatPingFailureText(pingCheck) {
 
 function renderDeviceLocation(device) {
   if (!device?.location) return '';
-  return `<div class="device-location small fw-normal text-secondary"><i class="fa-solid fa-location-dot" aria-hidden="true"></i><span><span class="visually-hidden">Location: </span><span class="device-location-text">${escapeHtml(device.location)}</span></span></div>`;
+  return NetWatchI18n.html`<div class="device-location small fw-normal text-secondary"><i class="fa-solid fa-location-dot" aria-hidden="true"></i><span><span class="visually-hidden">Location: </span><span class="device-location-text">${escapeHtml(device.location)}</span></span></div>`;
 }
 
 function renderDeviceNotes(device) {
   if (!device?.notes) return '';
-  return `<details class="device-notes small fw-normal text-secondary"><summary aria-label="Notes for ${escapeAttribute(device.name)}"><i class="fa-regular fa-note-sticky me-1" aria-hidden="true"></i>Notes</summary><div class="device-notes-text">${escapeHtml(device.notes)}</div></details>`;
+  return NetWatchI18n.html`<details class="device-notes small fw-normal text-secondary"><summary aria-label="Notes for ${escapeAttribute(device.name)}"><i class="fa-regular fa-note-sticky me-1" aria-hidden="true"></i>Notes</summary><div class="device-notes-text">${escapeHtml(device.notes)}</div></details>`;
 }
 
 function renderWebsiteLink(websiteUrl) {
@@ -2229,7 +2272,7 @@ function renderWebsiteLink(websiteUrl) {
     return "";
   }
 
-  return `
+  return NetWatchI18n.html`
     <a class="small text-decoration-none" href="${escapeHtml(websiteUrl)}" target="_blank" rel="noopener noreferrer">
       <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Open website
     </a>`;
@@ -2237,7 +2280,7 @@ function renderWebsiteLink(websiteUrl) {
 
 function renderCommandButton(command) {
   if (!command) return '';
-  return `<button class="btn btn-link btn-sm p-0 device-command-button" type="button" data-copy-command="${escapeAttribute(command)}" title="Copy command" aria-label="Copy command"><i class="fa-solid fa-terminal" aria-hidden="true"></i><span aria-live="polite">Command</span></button>`;
+  return NetWatchI18n.html`<button class="btn btn-link btn-sm p-0 device-command-button" type="button" data-copy-command="${escapeAttribute(command)}" title="Copy command" aria-label="Copy command"><i class="fa-solid fa-terminal" aria-hidden="true"></i><span aria-live="polite">Command</span></button>`;
 }
 
 async function copyDeviceCommand(button) {
@@ -2267,14 +2310,14 @@ async function copyDeviceCommand(button) {
       }
     }
   } catch { copied = false; }
-  label.textContent = copied ? 'Copied' : 'Copy failed';
-  button.title = copied ? 'Command copied' : 'Clipboard unavailable';
+  label.textContent = NetWatchI18n.text(copied ? 'Copied' : 'Copy failed');
+  button.title = NetWatchI18n.text(copied ? 'Command copied' : 'Clipboard unavailable');
   button.disabled = false;
   if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
   setTimeout(() => {
     if (!button.isConnected) return;
-    label.textContent = 'Command';
-    button.title = 'Copy command';
+    label.textContent = NetWatchI18n.text('Command');
+    button.title = NetWatchI18n.text('Copy command');
   }, 2000);
 }
 
@@ -2287,6 +2330,7 @@ function renderDeviceStatus(status) {
   const normalizedStatus = status || "Down";
   const statusMap = {
     Pending: { className: 'text-bg-secondary', icon: 'fa-clock', label: 'Not checked' },
+    Paused: { className: 'text-bg-secondary', icon: 'fa-pause', label: 'Paused' },
     Healthy: {
       className: "text-bg-success",
       icon: "fa-check",
@@ -2305,9 +2349,9 @@ function renderDeviceStatus(status) {
   };
   const statusInfo = statusMap[normalizedStatus] ?? statusMap.Down;
 
-  return `
+  return NetWatchI18n.html`
     <span class="badge ${statusInfo.className} status-badge">
-      <i class="fa-solid ${statusInfo.icon} me-1"></i>${statusInfo.label}
+      <i class="fa-solid ${statusInfo.icon} me-1"></i>${NetWatchI18n.text(statusInfo.label)}
     </span>`;
 }
 
@@ -2363,13 +2407,13 @@ function renderPorts(result) {
 
   if (requestedPorts.length === 0) {
     if ((result.checks ?? []).some(check => check.type === "http")) return "";
-    return `<span class="text-secondary">No ports configured</span>`;
+    return NetWatchI18n.html`<span class="text-secondary">No ports configured</span>`;
   }
 
-  if (result.status === 'Pending') return '<span class="badge text-bg-secondary port-pill">TCP not checked</span>';
+  if (result.status === 'Pending') return NetWatchI18n.markup('<span class="badge text-bg-secondary port-pill">TCP not checked</span>');
 
   if (isPingOnlyResult) {
-    return `
+    return NetWatchI18n.html`
       <span class="badge text-bg-secondary port-pill" title="TCP checks were skipped for this Ping Only execution.">
         <i class="fa-solid fa-forward me-1"></i>Skipped - Ping Only
       </span>`;
@@ -2383,18 +2427,18 @@ function renderPorts(result) {
     const icon = isOpen ? "fa-check" : "fa-xmark";
     const label = isOpen ? "open" : "closed";
     const webUrl = getWebPortUrl(result.ip, port);
-    const content = `
+    const content = NetWatchI18n.html`
         <i class="fa-solid ${icon}"></i>
-        ${port} ${label}`;
+        ${port} ${NetWatchI18n.text(label)}`;
 
     if (webUrl) {
-      return `
+      return NetWatchI18n.html`
         <a class="badge ${badgeClass} port-pill port-link" href="${escapeHtml(webUrl)}" target="_blank" rel="noopener noreferrer" title="Open ${escapeHtml(webUrl)}">
           ${content}
         </a>`;
     }
 
-    return `
+    return NetWatchI18n.html`
       <span class="badge ${badgeClass} port-pill">
         ${content}
       </span>`;
@@ -2404,25 +2448,33 @@ function renderPorts(result) {
 function renderDeviceHttpChecks(result) {
   if (result.status === 'Pending') {
     return (result.checks ?? []).filter(check => check.type === 'http').map(check =>
-      `<div class="http-check-result mt-1"><span class="badge text-bg-secondary">HTTP not checked</span><div class="small text-secondary text-break">${escapeHtml(check.url || '')}</div></div>`).join('');
+      NetWatchI18n.html`<div class="http-check-result mt-1"><span class="badge text-bg-secondary">HTTP not checked</span><div class="small text-secondary text-break">${escapeHtml(check.url || '')}</div></div>`).join('');
   }
   if (isPingOnlyMode(result.checkMode)) {
     const device = configState.devices.find(item => createDeviceKey(item) === createDeviceKey(result));
     return device?.checks?.some(check => check.type === "http")
-      ? '<div class="small text-secondary mt-1">HTTP skipped - Ping Only</div>' : "";
+      ? NetWatchI18n.markup('<div class="small text-secondary mt-1">HTTP skipped - Ping Only</div>') : "";
   }
   return renderHttpChecks(result.checks);
 }
 
 function renderHttpChecks(checks = []) {
-  return checks.filter(check => check.type === "http").map(check => `
+  return checks.filter(check => check.type === "http").map(check => {
+    const diagnostic = NetWatchHttpDiagnostics.describe(check);
+    const duration = check.durationMs != null && Number.isFinite(Number(check.durationMs)) ? `${Number(check.durationMs)} ms` : '-';
+    return NetWatchI18n.html`
     <div class="http-check-result mt-1">
       <span class="badge ${check.isAvailable ? "text-bg-success" : "text-bg-danger"}">
-        <i class="fa-solid ${check.isAvailable ? "fa-check" : "fa-xmark"} me-1"></i>HTTP ${escapeHtml(check.statusCode ?? check.status ?? "Failed")} &middot; ${Number(check.durationMs) || 0} ms
+        <i class="fa-solid ${check.isAvailable ? "fa-check" : "fa-xmark"} me-1"></i>${escapeHtml(NetWatchI18n.text(diagnostic.title))} &middot; ${escapeHtml(duration)}
       </span>
       <div class="small text-secondary text-break">${escapeHtml(check.url || "")}</div>
-      ${!check.isAvailable ? `<div class="small text-danger">${escapeHtml(check.message || check.status || "HTTP check failed.")}</div>` : ""}
-    </div>`).join("");
+      ${!check.isAvailable ? NetWatchI18n.html`<div class="small text-danger">${escapeHtml(NetWatchI18n.text(diagnostic.summary))}</div><details class="small mt-1 http-diagnostic"><summary>Details</summary>
+        <p class="mb-1">${escapeHtml(NetWatchI18n.text(diagnostic.action))}</p><dl class="http-diagnostic-facts"><dt>Diagnostic code</dt><dd><code>${escapeHtml(diagnostic.code)}</code></dd>
+        ${check.expectedStatusCode != null ? NetWatchI18n.html`<dt>Expected status</dt><dd>${Number(check.expectedStatusCode)}</dd>` : ''}
+        ${check.timeoutMs != null ? NetWatchI18n.html`<dt>Timeout (ms)</dt><dd>${Number(check.timeoutMs)}</dd>` : ''}
+        ${check.attempts != null ? NetWatchI18n.html`<dt>Attempts</dt><dd>${Number(check.attempts)}</dd>` : ''}</dl></details>` : ""}
+    </div>`;
+  }).join("");
 }
 
 function getWebPortUrl(address, port) {
@@ -2608,11 +2660,6 @@ async function runFacilityCheck(facility = "") {
 
 async function runSelectedGroupCheck() {
   const category = groupCheckSelect.value;
-
-  if (!category) {
-    return;
-  }
-
   await runGroupCheck(category);
 }
 
@@ -2698,10 +2745,10 @@ async function toggleAutoRefresh() {
   autoRefreshEnabled = !autoRefreshEnabled;
   autoRefreshToggle.classList.toggle("btn-success", autoRefreshEnabled);
   autoRefreshToggle.classList.toggle("btn-danger", !autoRefreshEnabled);
-  autoRefreshLabel.textContent = autoRefreshEnabled
+  autoRefreshLabel.textContent = NetWatchI18n.text(autoRefreshEnabled
     ? "Auto Refresh: ON"
-    : "Auto Refresh: OFF";
-  executionMode.textContent = getDashboardExecutionText();
+    : "Auto Refresh: OFF");
+  executionMode.textContent = NetWatchI18n.text(getDashboardExecutionText());
 
   if (autoRefreshEnabled) {
     if (!hasLoadedDashboardGroups) {
@@ -2733,6 +2780,8 @@ async function loadConfig({ clearAlert = true, showBusy = true } = {}) {
     }
 
     applyConfigPayload(payload);
+    await loadMonitoringInventory();
+    renderConfigFilterOptions();
     renderConfigDevices();
     renderBulkEditDevices();
     resetDeviceForm();
@@ -2747,25 +2796,33 @@ async function loadConfig({ clearAlert = true, showBusy = true } = {}) {
 }
 
 async function refreshConfigurationForRun() {
-  const reloadResponse = await fetch("/api/reload", { method: "POST" });
-  const reloadPayload = await readJsonResponse(reloadResponse);
-
-  if (!reloadResponse.ok) {
-    throw new Error(reloadPayload.error || reloadPayload.detail || `Configuration reload failed with ${reloadResponse.status}`);
-  }
-
-  const configResponse = await fetch("/api/config");
-  const configPayload = await readJsonResponse(configResponse);
-
-  if (!configResponse.ok) {
-    throw new Error(configPayload.error || configPayload.detail || `Unable to load refreshed configuration. HTTP ${configResponse.status}`);
-  }
-
-  applyConfigPayload(configPayload);
+  const previous = monitorInventorySnapshot;
+  await loadMonitoringInventory();
   renderGroupCheckOptions(configState.devices, { preserveSelection: true });
   renderFacilityTabs();
   hasLoadedDashboardGroups = true;
   dashboardConfigStale = false;
+  if (previous && (previous.profileId !== monitorInventorySnapshot.profileId || previous.revision !== monitorInventorySnapshot.revision)) {
+    renderFilteredCategories();
+    throw new Error('The active support group or inventory changed. Review the refreshed selection and try again.');
+  }
+}
+
+async function loadMonitoringInventory() {
+  const response = await fetch('/api/monitor/inventory');
+  const snapshot = await readJsonResponse(response);
+  if (!response.ok || !snapshot.configuration || !Array.isArray(snapshot.keys)) {
+    throw new Error(snapshot.error || snapshot.detail || 'Unable to load the monitoring inventory. Update the backend and reload.');
+  }
+  if (regionManagerLoaded && regionState.activeProfileId !== snapshot.profileId) {
+    throw new Error('The active support group changed. Reload before continuing.');
+  }
+  if (lastRunPayload?.profileId && lastRunPayload.profileId !== snapshot.profileId) {
+    lastRunPayload = null;
+    document.querySelector('#last-run-receipt').hidden = true;
+  }
+  applyConfigPayload(snapshot.configuration, snapshot);
+  return snapshot;
 }
 
 async function saveConfig(successMessage = "Settings saved to the active support group. The previous version was backed up.") {
@@ -2833,11 +2890,12 @@ function markDashboardConfigurationStale() {
     renderFacilityTabs();
     renderSummary(createProgressSummary([], 0));
     renderFilteredCategories();
-    lastCheck.textContent = 'Configuration updated. No checks yet.';
+    lastCheck.textContent = NetWatchI18n.text('Configuration updated. No checks yet.');
   }
 }
 
-function applyConfigPayload(payload) {
+function applyConfigPayload(payload, snapshot = null) {
+  monitorInventorySnapshot = snapshot;
   configState = payload;
   configState.devices ??= [];
   dashboardInventoryAvailable = true;
@@ -2865,6 +2923,14 @@ function applyConfigPayload(payload) {
     facility: device.facility || "Unassigned",
     useHostnameForPing: device.useHostnameForPing ?? legacyUseHostnameForPing
   }));
+  const nextDefinitions = new Map();
+  for (const device of configState.devices) {
+    const key = createDeviceKey(device);
+    nextDefinitions.set(key, `${nextDefinitions.get(key) || ''}\n${JSON.stringify(device)}`);
+  }
+  latestResults = latestResults.filter(result => nextDefinitions.has(createDeviceKey(result))
+    && inventoryDefinitions.get(createDeviceKey(result)) === nextDefinitions.get(createDeviceKey(result)));
+  inventoryDefinitions = nextDefinitions;
   if (intervalSecondsInput) {
     intervalSecondsInput.value = String(configState.settings.intervalSeconds);
   }
@@ -2882,7 +2948,13 @@ async function readJsonResponse(response) {
   }
 
   try {
-    return JSON.parse(text);
+    const payload = JSON.parse(text);
+    if (!response.ok && payload && typeof payload === 'object') {
+      const message = payload.error || payload.detail || payload.title;
+      const trace = response.status >= 500 ? payload.traceId || response.headers.get('X-NetWatch-Trace') : '';
+      if (message) return { ...payload, error: NetWatchI18n.error(message, trace), detail: NetWatchI18n.error(message, trace) };
+    }
+    return payload;
   } catch {
     throw new Error("The API did not return JSON. Restart the application so the latest backend endpoints are loaded.");
   }
@@ -2926,7 +2998,7 @@ async function loadDashboardGroups({ resetResults = false } = {}) {
   runGroupCheckButton.disabled = true;
   renderGroupCheckOptions([]);
   facilityTabs.innerHTML = '';
-  resultsBody.innerHTML = '<div class="text-center text-secondary py-4">Loading inventory...</div>';
+  resultsBody.innerHTML = NetWatchI18n.markup('<div class="text-center text-secondary py-4">Loading inventory...</div>');
   try {
     const response = await fetch("/api/config");
     const payload = await readJsonResponse(response);
@@ -2936,8 +3008,9 @@ async function loadDashboardGroups({ resetResults = false } = {}) {
     }
 
     applyConfigPayload(payload);
+    await loadMonitoringInventory();
     renderFacilityTabs();
-    renderGroupCheckOptions(payload.devices);
+    renderGroupCheckOptions(configState.devices);
     hasLoadedDashboardGroups = true;
     dashboardConfigStale = false;
 
@@ -2950,7 +3023,7 @@ async function loadDashboardGroups({ resetResults = false } = {}) {
       expandedCategoryNames.clear();
       updateRunFailedButton();
       renderSummary(createProgressSummary([], 0));
-      lastCheck.textContent = 'No checks yet.';
+      lastCheck.textContent = NetWatchI18n.text('No checks yet.');
     }
     revealSavedDashboardDevice();
     renderFilteredCategories();
@@ -2962,7 +3035,7 @@ async function loadDashboardGroups({ resetResults = false } = {}) {
     renderFilteredCategories();
     console.error(error);
     runGroupCheckButton.disabled = true;
-    lastCheck.textContent = error.message || "Unable to load dashboard groups.";
+    lastCheck.textContent = NetWatchI18n.error(error.message || "Unable to load dashboard groups.");
   }
 }
 
@@ -2973,25 +3046,31 @@ function renderGroupCheckOptions(devices, { preserveSelection = false } = {}) {
     : devices ?? [];
   const categories = Array.from(new Set(
     scopedDevices
-      .filter(device => device.enabled !== false && matchesDashboardDeviceType(device))
+      .filter(matchesDashboardDeviceType)
       .map(device => device.category || "Uncategorized")))
     .sort((left, right) => left.localeCompare(right));
 
-  groupCheckSelect.innerHTML = `
-    <option value="">Select group</option>
-    ${categories.map(category => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`).join("")}`;
-  if (preserveSelection && categories.includes(selectedCategory)) groupCheckSelect.value = selectedCategory;
-  runGroupCheckButton.disabled = !groupCheckSelect.value;
+  groupCheckSelect.innerHTML = NetWatchI18n.html`
+    <option value="">All categories</option>
+    ${categories.map(category => NetWatchI18n.html`<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`).join("")}`;
+  if (preserveSelection && selectedCategory) {
+    if (!categories.includes(selectedCategory)) groupCheckSelect.add(new Option(NetWatchI18n.text(`Unavailable category: ${selectedCategory}`), selectedCategory));
+    groupCheckSelect.value = selectedCategory;
+  }
+  runGroupCheckButton.disabled = !dashboardInventoryAvailable || !monitorInventorySnapshot || !getVisibleResults().some(item => item.enabled !== false) || Boolean(activeMonitorStream) || monitorPlanning;
 }
 
 function updateDashboardFilterReset() {
-  clearDashboardFiltersButton.disabled = !activeFacility && !activeDashboardDeviceType && !activeSearch.trim() && activeFilter === 'all' && !groupCheckSelect.value;
+  clearDashboardFiltersButton.disabled = Boolean(activeMonitorStream) || monitorPlanning
+    || !activeFacility && !activeDashboardDeviceType && !activeSearch.trim() && activeFilter === 'all' && !groupCheckSelect.value && activeDashboardMonitoring === 'enabled';
 }
 
 function clearDashboardFilters() {
   activeFacility = '';
   activeDashboardDeviceType = '';
   dashboardDeviceTypeSelect.value = '';
+  activeDashboardMonitoring = 'enabled';
+  dashboardMonitoringSelect.value = 'enabled';
   activeSearch = '';
   activeFilter = 'all';
   searchInput.value = '';
@@ -3003,21 +3082,70 @@ function clearDashboardFilters() {
 
 function selectFacility(facilityName) {
   activeFacility = facilityName || "";
-  groupCheckSelect.value = "";
-  runGroupCheckButton.disabled = true;
-  renderGroupCheckOptions(configState.devices);
+  renderGroupCheckOptions(configState.devices, { preserveSelection: true });
   renderFilteredCategories();
+}
+
+function renderConfigFilterOptions() {
+  const devices = configState.devices ?? [];
+  const setOptions = (control, options, selected, label) => {
+    control.innerHTML = NetWatchI18n.html`<option value="">${NetWatchI18n.text(label)}</option>` + options.map(option =>
+      NetWatchI18n.html`<option value="${escapeAttribute(option.value)}">${escapeHtml(option.label)}</option>`).join('');
+    if (selected && !options.some(option => option.value === selected)) control.add(new Option(NetWatchI18n.text(`Unavailable: ${selected}`), selected));
+    control.value = selected;
+  };
+  setOptions(configFilters.facility, [...new Set(devices.map(item => item.facility || 'Unassigned'))].sort().map(value => ({ value, label: value })), activeConfigFilters.facility, 'All facilities');
+  setOptions(configFilters.deviceType, (configState.deviceTypes ?? []).map(type => ({ value: type.id, label: deviceTypeDisplayName(type) })), activeConfigFilters.deviceType, 'All device types');
+  const scope = devices.filter(item => NetWatchFilters.matches(item, { facility: activeConfigFilters.facility, deviceType: activeConfigFilters.deviceType }));
+  setOptions(configFilters.category, [...new Set(scope.map(item => item.category || 'Uncategorized'))].sort().map(value => ({ value, label: value })), activeConfigFilters.category, 'All categories');
+  configFilters.status.value = activeConfigFilters.status;
+  configFilters.monitoring.value = activeConfigFilters.monitoring;
+  configGroupingSelect.value = activeConfigGrouping;
+  clearConfigFiltersButton.disabled = !activeConfigSearch.trim() && !activeConfigFilters.facility && !activeConfigFilters.deviceType
+    && !activeConfigFilters.category && activeConfigFilters.status === 'all' && activeConfigFilters.monitoring === 'all';
+}
+
+function hasBulkDrafts() {
+  if (currentRoute !== '/config' || activeConfigView !== 'bulk') return false;
+  return [...bulkDevicesBody.querySelectorAll('[data-bulk-index]')].some(row => {
+    const edited = readBulkRowDevice(row, { showErrors: false });
+    return !edited || !areBulkDevicesEqual(configState.devices[Number(row.dataset.bulkIndex)], edited);
+  });
+}
+
+async function discardBulkDrafts() {
+  return !hasBulkDrafts() || await confirmManagementAction({ title: 'Discard unsaved row changes?',
+    message: 'The current row edits have not been saved.', confirmLabel: 'Discard changes', destructive: false });
+}
+
+async function updateConfigFilter(key, value) {
+  if (!await discardBulkDrafts()) { renderConfigFilterOptions(); return; }
+  if (key === 'grouping') {
+    activeConfigGrouping = value === 'deviceType' ? 'deviceType' : 'facility';
+    try { localStorage.setItem('netwatch.configGrouping', activeConfigGrouping); } catch { /* Preferences are optional. */ }
+    collapsedBulkFacilityNames.clear();
+  } else activeConfigFilters[key] = value;
+  activeBulkFacility = '';
+  activeBulkCategory = '';
+  renderConfigFilterOptions();
+  renderConfigDevices();
+  renderBulkEditDevices();
+}
+
+function hasConfigFilters() {
+  return Boolean(activeConfigSearch.trim() || activeConfigFilters.facility || activeConfigFilters.deviceType || activeConfigFilters.category
+    || activeConfigFilters.status !== 'all' || activeConfigFilters.monitoring !== 'all');
 }
 
 function renderConfigDevices() {
   renderConfigView();
   const devices = filterConfigDevices(configState.devices ?? []);
-  const hasSearch = activeConfigSearch.trim().length > 0;
+  const hasSearch = hasConfigFilters();
 
   if (devices.length === 0) {
-    configDevicesBody.innerHTML = `
+    configDevicesBody.innerHTML = NetWatchI18n.html`
       <tr>
-        <td colspan="7" class="text-center text-secondary py-4">${hasSearch ? "No devices match the current filter." : "No devices configured."}</td>
+        <td colspan="7" class="text-center text-secondary py-4">${NetWatchI18n.text(hasSearch ? "No devices match the current filter." : "No devices configured.")}</td>
       </tr>`;
     return;
   }
@@ -3027,7 +3155,7 @@ function renderConfigDevices() {
       const facilityId = `config-facility-${facilityIndex}-${slugify(facility.name)}`;
       const facilityRevealed = hasSearch || facility.devices.some(({ device }) => isSavedDeviceRevealed(device));
 
-      return `
+      return NetWatchI18n.html`
       <tr class="config-facility-row">
         <td colspan="7">
           <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
@@ -3042,7 +3170,7 @@ function renderConfigDevices() {
                 aria-controls="${facilityId}">
                 <i class="fa-solid fa-chevron-down"></i>
               </button>
-              <span class="fw-semibold"><i class="fa-solid fa-location-dot me-2"></i>${escapeHtml(facility.name)}</span>
+              <span class="fw-semibold"><i class="fa-solid ${activeConfigGrouping === 'deviceType' ? 'fa-desktop' : 'fa-location-dot'} me-2"></i>${escapeHtml(facility.name)}</span>
             </div>
             <span class="badge text-bg-secondary">${facility.devices.length} devices</span>
           </div>
@@ -3052,7 +3180,7 @@ function renderConfigDevices() {
         const categoryId = `${facilityId}-category-${categoryIndex}-${slugify(category.name)}`;
         const categoryRevealed = hasSearch || category.devices.some(({ device }) => isSavedDeviceRevealed(device));
 
-        return `
+        return NetWatchI18n.html`
           <tr class="config-category-row" data-config-facility-row="${facilityId}" ${facilityRevealed ? '' : 'hidden'}>
             <td colspan="7">
               <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 ps-3">
@@ -3110,12 +3238,12 @@ function renderBulkEditDevices() {
     return;
   }
 
-  bulkEditSummary.textContent = `${formatNumber(devices.length)} of ${formatNumber(configState.devices?.length ?? 0)} devices shown`;
+  bulkEditSummary.textContent = NetWatchI18n.text(`${formatNumber(devices.length)} of ${formatNumber(configState.devices?.length ?? 0)} devices shown`);
 
   if (devices.length === 0) {
-    bulkDevicesBody.innerHTML = `
+    bulkDevicesBody.innerHTML = NetWatchI18n.html`
       <tr>
-        <td colspan="10" class="text-center text-secondary py-4">${hasSearch || hasBulkFilters ? "No devices match the current filters." : "No devices configured."}</td>
+        <td colspan="10" class="text-center text-secondary py-4">${NetWatchI18n.text(hasSearch || hasBulkFilters ? "No devices match the current filters." : "No devices configured.")}</td>
       </tr>`;
     updateBulkSelectionControls();
     return;
@@ -3134,31 +3262,7 @@ function renderBulkEditDevices() {
  * choose category/facility combinations that have no rows.
  */
 function renderBulkEditFilterOptions() {
-  if (!bulkFacilityFilter || !bulkCategoryFilter) {
-    return;
-  }
-
-  const devices = filterConfigDevices(configState.devices ?? []);
-  const facilities = getUniqueDeviceValues(devices, "facility", "Unassigned");
-  const facilityScopedDevices = activeBulkFacility
-    ? devices.filter(({ device }) => (device.facility || "Unassigned") === activeBulkFacility)
-    : devices;
-  const categories = getUniqueDeviceValues(facilityScopedDevices, "category", "Uncategorized");
-
-  if (activeBulkFacility && !facilities.includes(activeBulkFacility)) {
-    activeBulkFacility = "";
-  }
-
-  if (activeBulkCategory && !categories.includes(activeBulkCategory)) {
-    activeBulkCategory = "";
-  }
-
-  bulkFacilityFilter.innerHTML = `
-    <option value="">All facilities</option>
-    ${facilities.map(facility => `<option value="${escapeHtml(facility)}" ${facility === activeBulkFacility ? "selected" : ""}>${escapeHtml(facility)}</option>`).join("")}`;
-  bulkCategoryFilter.innerHTML = `
-    <option value="">All categories</option>
-    ${categories.map(category => `<option value="${escapeHtml(category)}" ${category === activeBulkCategory ? "selected" : ""}>${escapeHtml(category)}</option>`).join("")}`;
+  renderConfigFilterOptions();
 }
 
 /**
@@ -3180,13 +3284,7 @@ function getUniqueDeviceValues(indexedDevices, fieldName, fallback) {
  * @returns {Array<{device: object, index: number}>} Devices visible in the Bulk Edit table.
  */
 function filterBulkEditDevices(indexedDevices) {
-  return indexedDevices.filter(({ device }) => {
-    const facility = device.facility || "Unassigned";
-    const category = device.category || "Uncategorized";
-
-    return (!activeBulkFacility || facility === activeBulkFacility)
-      && (!activeBulkCategory || category === activeBulkCategory);
-  });
+  return indexedDevices;
 }
 
 /**
@@ -3197,7 +3295,7 @@ function filterBulkEditDevices(indexedDevices) {
 function renderBulkEditFacilityGroup(group) {
   const isCollapsed = collapsedBulkFacilityNames.has(group.name);
 
-  return `
+  return NetWatchI18n.html`
     <tr class="bulk-group-row">
       <td colspan="10">
         <button class="btn btn-sm bulk-facility-toggle" type="button" data-bulk-facility-toggle="${escapeAttribute(group.name)}" aria-expanded="${!isCollapsed}">
@@ -3208,7 +3306,7 @@ function renderBulkEditFacilityGroup(group) {
         <span class="small ms-2">${group.categories.length} categories</span>
       </td>
     </tr>
-    ${isCollapsed ? "" : group.categories.map(category => `
+    ${isCollapsed ? "" : group.categories.map(category => NetWatchI18n.html`
       <tr class="bulk-category-row">
         <td colspan="10">
           <span class="fw-semibold">${escapeHtml(category.name)}</span>
@@ -3222,7 +3320,7 @@ function renderBulkEditFacilityGroup(group) {
 function renderBulkEditRow(device, index) {
   const isSelected = selectedBulkIndexes.has(index);
 
-  return `
+  return NetWatchI18n.html`
     <tr class="bulk-edit-row ${isSelected ? "table-active" : ""}" data-bulk-index="${index}">
       <td class="text-center">
         <input class="form-check-input" type="checkbox" data-bulk-select="${index}" ${isSelected ? "checked" : ""} aria-label="Select ${escapeAttribute(device.name ?? "device")}">
@@ -3275,14 +3373,14 @@ function updateBulkSelectionControls() {
   const actionNeedsValue = bulkActionRequiresValue(bulkActionSelect?.value || "");
 
   if (bulkSelectionSummary) {
-    bulkSelectionSummary.textContent = `${formatNumber(selectedCount)} selected / ${formatNumber(visibleCount)} visible`;
+    bulkSelectionSummary.textContent = NetWatchI18n.text(`${formatNumber(selectedCount)} selected / ${formatNumber(visibleCount)} visible`);
   }
 
   if (bulkActionValueInput) {
     bulkActionValueInput.disabled = !actionNeedsValue;
-    bulkActionValueInput.placeholder = actionNeedsValue
+    bulkActionValueInput.placeholder = NetWatchI18n.text(actionNeedsValue
       ? bulkActionSelect.value === "facility" ? "Facility name" : "Category name"
-      : "Value";
+      : "Value");
     if (!actionNeedsValue) {
       bulkActionValueInput.value = "";
     }
@@ -3557,40 +3655,28 @@ function setBulkRowBusy(row, isBusy) {
 
 function setBulkRowStatus(row, message, type) {
   const status = row.querySelector("[data-bulk-status]");
-  status.textContent = message;
+  status.textContent = NetWatchI18n.text(message);
   status.className = `small mt-1 text-${type}`;
 }
 
 function showBulkRowError(row, message) {
   const error = row.querySelector("[data-bulk-error]");
-  error.textContent = message;
+  error.textContent = NetWatchI18n.text(message);
   error.classList.remove("d-none");
 }
 
 function clearBulkRowError(row) {
   const error = row.querySelector("[data-bulk-error]");
-  error.textContent = "";
+  error.textContent = NetWatchI18n.text("");
   error.classList.add("d-none");
 }
 
 function filterConfigDevices(devices) {
-  const search = activeConfigSearch.trim().toLowerCase();
   const indexedDevices = devices.map((device, index) => ({ device, index }));
-
-  if (!search) {
-    return indexedDevices;
-  }
-
-  return indexedDevices.filter(({ device }) =>
-    String(device.name ?? "").toLowerCase().includes(search)
-      || String(device.ip ?? "").toLowerCase().includes(search)
-      || String(device.hostname ?? "").toLowerCase().includes(search)
-      || String(device.facility ?? "").toLowerCase().includes(search)
-      || String(device.category ?? "").toLowerCase().includes(search)
-      || String(device.websiteUrl ?? "").toLowerCase().includes(search)
-      || String(device.notes ?? "").toLowerCase().includes(search)
-      || String(device.location ?? "").toLowerCase().includes(search)
-      || (device.checks ?? []).some(check => String(check.url ?? '').toLowerCase().includes(search)));
+  const measured = new Map(getDashboardDevices().map(item => [item.inventoryIndex, item]));
+  return indexedDevices.filter(({ device, index }) => NetWatchFilters.matches({ ...measured.get(index), ...device,
+    status: measured.get(index)?.status || 'Pending', isOnline: measured.get(index)?.isOnline || false,
+    lastCheck: measured.get(index)?.lastCheck || null }, { ...activeConfigFilters, search: activeConfigSearch }));
 }
 
 /**
@@ -3603,7 +3689,8 @@ function groupConfigDevicesByFacility(devices) {
   const facilityGroups = new Map();
 
   devices.forEach(({ device, index }) => {
-    const facilityName = device.facility || "Unassigned";
+    const facilityName = activeConfigGrouping === 'deviceType'
+      ? dashboardDeviceTypeLabel(device.deviceType || 'unspecified') : device.facility || "Unassigned";
     const categoryName = device.category || "Uncategorized";
 
     if (!facilityGroups.has(facilityName)) {
@@ -3673,19 +3760,19 @@ function compareDevices(left, right) {
 function renderConfigDeviceRow(device, index, groupId, revealed = false) {
   const pingModeLabel = device.useHostnameForPing ? "Hostname" : "Address";
 
-  return `
+  return NetWatchI18n.html`
     <tr class="config-device-row" data-config-category-row="${groupId}" ${revealed ? '' : 'hidden'}>
       <td>
         <div class="fw-semibold">${escapeHtml(device.name)}</div>
         ${renderDeviceLocation(device)}
         ${renderDeviceNotes(device)}
         ${renderWorkstationInventory(device)}
-        <div class="text-secondary small">${device.enabled === false ? "Disabled" : "Enabled"}</div>
+        ${renderMonitoringToggle(device, index)}
       </td>
       <td>${escapeHtml(device.facility || "Unassigned")}</td>
-      <td><code>${escapeHtml(device.ip)}</code></td>
-      <td>${device.hostname ? `<code>${escapeHtml(device.hostname)}</code>` : `<span class="text-secondary">Not set</span>`}</td>
-      <td><span class="badge text-bg-${device.useHostnameForPing ? "primary" : "secondary"}">${pingModeLabel}</span></td>
+      <td><code class="text-break">${escapeHtml(primaryMonitoringTarget(device))}</code></td>
+      <td>${device.hostname ? NetWatchI18n.html`<code>${escapeHtml(device.hostname)}</code>` : NetWatchI18n.html`<span class="text-secondary">Not set</span>`}</td>
+      <td><span class="badge text-bg-${device.useHostnameForPing ? "primary" : "secondary"}">${NetWatchI18n.text(pingModeLabel)}</span></td>
       <td>${device.checks?.length ?? 0}</td>
       <td class="text-end">
         <div class="config-device-actions" role="group" aria-label="Device actions for ${escapeAttribute(device.name)}">
@@ -3769,8 +3856,8 @@ function editDevice(index) {
   }
 
   editingDeviceIndex.value = String(index);
-  deviceFormTitle.textContent = "Edit Device";
-  submitDeviceButton.textContent = "Update Device";
+  deviceFormTitle.textContent = NetWatchI18n.text("Edit device or website");
+  submitDeviceButton.textContent = NetWatchI18n.text("Save changes");
   populateDeviceForm(device);
   showDeviceForm();
   deviceNameInput.focus();
@@ -3786,8 +3873,8 @@ function copyDevice(index) {
   const copiedDevice = structuredClone(device);
   copiedDevice.name = createCopyDeviceName(device.name);
   editingDeviceIndex.value = "";
-  deviceFormTitle.textContent = "Copy Device";
-  submitDeviceButton.textContent = "Add Copy";
+  deviceFormTitle.textContent = NetWatchI18n.text("Copy device or website");
+  submitDeviceButton.textContent = NetWatchI18n.text("Add Copy");
   populateDeviceForm(copiedDevice);
   showDeviceForm();
   deviceNameInput.focus();
@@ -3861,6 +3948,11 @@ function revealSavedDevice(index) {
   if (!device) return;
   savedDeviceReveal = { profileId: regionState.activeProfileId, key: createDeviceKey(device) };
   pendingDashboardReveal = { ...savedDeviceReveal };
+  const measured = getDashboardDevices().find(item => item.inventoryIndex === index) || { ...device, status: 'Pending' };
+  for (const key of ['facility', 'deviceType', 'category', 'status', 'monitoring']) {
+    if (!NetWatchFilters.matches(measured, { [key]: activeConfigFilters[key] }))
+      activeConfigFilters[key] = key === 'status' || key === 'monitoring' ? 'all' : '';
+  }
   if (!filterConfigDevices(configState.devices).some(entry => entry.index === index)) {
     activeConfigSearch = '';
     configDeviceSearchInput.value = '';
@@ -3873,7 +3965,7 @@ function revealSavedDevice(index) {
   renderConfigDevices();
   renderBulkEditDevices();
   if (device.enabled === false) {
-    showConfigAlert('success', 'Device saved. It is disabled and will not appear on Dashboard until enabled.');
+    showConfigAlert('success', 'Device saved. Monitoring is disabled; select Paused on Dashboard to view it.');
   }
 }
 
@@ -3883,6 +3975,7 @@ function revealSavedDashboardDevice() {
   if (target?.profileId !== regionState.activeProfileId) return;
   const device = getDashboardDevices().find(entry => createDeviceKey(entry) === target.key);
   if (!device) return;
+  if (device.enabled === false) return;
   if (activeFacility && activeFacility !== device.facility) activeFacility = '';
   if (!matchesDashboardDeviceType(device)) {
     activeDashboardDeviceType = '';
@@ -3891,6 +3984,10 @@ function revealSavedDashboardDevice() {
   if (!matchesSearch(device, activeSearch.trim().toLowerCase())) {
     activeSearch = '';
     searchInput.value = '';
+  }
+  if (groupCheckSelect.value && groupCheckSelect.value !== (device.category || 'Uncategorized')) groupCheckSelect.value = '';
+  if (activeDashboardMonitoring === 'paused') {
+    activeDashboardMonitoring = 'enabled'; dashboardMonitoringSelect.value = 'enabled';
   }
   if (!matchesFilter(device, activeFilter)) {
     activeFilter = 'all';
@@ -4016,7 +4113,7 @@ function readCheckRows() {
 
 function showDeviceCheckAlert(message) {
   const alert = document.querySelector("#device-check-alert");
-  alert.textContent = message;
+  alert.textContent = NetWatchI18n.text(message);
   alert.hidden = !message;
 }
 
@@ -4028,8 +4125,8 @@ function resetDeviceForm() {
   deviceEnabledInput.checked = true;
   deviceUseHostnameForPingInput.checked = false;
   deviceFacilityInput.value = "";
-  deviceFormTitle.textContent = "Add Device";
-  submitDeviceButton.textContent = "Add Device";
+  deviceFormTitle.textContent = NetWatchI18n.text("Add device or website");
+  submitDeviceButton.textContent = NetWatchI18n.text("Add device or website");
   checksList.innerHTML = "";
   addCheckRow({ type: "ping" });
   document.querySelector('#device-monitoring-preset-wrap').hidden = false;
@@ -4105,7 +4202,7 @@ function addCheckRow(check = { type: "ping" }) {
   const row = document.createElement("div");
   const helpKey = `http-check-${++httpCheckHelpSequence}`;
   row.className = "check-row";
-  row.innerHTML = `
+  row.innerHTML = NetWatchI18n.html`
     <select class="form-select form-select-sm" data-check-type aria-label="Check type">
       <option value="ping">Ping</option>
       <option value="tcp">TCP</option>
@@ -4117,9 +4214,9 @@ function addCheckRow(check = { type: "ping" }) {
     </button>
     <fieldset class="http-check-fields" data-http-fields hidden disabled>
       <label class="http-check-wide"><span class="form-label">URL to monitor</span><input class="form-control form-control-sm" type="url" maxlength="2048" placeholder="https://app.example.com/health" data-check-url required></label>
-      <div><label class="form-label" for="${helpKey}-timeout">Timeout (ms)</label><input class="form-control form-control-sm" type="number" min="100" max="60000" step="1" id="${helpKey}-timeout" data-check-timeout aria-describedby="${helpKey}-timeout-help" required><div class="form-text" id="${helpKey}-timeout-help" data-http-timeout-help>Espera m&aacute;xima por intento HTTP (10000 ms = 10 s), no cantidad de pings. Reintentos: Settings &gt; Retries (0 = un intento; 2 = hasta tres si falla).</div></div>
+      <div><label class="form-label" for="${helpKey}-timeout">Timeout (ms)</label><input class="form-control form-control-sm" type="number" min="100" max="60000" step="1" id="${helpKey}-timeout" data-check-timeout aria-describedby="${helpKey}-timeout-help" required><div class="form-text" id="${helpKey}-timeout-help" data-http-timeout-help>Maximum wait per HTTP attempt (10000 ms = 10 s), not a ping count. Retries: Settings &gt; Retries (0 = one attempt; 2 = up to three after failures).</div></div>
       <label><span class="form-label">Expected status</span><input class="form-control form-control-sm" type="number" min="200" max="599" step="1" data-check-status required></label>
-      <div class="http-check-wide"><label class="form-label" for="${helpKey}-text">Expected text (optional)</label><textarea class="form-control form-control-sm" rows="2" maxlength="4096" id="${helpKey}-text" data-check-text aria-describedby="${helpKey}-text-help"></textarea><div class="form-text" id="${helpKey}-text-help" data-http-text-help>Opcional: texto literal de la respuesta (ej. READY), sensible a may&uacute;sculas. Vac&iacute;o: solo el c&oacute;digo esperado. No ejecuta JavaScript ni usa tu sesi&oacute;n del navegador.</div></div>
+      <div class="http-check-wide"><label class="form-label" for="${helpKey}-text">Expected text (optional)</label><textarea class="form-control form-control-sm" rows="2" maxlength="4096" id="${helpKey}-text" data-check-text aria-describedby="${helpKey}-text-help"></textarea><div class="form-text" id="${helpKey}-text-help" data-http-text-help>Optional literal response text (for example READY), case-sensitive. Blank: expected status only. No JavaScript or browser login session is used.</div></div>
     </fieldset>`;
 
   const typeSelect = row.querySelector("[data-check-type]");
@@ -4161,7 +4258,7 @@ function updateDeviceAddressRequirement() {
   const network = !types.length || types.some(input => input.value !== "http");
   const ping = types.some(input => input.value === 'ping');
   deviceAddressInput.required = network;
-  deviceAddressInput.placeholder = deviceAddressInput.required ? "" : "Optional - uses the first URL host";
+  deviceAddressInput.placeholder = NetWatchI18n.text(deviceAddressInput.required ? "" : "Optional - uses the first URL host");
   document.querySelector('#device-network-fields').hidden = !network;
   document.querySelector('#device-hostname-fields').hidden = !network;
   document.querySelector('#device-ping-fields').hidden = !ping;
@@ -4202,6 +4299,10 @@ async function confirmDeleteDevice() {
 }
 
 function setConfigBusy(isBusy, { showSaveSpinner = true } = {}) {
+  configurationBusy = isBusy;
+  document.querySelector('#app-language').disabled = isBusy || Boolean(activeMonitorStream) || monitorPlanning || monitoringMutationBusy;
+  configDevicesBody.querySelectorAll('button, input').forEach(element => { element.disabled = isBusy; });
+  document.querySelectorAll('#config-filter-bar select, #config-filter-bar button').forEach(element => { element.disabled = isBusy; });
   saveConfigButton.disabled = isBusy;
   reloadConfigButton.disabled = isBusy;
   exportConfigButton.disabled = isBusy;
@@ -4343,6 +4444,7 @@ async function navigateTo(route, replace = false) {
   }
   const previousRoute = currentRoute;
   currentRoute = normalizedRoute;
+  if (previousRoute === '/diagnostics' && normalizedRoute !== '/diagnostics') NetWatchDiagnostics.leave();
   if (previousRoute === '/reports' && normalizedRoute !== '/reports') {
     ++reportsLoadVersion;
     reportsBusy = false;
@@ -4356,13 +4458,14 @@ async function navigateTo(route, replace = false) {
   deviceTypesPage.hidden = normalizedRoute !== '/device-types';
   workstationsPage.hidden = normalizedRoute !== '/workstations';
   reportsPage.hidden = normalizedRoute !== "/reports";
-  document.querySelector('.topbar-actions').hidden = normalizedRoute === '/reports';
+  document.querySelector('#diagnostics-page').hidden = normalizedRoute !== '/diagnostics';
+  document.querySelector('.topbar-status').hidden = normalizedRoute === '/reports' || normalizedRoute === '/diagnostics';
   integrationsPage.hidden = normalizedRoute !== "/integrations";
   regionsPage.hidden = normalizedRoute !== "/regions";
   themesPage.hidden = normalizedRoute !== "/themes";
   manualPage.hidden = normalizedRoute !== "/manual";
   aboutPage.hidden = normalizedRoute !== "/about";
-  currentPageLabel.textContent = getPageLabel(normalizedRoute);
+  currentPageLabel.textContent = NetWatchI18n.text(getPageLabel(normalizedRoute));
 
   navLinks.forEach(link => {
     link.classList.toggle("active", link.dataset.route === normalizedRoute);
@@ -4436,6 +4539,8 @@ function resetDashboardViewState() {
   activeFilter = "all";
   activeFacility = "";
   activeDashboardDeviceType = '';
+  activeDashboardMonitoring = 'enabled';
+  dashboardMonitoringSelect.value = 'enabled';
   activeRunDeviceType = '';
   dashboardDeviceTypeSelect.value = '';
   activeRunCategory = "";
@@ -4462,6 +4567,7 @@ function resetDashboardViewState() {
 
 function resetConfigViewState() {
   activeConfigSearch = "";
+  activeConfigFilters = { facility: '', deviceType: '', category: '', status: 'all', monitoring: 'all' };
   activeConfigView = "normal";
   activeBulkFacility = "";
   activeBulkCategory = "";
@@ -4505,6 +4611,7 @@ function resetThemesViewState() {
 }
 
 function refreshRouteData(route) {
+  if (route === '/diagnostics') { void NetWatchDiagnostics.load(); return; }
   if (route === '/device-types') {
     void loadDeviceTypes();
     return;
@@ -4558,7 +4665,7 @@ async function refreshConfigFromActiveRegion() {
 }
 
 function normalizeRoute(pathname) {
-  const knownRoutes = new Set(["/", "/config", "/regions", "/reports", "/integrations", "/themes", "/manual", "/about", "/peripherals", "/workstations", "/device-types"]);
+  const knownRoutes = new Set(["/", "/config", "/regions", "/reports", "/diagnostics", "/integrations", "/themes", "/manual", "/about", "/peripherals", "/workstations", "/device-types"]);
   return knownRoutes.has(pathname) ? pathname : "/";
 }
 
@@ -4571,6 +4678,7 @@ function getPageLabel(route) {
     "/workstations": "Workstations",
     "/regions": "Support Groups",
     "/reports": "Reports",
+    "/diagnostics": "Diagnostics",
     "/integrations": "Integrations",
     "/themes": "Themes",
     "/manual": "User Manual",
@@ -4607,7 +4715,7 @@ function setButtonLoading(button, spinner, icon, isLoading) {
 }
 
 function setDashboardRunButtonsDisabled(isDisabled) {
-  if (!isDisabled) renderFacilityTabs();
+  if (!isDisabled) { renderFilteredCategories(); return; }
   resultsBody
     .querySelectorAll("[data-run-facility-only], [data-run-category], [data-run-device-name]")
     .forEach(button => {
@@ -4616,7 +4724,7 @@ function setDashboardRunButtonsDisabled(isDisabled) {
 }
 
 function setOtherDashboardRunButtonsDisabled(isDisabled, activeDevice = null) {
-  if (!isDisabled) renderFacilityTabs();
+  if (!isDisabled) { renderFilteredCategories(); return; }
   resultsBody
     .querySelectorAll("[data-run-facility-only], [data-run-category], [data-run-device-name]")
     .forEach(button => {
@@ -4670,7 +4778,7 @@ function isPingOnlyMode(checkMode) {
 }
 
 function getCheckModeLabel(checkMode = getSelectedCheckMode()) {
-  return isPingOnlyMode(checkMode) ? "Ping Only" : "Full Check";
+  return NetWatchI18n.text(isPingOnlyMode(checkMode) ? 'Ping Only' : 'Full Check');
 }
 
 function getDashboardExecutionText(checkMode = getSelectedCheckMode()) {
@@ -4681,9 +4789,16 @@ function getDashboardExecutionText(checkMode = getSelectedCheckMode()) {
 }
 
 function setCheckModeInputsDisabled(isDisabled) {
-  dashboardDeviceTypeSelect.disabled = isDisabled || !dashboardInventoryAvailable;
+  const disabled = isDisabled || monitorPlanning || Boolean(activeMonitorStream);
+  document.querySelector('#app-language').disabled = disabled || configurationBusy || monitoringMutationBusy;
+  dashboardDeviceTypeSelect.disabled = disabled || !dashboardInventoryAvailable || !monitorInventorySnapshot;
+  dashboardMonitoringSelect.disabled = disabled || !dashboardInventoryAvailable || !monitorInventorySnapshot;
+  groupCheckSelect.disabled = disabled || !dashboardInventoryAvailable || !monitorInventorySnapshot;
+  searchInput.disabled = disabled;
+  filterInputs.forEach(input => { input.disabled = disabled; });
+  clearDashboardFiltersButton.disabled = disabled || clearDashboardFiltersButton.disabled;
   checkModeInputs.forEach(input => {
-    input.disabled = isDisabled;
+    input.disabled = disabled;
   });
 }
 
@@ -4692,18 +4807,18 @@ function formatDate(value) {
     return "";
   }
 
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(NetWatchI18n.locale, {
     dateStyle: "short",
     timeStyle: "medium"
   }).format(new Date(value));
 }
 
 function formatNumber(value) {
-  return new Intl.NumberFormat().format(Number(value) || 0);
+  return new Intl.NumberFormat(NetWatchI18n.locale).format(Number(value) || 0);
 }
 
 function formatPercent(value) {
-  return new Intl.NumberFormat(undefined, {
+  return new Intl.NumberFormat(NetWatchI18n.locale, {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1
   }).format(Number(value) || 0);
@@ -4715,9 +4830,9 @@ function showPageAlert(container, type, message) {
   }
 
   clearPageAlert(container);
-  container.innerHTML = `
+  container.innerHTML = NetWatchI18n.html`
     <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-      ${escapeHtml(message)}
+      ${escapeHtml(type === 'danger' || type === 'warning' ? NetWatchI18n.error(message) : NetWatchI18n.text(message))}
       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>`;
 
@@ -4800,12 +4915,17 @@ runFailedCheckButton.addEventListener("click", runFailedChecks);
 checkModeInputs.forEach(input => {
   input.addEventListener("change", () => {
     activeRunCheckMode = getSelectedCheckMode();
-    executionMode.textContent = getDashboardExecutionText();
+    executionMode.textContent = NetWatchI18n.text(getDashboardExecutionText());
   });
 });
 groupCheckSelect.addEventListener("change", () => {
-  runGroupCheckButton.disabled = !groupCheckSelect.value;
-  updateDashboardFilterReset();
+  renderFilteredCategories();
+  updateRunFailedButton();
+});
+dashboardMonitoringSelect.addEventListener('change', event => {
+  activeDashboardMonitoring = event.target.value;
+  renderFilteredCategories();
+  updateRunFailedButton();
 });
 dashboardDeviceTypeSelect.addEventListener('change', event => {
   activeDashboardDeviceType = event.target.value;
@@ -4880,7 +5000,8 @@ resultsBody.addEventListener("click", event => {
       ip: runDeviceButton.dataset.runDeviceIp,
       facility: runDeviceButton.dataset.runDeviceFacility,
       category: runDeviceButton.dataset.runDeviceCategory,
-      deviceType: runDeviceButton.dataset.runDeviceType || 'unspecified'
+      deviceType: runDeviceButton.dataset.runDeviceType || 'unspecified',
+      inventoryIndex: Number(runDeviceButton.dataset.runDeviceIndex)
     });
     return;
   }
@@ -4909,7 +5030,8 @@ importConfigFileInput.addEventListener("change", event => {
 saveConfigButton.addEventListener("click", () => saveConfig());
 configNormalViewButton.addEventListener("click", () => switchConfigView("normal"));
 configBulkViewButton.addEventListener("click", () => switchConfigView("bulk"));
-configDeviceSearchInput.addEventListener("input", debounce(event => {
+configDeviceSearchInput.addEventListener("input", debounce(async event => {
+  if (!await discardBulkDrafts()) { configDeviceSearchInput.value = activeConfigSearch; return; }
   const hadSearch = Boolean(activeConfigSearch.trim());
   activeConfigSearch = event.target.value;
   if (activeConfigSearch.trim()) {
@@ -4923,24 +5045,19 @@ configDeviceSearchInput.addEventListener("input", debounce(event => {
   renderConfigDevices();
   renderBulkEditDevices();
 }, 150));
-bulkFacilityFilter.addEventListener("change", event => {
-  activeBulkFacility = event.target.value;
-  renderBulkEditDevices();
-});
-bulkCategoryFilter.addEventListener("change", event => {
-  activeBulkCategory = event.target.value;
-  renderBulkEditDevices();
-});
-bulkClearFiltersButton.addEventListener("click", () => {
-  activeBulkFacility = "";
-  activeBulkCategory = "";
+for (const [key, control] of Object.entries(configFilters)) {
+  control.addEventListener('change', event => { void updateConfigFilter(key, event.target.value); });
+}
+configGroupingSelect.addEventListener('change', event => { void updateConfigFilter('grouping', event.target.value); });
+clearConfigFiltersButton.addEventListener('click', async () => {
+  if (!await discardBulkDrafts()) return;
+  activeConfigFilters = { facility: '', deviceType: '', category: '', status: 'all', monitoring: 'all' };
+  activeConfigSearch = '';
+  configDeviceSearchInput.value = '';
+  activeBulkFacility = activeBulkCategory = '';
   collapsedBulkFacilityNames.clear();
-  if (bulkFacilityFilter) {
-    bulkFacilityFilter.value = "";
-  }
-  if (bulkCategoryFilter) {
-    bulkCategoryFilter.value = "";
-  }
+  renderConfigFilterOptions();
+  renderConfigDevices();
   renderBulkEditDevices();
 });
 bulkSelectVisibleButton.addEventListener("click", selectVisibleBulkRows);
@@ -5330,6 +5447,8 @@ if (deleteDeviceModalElement) {
 }
 window.addEventListener("popstate", () => navigateTo(location.pathname, true));
 
+try { activeConfigGrouping = localStorage.getItem('netwatch.configGrouping') === 'deviceType' ? 'deviceType' : 'facility'; } catch { /* Preferences are optional. */ }
+configGroupingSelect.value = activeConfigGrouping;
 void loadRegions({ showBusy: false, showErrors: false });
 void loadThemes({ showBusy: false, showErrors: false });
 navigateTo(currentRoute, true);

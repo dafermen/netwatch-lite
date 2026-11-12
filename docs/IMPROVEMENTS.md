@@ -1,6 +1,6 @@
 # Improvement Backlog
 
-Last updated: 2026-11-11
+Last updated: 2026-11-12
 
 User-reported improvements are recorded here with stable IDs. A pending entry
 is not approval to implement it. Keep implementation and validation status
@@ -8,7 +8,24 @@ explicit; technical/release risks remain in [CURRENT_STATUS.md](../CURRENT_STATU
 The user requested coordination on 2026-11-09. Delivery order and cross-cutting
 gates are in [ROADMAP.md](ROADMAP.md); queued work is not implemented work.
 
+## IMP-008 - Multilingual Monitoring And Diagnostics
+
+- Authorized: 2026-11-11; local development, regression and a new portable only.
+  GitHub publication is explicitly on hold.
+- Implemented: English-default/Spanish UI, inclusive device/website entry,
+  Configuration shared facets and Facility/Device Type grouping, Type-only Run,
+  exact filtered manual/automatic monitoring, pause/resume, last-execution detail,
+  and internal/probe diagnostics with private query/export.
+- Validation: 416 .NET passes, seeded JS properties and eight killed monitoring
+  mutants. Full browser/package/cutover validation remains in progress.
+- Compatibility: No schema migration or private-data rewrite; legacy calls with
+  no exact selection token retain previous behavior. Old portables are immutable.
+- Evidence/limits: [Current validation](VALIDATION_MULTILINGUAL_2026-11-12.md).
+
 ## IMP-007 - Dashboard Device Type Filter
+
+The rc.13 global automatic/presentation-only semantics below are historical;
+IMP-008 supersedes them for the current UI.
 
 - Authorized: 2026-11-11, including GitHub source and new portable publication.
 - Status: Completed 2026-11-11; 373 .NET/356 browser passes and native rc.13

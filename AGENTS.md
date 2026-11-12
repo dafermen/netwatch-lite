@@ -47,10 +47,10 @@ These instructions are mandatory for any Codex session working on NetWatch Lite.
 
 ## Safety Rules
 
-- The user authorized GitHub repository update and a new portable release for
-  the Dashboard Device Type filter on 2026-11-11, superseding the previous hold
-  for this delivery. Publish only reviewed public source and neutral ZIP/SHA.
-  This is not blanket authorization for later releases or stable deployment.
+- GitHub publication is ON HOLD for the new multilingual/filter/diagnostics
+  work order authorized on 2026-11-11. Local commits and a neutral portable are
+  allowed; do not push, create releases or deploy until explicitly authorized.
+  The preceding rc.13 publication was a separate completed delivery.
 - Do not commit runtime operational data. These files must stay private and ignored: `Data/config.json`, `Data/config.backup.json`, `Data/regions.json`, `Data/regions/`, `Data/themes.json`, `Data/monitor-history.json`, `Data/app-errors.json`, and `Data/integrations.json`.
 - Portable releases must include only safe sample data such as `Data/config.sample.json`.
 - Never package database/sidecar/lease files or storage-backups/storage-exports.
@@ -82,12 +82,23 @@ These instructions are mandatory for any Codex session working on NetWatch Lite.
   protected legacy keys/names, especially `workstation` and its exclusive
   peripheral behavior. Use catalog-only mutations with profile/revision guards;
   preserve catalogs in full configuration, row saves and profile copies.
-- Dashboard Device Type is independent from Category and intersects Facility,
-  search and status for presentation. Scoped runs enforce the type on the server,
-  not by IP alone; no-match/stale types must never broaden to all devices.
-  Global automatic runs remain global. Capture classification in new results and
-  optional history scope, leave old history unknown/unchanged, and include type
-  in dashboard identities so identical names/addresses do not share results.
+- Dashboard/Configuration share AND filters: search, Facility, Device Type,
+  Category, status and monitoring participation. Modern manual/automatic runs
+  capture exactly visible enabled snapshot keys via MonitorPlans, superseding
+  rc.13 presentation-only search/status and global automatic runs. Empty/stale/
+  removed/paused scopes never broaden. Legacy API behavior applies only without
+  an explicit token. Keys separate identical rows but are not persistent IDs.
+  Never log the search literal. Narrow enabled writes use profile/revision guards
+  and retain all other fields. Grouping changes only the view. See docs/DASHBOARD_FILTERS.md.
+- English is the default UI; Spanish is an explicit browser preference. Translate
+  owned literal copy before interpolation, never operator data, IDs or technical
+  records. Preserve table/boolean slots and code/pre data. Guard language reloads
+  against operations/draft loss; test both languages/viewports. Engineering docs
+  retain their existing language.
+- Diagnostics separates probe failures (history) from internal/browser errors.
+  Keep references, bounded sanitized private projections and revision-checked
+  exports. Do not duplicate failed probes into app-errors, collect request bodies
+  or claim redaction guarantees anonymity.
 - HTTP/HTTPS definitions use `type: http`. Preserve their URL/expectations in
   all configuration workflows. Keep deadlines across body reads, bounded
   decompressed content, strict TLS, no cookies/redirects and sanitized results.

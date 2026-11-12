@@ -96,7 +96,7 @@ test('link changes retain Connection/address rules and appear in all inventory v
   const beforeReads = await (await request.get('/api/config')).json();
   await expandConfig(page);
   await page.locator('.workstation-inventory summary').click();
-  await expect(page.locator('.workstation-inventory')).toContainText('NETWORK \u00b7 Wireless');
+  await expect(page.locator('.workstation-inventory')).toContainText('Network \u00b7 Wireless');
   await expect(page.locator('.workstation-inventory')).toContainText('USB \u00b7 Cabled');
   await expect(page.locator('.workstation-inventory img')).toHaveCount(0);
   await page.goto('/');
@@ -106,7 +106,7 @@ test('link changes retain Connection/address rules and appear in all inventory v
   await expect(page.locator('.workstation-inventory')).toContainText('Cabled');
   await page.goto('/workstations');
   for (const summary of await page.locator('.workstation-peripheral-cell summary').all()) await summary.click();
-  await expect(page.locator('#workstations-body')).toContainText('NETWORK | Wireless');
+  await expect(page.locator('#workstations-body')).toContainText('Network | Wireless');
   await expect(page.locator('#workstations-body')).toContainText('USB | Cabled');
   await expect(page.locator('#workstations-pending')).toHaveText('0');
   expect(await (await request.get('/api/config')).json()).toEqual(beforeReads);

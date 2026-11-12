@@ -2,6 +2,7 @@ using NetWatch.Services;
 using NetWatch.Models;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.RateLimiting;
 
 const long MaxConfigImportBytes = 5 * 1024 * 1024;
 
@@ -30,6 +31,17 @@ builder.Services.AddSingleton<JsonDeviceRepository>();
 builder.Services.AddSingleton<JsonThemeRepository>();
 builder.Services.AddSingleton<JsonMonitorHistoryRepository>();
 builder.Services.AddSingleton<JsonAppErrorLogRepository>();
+builder.Services.AddSingleton<DiagnosticPages>();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("browser-diagnostics", limiter =>
+    {
+        limiter.PermitLimit = 30;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueLimit = 0;
+    });
+});
 builder.Services.AddSingleton<JsonIntegrationRepository>();
 builder.Services.AddHttpClient(HttpCheckService.ClientName, client =>
 {
@@ -38,6 +50,7 @@ builder.Services.AddHttpClient(HttpCheckService.ClientName, client =>
   .RemoveAllLoggers();
 builder.Services.AddSingleton<HttpCheckService>();
 builder.Services.AddSingleton<NetworkMonitorService>();
+builder.Services.AddSingleton<MonitorPlans>();
 builder.Services.AddSingleton<MonitorExecutionService>();
 
 await using var app = builder.Build();
@@ -90,8 +103,30 @@ app.UseStaticFiles();
 
 var documentationPath = Path.Combine(app.Environment.ContentRootPath, "docs");
 
+async Task RecordDiagnosticAsync(Exception exception, string source, HttpContext context, int status)
+{
+    context.Items["NetWatch.DiagnosticRecorded"] = true;
+    using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+    try
+    {
+        await context.RequestServices.GetRequiredService<JsonAppErrorLogRepository>()
+            .AppendAsync(exception, source, context, status, deadline.Token);
+    }
+    catch (Exception loggingFailure)
+    {
+        app.Logger.LogError("Unable to persist diagnostic {TraceId}: {ErrorType}.", context.TraceIdentifier, loggingFailure.GetType().Name);
+    }
+}
+
 app.Use(async (context, next) =>
 {
+    context.Response.Headers["X-NetWatch-Trace"] = context.TraceIdentifier;
+    context.Response.OnStarting(async () =>
+    {
+        if (context.Response.StatusCode >= 500 && !context.Items.ContainsKey("NetWatch.DiagnosticRecorded"))
+            await RecordDiagnosticAsync(new InvalidOperationException($"The API returned HTTP {context.Response.StatusCode}."),
+                "HTTP response", context, context.Response.StatusCode);
+    });
     try
     {
         await next();
@@ -104,15 +139,7 @@ app.Use(async (context, next) =>
     {
         app.Logger.LogError(ex, "Unhandled application error {TraceId}.", context.TraceIdentifier);
 
-        try
-        {
-            var errorRepository = context.RequestServices.GetRequiredService<JsonAppErrorLogRepository>();
-            await errorRepository.AppendAsync(ex, "UnhandledExceptionMiddleware", context, StatusCodes.Status500InternalServerError, context.RequestAborted);
-        }
-        catch (Exception logException)
-        {
-            app.Logger.LogError(logException, "Unable to write app-errors.json.");
-        }
+        await RecordDiagnosticAsync(ex, "UnhandledExceptionMiddleware", context, StatusCodes.Status500InternalServerError);
 
         if (context.Response.HasStarted)
         {
@@ -120,6 +147,7 @@ app.Use(async (context, next) =>
         }
 
         context.Response.Clear();
+        context.Response.Headers["X-NetWatch-Trace"] = context.TraceIdentifier;
         await Results.Problem(
             title: "An unexpected application error occurred.",
             statusCode: StatusCodes.Status500InternalServerError,
@@ -127,6 +155,9 @@ app.Use(async (context, next) =>
             .ExecuteAsync(context);
     }
 });
+
+app.UseRouting();
+app.UseRateLimiter();
 
 // Load the active support group JSON at startup so configuration errors are visible immediately.
 var repository = app.Services.GetRequiredService<JsonDeviceRepository>();
@@ -155,6 +186,8 @@ app.MapGet("/api/storage", (LocalDataStore storage) => Results.Ok(new
     provider = storage.Provider, schemaVersion = storage.IsSqlite ? LocalDataStore.CurrentSchemaVersion : (int?)null, engineVersion = storage.EngineVersion
 }));
 app.MapStorageEndpoints();
+app.MapMonitoringEndpoints();
+app.MapDiagnosticEndpoints();
 
 // Reloads the active support group JSON from disk without restarting the application.
 app.MapPost("/api/reload", async (JsonDeviceRepository deviceRepository) =>
@@ -913,7 +946,7 @@ app.MapGet("/api/monitor/stream", async (
                 CompletedDevices = 0,
                 Timestamp = DateTimeOffset.Now,
                 ExecutionStatus = "Failed",
-                Message = exception.Message
+                Message = DiagnosticSanitizer.Text(exception.Message)
             }, context.RequestAborted);
         }
         catch (Exception writeException) when (
@@ -945,7 +978,8 @@ app.MapGet("/api/monitor/stream", async (
             deviceIps,
             checkMode,
             context.RequestAborted,
-            deviceType: deviceType);
+            deviceType: deviceType,
+            selectionToken: context.Request.Query.ContainsKey("selection") ? context.Request.Query["selection"].ToString() : null);
 
         if (!started)
         {
@@ -964,11 +998,14 @@ app.MapGet("/api/monitor/stream", async (
     {
         app.Logger.LogDebug(ex, "Monitoring stream client disconnected.");
     }
+    catch (MonitorScopeConflictException ex)
+    {
+        await WriteErrorEventAsync(ex);
+    }
     catch (Exception ex)
     {
         app.Logger.LogError(ex, "Monitoring stream failed.");
-        var errorRepository = context.RequestServices.GetRequiredService<JsonAppErrorLogRepository>();
-        await errorRepository.AppendAsync(ex, "GET /api/monitor/stream", context, StatusCodes.Status500InternalServerError, context.RequestAborted);
+        await RecordDiagnosticAsync(ex, "GET /api/monitor/stream", context, StatusCodes.Status500InternalServerError);
         await WriteErrorEventAsync(ex);
     }
 });

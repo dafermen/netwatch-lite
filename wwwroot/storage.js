@@ -9,7 +9,7 @@
   let total = 0;
   let sqlite = false;
   let savedPolicy = null;
-  const message = (text, danger = false) => { alert.textContent = text; alert.className = danger ? 'text-danger mb-2' : 'text-success mb-2'; };
+  const message = (text, danger = false) => { alert.textContent = danger ? NetWatchI18n.error(text) : NetWatchI18n.text(text); alert.className = danger ? 'text-danger mb-2' : 'text-success mb-2'; };
   const escape = value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
   async function request(path, options) {
     const response = await fetch(path, options);
@@ -29,21 +29,21 @@
     try {
       const provider = await request('/api/storage');
       sqlite = provider.provider === 'sqlite';
-      find('storage-provider').textContent = sqlite ? `SQLite ${provider.schemaVersion}` : 'JSON';
+      find('storage-provider').textContent = NetWatchI18n.text(sqlite ? `SQLite ${provider.schemaVersion}` : 'JSON');
       const policy = await request('/api/storage/policy');
       savedPolicy = policy;
       for (const [id, key] of [['history-max-runs', 'historyMaxRuns'], ['history-max-days', 'historyMaxAgeDays'], ['backup-hours', 'backupIntervalHours'], ['backup-copies', 'backupCopies']]) find(id).value = policy[key];
       find('history-export-first').checked = policy.exportBeforePrune;
       find('backup-automatic').checked = policy.automaticBackups;
       const backups = sqlite ? await request('/api/storage/backups') : [];
-      find('storage-backups-body').innerHTML = backups.length ? backups.map(value => `<tr><td data-label="Created">${escape(new Date(value.createdUtc).toLocaleString())}</td><td data-label="File" class="text-break">${escape(value.name)}</td><td data-label="Size" class="text-end">${escape((value.bytes / 1048576).toFixed(2))} MB</td></tr>`).join('') : '<tr><td colspan="3" class="text-secondary">No managed backups.</td></tr>';
+      find('storage-backups-body').innerHTML = backups.length ? backups.map(value => NetWatchI18n.html`<tr><td data-label="Created">${escape(new Date(value.createdUtc).toLocaleString(NetWatchI18n.locale))}</td><td data-label="File" class="text-break">${escape(value.name)}</td><td data-label="Size" class="text-end">${escape((value.bytes / 1048576).toFixed(2))} MB</td></tr>`).join('') : NetWatchI18n.markup('<tr><td colspan="3" class="text-secondary">No managed backups.</td></tr>');
       const audit = sqlite ? await request(`/api/storage/audit?page=${page}&size=25`) : { records: [], total: 0 };
       total = audit.total;
       find('storage-audit-body').innerHTML = audit.records.length ? audit.records.map(value => {
         const changes = JSON.parse(value.changes);
-        return `<tr><td data-label="Changed">${escape(new Date(value.changed_utc).toLocaleString())}</td><td data-label="Document" class="text-break">${escape(value.document)}</td><td data-label="Action">${escape(value.action)}</td><td data-label="Fields"><details><summary>${escape(Object.keys(changes).join(', ') || 'Document')}</summary><pre class="small text-break mb-0">${escape(JSON.stringify(changes, null, 2))}</pre></details></td></tr>`;
-      }).join('') : '<tr><td colspan="4" class="text-secondary">No recorded changes.</td></tr>';
-      find('storage-audit-page').textContent = `${total ? (page - 1) * 25 + 1 : 0}-${Math.min(total, page * 25)} / ${total}`;
+        return NetWatchI18n.html`<tr><td data-label="Changed">${escape(new Date(value.changed_utc).toLocaleString(NetWatchI18n.locale))}</td><td data-label="Document" class="text-break">${escape(value.document)}</td><td data-label="Action">${escape(value.action)}</td><td data-label="Fields"><details><summary>${escape(Object.keys(changes).join(', ') || NetWatchI18n.text('Document'))}</summary><pre class="small text-break mb-0">${escape(JSON.stringify(changes, null, 2))}</pre></details></td></tr>`;
+      }).join('') : NetWatchI18n.markup('<tr><td colspan="4" class="text-secondary">No recorded changes.</td></tr>');
+      find('storage-audit-page').textContent = NetWatchI18n.text(`${total ? (page - 1) * 25 + 1 : 0}-${Math.min(total, page * 25)} / ${total}`);
       fields.disabled = false;
     } catch (error) { message(error.message, true); }
     finally { busy = false; controls(); }

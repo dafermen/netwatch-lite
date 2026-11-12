@@ -1,5 +1,21 @@
 # Changelog
 
+## Multilingual Monitoring And Portable 0.8.0-rc.14 - 2026-11-12
+
+- English-default/Spanish interface, remembered browser choice and draft-safe
+  switching. Operator data, IDs and original technical records are not translated.
+- Inclusive device/website forms, shared Dashboard/Configuration filters,
+  Normal/Bulk filtering and Facility/Device Type grouping.
+- Manual/automatic runs capture exactly visible enabled records, including
+  search/status; Device Type alone works. Stale/empty scopes never broaden.
+  This intentionally supersedes rc.13 global automatic/presentation-only behavior.
+- Quick monitoring pause/resume and last-execution receipt/detail.
+- Private Diagnostics query/detail/full filtered CSV/JSON export, references and
+  bounded browser collection. Actionable HTTP guidance retains strict TLS and limits.
+- No schema migration, inventory rewrite or historical artifact replacement.
+  GitHub publication is on hold; CURRENT_STATUS and the dated validation guide
+  record actual local tests/package/restart and remaining acceptance limits.
+
 ## Dashboard Device Type Filter And Portable 0.8.0-rc.13 - 2026-11-11
 
 - Added a catalog-backed Device Type selector before Category, combining with

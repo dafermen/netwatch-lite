@@ -11,10 +11,14 @@ let deviceTypesSnapshot = null;
 let deviceTypesBusy = false;
 let deviceTypesStale = false;
 
+function deviceTypeDisplayName(type) {
+  return initialDeviceTypes.some(system => system.id === type.id) ? NetWatchI18n.text(type.name) : type.name;
+}
+
 function renderDeviceTypeOptions(selected = 'unspecified') {
   const types = configState.deviceTypes ?? initialDeviceTypes;
   deviceTypeSelect.innerHTML = types.map(type =>
-    `<option value="${escapeAttribute(type.id)}">${escapeHtml(type.name)}</option>`).join('');
+    NetWatchI18n.html`<option value="${escapeAttribute(type.id)}">${escapeHtml(deviceTypeDisplayName(type))}</option>`).join('');
   deviceTypeSelect.value = types.some(type => type.id === selected) ? selected : 'unspecified';
 }
 
@@ -46,31 +50,31 @@ function renderDeviceTypes() {
         || (filter === 'used' && uses > 0) || (filter === 'unused' && uses === 0));
   }).sort((a, b) => a.name.localeCompare(b.name));
   document.querySelector('#device-types-profile').textContent =
-    `Support group: ${deviceTypesSnapshot.profileName} / ${deviceTypesSnapshot.region}`;
+    NetWatchI18n.text(`Support group: ${deviceTypesSnapshot.profileName} / ${deviceTypesSnapshot.region}`);
   document.querySelector('#device-types-count').textContent =
-    `${types.length} of ${deviceTypesSnapshot.deviceTypes.length} types`;
+    NetWatchI18n.text(`${types.length} of ${deviceTypesSnapshot.deviceTypes.length} types`);
   deviceTypesBody.innerHTML = types.map(type => {
     const protectedType = protectedIds.has(type.id);
     const uses = deviceTypesSnapshot.usage[type.id] || 0;
-    return `<tr data-device-type-row="${escapeAttribute(type.id)}">
-      <td class="device-type-name"><div class="fw-semibold">${escapeHtml(type.name)}</div><code class="small text-secondary">${escapeHtml(type.id)}</code></td>
+    return NetWatchI18n.html`<tr data-device-type-row="${escapeAttribute(type.id)}">
+      <td class="device-type-name"><div class="fw-semibold">${escapeHtml(deviceTypeDisplayName(type))}</div><code class="small text-secondary">${escapeHtml(type.id)}</code></td>
       <td class="device-type-usage">${uses} device${uses === 1 ? '' : 's'}</td>
-      <td class="device-type-status"><span class="badge ${protectedType ? 'text-bg-secondary' : 'text-bg-light'}">${protectedType ? '<i class="fa-solid fa-lock me-1"></i>Protected' : 'Custom'}</span></td>
+      <td class="device-type-status"><span class="badge ${protectedType ? 'text-bg-secondary' : 'text-bg-light'}">${protectedType ? NetWatchI18n.markup('<i class="fa-solid fa-lock me-1"></i>Protected') : 'Custom'}</span></td>
       <td class="device-type-actions text-end text-nowrap">
-        <button class="btn btn-outline-primary btn-sm" type="button" data-edit-device-type="${escapeAttribute(type.id)}" title="${protectedType ? 'Protected system type' : 'Rename type'}" aria-label="Rename type" ${protectedType ? 'data-type-protected disabled' : ''}><i class="fa-solid fa-pen-to-square"></i></button>
-        <button class="btn btn-outline-danger btn-sm" type="button" data-delete-device-type="${escapeAttribute(type.id)}" title="${protectedType ? 'Protected system type' : uses ? 'Reassign devices before deleting this type' : 'Delete type'}" aria-label="Delete type" ${protectedType ? 'data-type-protected disabled' : uses ? 'data-type-in-use disabled' : ''}><i class="fa-solid fa-trash"></i></button>
+        <button class="btn btn-outline-primary btn-sm" type="button" data-edit-device-type="${escapeAttribute(type.id)}" title="${NetWatchI18n.text(protectedType ? 'Protected system type' : 'Rename type')}" aria-label="Rename type" ${protectedType ? 'data-type-protected disabled' : ''}><i class="fa-solid fa-pen-to-square"></i></button>
+        <button class="btn btn-outline-danger btn-sm" type="button" data-delete-device-type="${escapeAttribute(type.id)}" title="${NetWatchI18n.text(protectedType ? 'Protected system type' : uses ? 'Reassign devices before deleting this type' : 'Delete type')}" aria-label="Delete type" ${protectedType ? 'data-type-protected disabled' : uses ? 'data-type-in-use disabled' : ''}><i class="fa-solid fa-trash"></i></button>
       </td></tr>`;
-  }).join('') || '<tr><td colspan="4" class="text-center text-secondary py-4">No device types match.</td></tr>';
+  }).join('') || NetWatchI18n.markup('<tr><td colspan="4" class="text-center text-secondary py-4">No device types match.</td></tr>');
 }
 
 async function loadDeviceTypes() {
   if (deviceTypesBusy) return;
   deviceTypesSnapshot = null;
   deviceTypesStale = false;
-  deviceTypesBody.innerHTML = '<tr><td colspan="4" class="text-center text-secondary py-4">Loading device types...</td></tr>';
-  document.querySelector('#device-types-profile').textContent = '';
-  document.querySelector('#device-types-count').textContent = '';
-  document.querySelector('#device-types-alert').textContent = '';
+  deviceTypesBody.innerHTML = NetWatchI18n.markup('<tr><td colspan="4" class="text-center text-secondary py-4">Loading device types...</td></tr>');
+  document.querySelector('#device-types-profile').textContent = NetWatchI18n.text('');
+  document.querySelector('#device-types-count').textContent = NetWatchI18n.text('');
+  document.querySelector('#device-types-alert').textContent = NetWatchI18n.text('');
   setDeviceTypesBusy(true);
   try {
     const response = await fetch('/api/device-types');
@@ -79,8 +83,8 @@ async function loadDeviceTypes() {
     deviceTypesSnapshot = payload;
     renderDeviceTypes();
   } catch (error) {
-    document.querySelector('#device-types-alert').textContent = error.message;
-    deviceTypesBody.innerHTML = '<tr><td colspan="4" class="text-center text-secondary py-4">Unable to load device types.</td></tr>';
+    document.querySelector('#device-types-alert').textContent = NetWatchI18n.error(error.message);
+    deviceTypesBody.innerHTML = NetWatchI18n.markup('<tr><td colspan="4" class="text-center text-secondary py-4">Unable to load device types.</td></tr>');
   } finally { setDeviceTypesBusy(false); }
 }
 
@@ -90,8 +94,8 @@ function openDeviceType(id = '') {
   deviceTypeForm.reset();
   document.querySelector('#device-type-edit-id').value = id;
   document.querySelector('#device-type-name').value = type?.name || '';
-  document.querySelector('#device-type-modal-title').textContent = type ? 'Rename Device Type' : 'Add Device Type';
-  document.querySelector('#device-type-form-alert').textContent = '';
+  document.querySelector('#device-type-modal-title').textContent = NetWatchI18n.text(type ? 'Rename Device Type' : 'Add Device Type');
+  document.querySelector('#device-type-form-alert').textContent = NetWatchI18n.text('');
   document.querySelector('#reload-type-editor').hidden = true;
   deviceTypeModal?.show();
 }
@@ -123,7 +127,7 @@ deviceTypeForm.addEventListener('submit', async event => {
   const index = types.findIndex(entry => entry.id === id);
   if (index < 0) types.push(type); else types[index] = type;
   try { await saveDeviceTypes(types); hideManagementModal(deviceTypeModalElement); }
-  catch (error) { document.querySelector('#device-type-form-alert').textContent = error.message; }
+  catch (error) { document.querySelector('#device-type-form-alert').textContent = NetWatchI18n.error(error.message); }
 });
 
 deviceTypesBody.addEventListener('click', async event => {
@@ -134,7 +138,7 @@ deviceTypesBody.addEventListener('click', async event => {
   const type = deviceTypesSnapshot.deviceTypes.find(item => item.id === remove.dataset.deleteDeviceType);
   if (!await confirmManagementAction({ title: 'Delete device type', message: `Delete the unused type '${type.name}'? Existing devices and other types will be kept.` })) return;
   try { await saveDeviceTypes(deviceTypesSnapshot.deviceTypes.filter(type => type.id !== remove.dataset.deleteDeviceType)); }
-  catch (error) { document.querySelector('#device-types-alert').textContent = error.message; }
+  catch (error) { document.querySelector('#device-types-alert').textContent = NetWatchI18n.error(error.message); }
 });
 
 document.querySelector('#add-device-type').addEventListener('click', () => openDeviceType());

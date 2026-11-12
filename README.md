@@ -23,6 +23,17 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 
 ## Portable Download
 
+Local candidate `0.8.0-rc.14` adds English/Spanish UI (English default), inclusive
+device/website forms, shared Configuration filters and Facility/Device Type
+grouping, quick pause/resume, exact filtered manual/automatic monitoring,
+last-execution detail and private diagnostics/export. These rules supersede
+rc.13's global automatic runs and presentation-only search. See
+[filters](docs/DASHBOARD_FILTERS.md), [languages](docs/UI_LANGUAGES.md),
+[diagnostics](docs/DIAGNOSTICS.md) and [validation](docs/VALIDATION_MULTILINGUAL_2026-11-12.md).
+**GitHub publication is on hold for rc.14.** The download below remains the
+previous published rc.13. New local ZIP/SHA receipts are in CURRENT_STATUS;
+stable/other-PC acceptance is separate.
+
 [Download Windows x64 ZIP 0.8.0-rc.13](https://github.com/dafermen/netwatch-lite/releases/download/v0.8.0-rc.13/NetWatch-Lite-v0.8.0-rc.13-win-x64.zip)
 and [SHA-256 checksum](https://github.com/dafermen/netwatch-lite/releases/download/v0.8.0-rc.13/NetWatch-Lite-v0.8.0-rc.13-win-x64.zip.sha256).
 This is a validated prerelease, not stable-deployment approval. The public download
@@ -61,7 +72,8 @@ Reports now waits for execution deletion to finish before refreshing SQL pages.
 Candidate rc.13 adds a Device Type selector immediately before Category. It uses
 the active profile catalog, filters pending/checked inventory and intersects the
 server-side scope of Facility/Category, individual and failed checks. Global
-automatic monitoring remains global. See [dashboard filters](docs/DASHBOARD_FILTERS.md).
+automatic monitoring remained global in rc.13 only; rc.14 uses active filters.
+See [dashboard filters](docs/DASHBOARD_FILTERS.md).
 The owner authorized this repository update and prerelease portable publication
 on 2026-11-11. Publication results are recorded in CURRENT_STATUS; a candidate is
 not stable-deployment approval.
@@ -565,14 +577,14 @@ Package success does not replace the thirteen deployment quality gates.
 
 ## Operational Notes
 
-- `Run All Facilities` executes all configured checks immediately.
-- Facility tabs focus the dashboard on one site. The same primary run button changes to `Run Facility` and executes checks only for the selected facility.
-- `Run Group` checks the selected category within the selected facility, or
-  across all facilities in the active support group when All Facilities is
-  selected. The search textbox filters the view, not execution scope.
+- `Run selection` executes exactly the visible enabled inventory. Search,
+  Facility, Device Type, Category, status and monitoring participation affect
+  manual and automatic runs. Facility/category/row Run narrows further.
+- Clear filters for every enabled item. Stale inventory requires review;
+  empty scopes never become global checks.
 - `Full Check` runs configured ping, TCP and HTTP/HTTPS checks; `Ping Only` runs connectivity checks only and shows TCP/HTTP checks as skipped for that execution.
 - `Run Failed` appears only when the current dashboard has `Degraded` or `Down` devices and retries only those devices.
-- Row `Run` is available for every displayed device, including healthy ones;
+- Row `Run` is available for every displayed enabled device, including healthy ones;
   it checks that exact name/address/facility/category and merges only its result.
 - Clear all dashboard filters resets Facility, group, textbox and status without
   running checks or deleting results/history. Untested facility tabs remain.
@@ -581,11 +593,12 @@ Package success does not replace the thirteen deployment quality gates.
 - The dashboard starts in manual mode with searchable inventory and neutral
   Not checked states. Typing never starts checks or adds history. Search opens
   matching sections, and clearing it restores their prior expansion state.
-- Summary counts cover the selected facility (or all facilities), independently
-  of text/status filters. Availability uses checked devices only and stays
-  unavailable until a result exists; pending devices are not counted as offline.
+- Summary counts use the current filtered inventory. Availability uses enabled,
+  checked devices only and stays unavailable until a result exists; pending and
+  paused devices are not counted as outages.
 - Full checks stream results progressively, so devices appear as they finish instead of waiting for the whole execution.
-- When a full check finishes, facilities show compact collapsible rows with nested category groups. Category groups collapse and show green when every device is healthy, orange when devices are degraded but none are down, and red when at least one device is down.
+- Completed groups open for immediate inspection; their headers remain collapsible.
+  Healthy is green, degraded amber and failed red; pending/paused stays neutral.
 - The monitoring progress bar is visible only while a full check is running.
 - NetWatch Lite starts in manual mode by default.
 - `Auto Refresh` runs a full check immediately after the operator turns it on, then repeats every `settings.intervalSeconds`.

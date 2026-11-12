@@ -2,6 +2,35 @@
 
 ## Conventions
 
+The rc.14 APIs below are additive; SQLite remains schema 2. UI language does not
+change stored field names, IDs or technical codes. API responses have an
+`X-NetWatch-Trace` correlation reference. See [diagnostics](DIAGNOSTICS.md).
+
+### Exact Monitoring And Diagnostics
+
+| Method | Path | Contract |
+| --- | --- | --- |
+| GET | `/api/monitor/inventory` | Active `profileId`, `revision`, `configuration`, opaque per-row `keys`; read-only |
+| POST | `/api/monitor/plans` | Body `{profileId,revision,keys,deviceType?,facility?,category?}`; validates fresh inventory, returns `{token,count,expiresAt}` |
+| GET | `/api/monitor/stream?selection=<token>` | Single-use exact enabled rows; other legacy query filters cannot broaden the plan |
+| POST | `/api/config/devices/{index}/monitoring` | Body `{profileId,revision,enabled}`; only Enabled changes; returns fresh snapshot |
+| GET | `/api/diagnostics` | `source=application|monitoring`, search/from/to/page/size/revision; bounded sanitized projection |
+| POST | `/api/diagnostics/client` | Bounded kind/message/script/line/column; error/rejection/resource kinds, application-wide 30/minute; returns IDs |
+
+Invalid selections return 400; stale profile/revision returns 409 without writes
+or checks. Plans expire after two minutes, max 128 pending; keys max 10000 unique
+64-character values. A present but invalid/empty stream token is a controlled
+SSE error, never unfiltered fallback. A busy stream does not consume a valid plan.
+Legacy requests with no selection retain previous behavior. Optional history
+`selectionCount` and result `inventoryKey` do not rewrite legacy history or create
+persistent inventory IDs. Search text is never stored as run scope.
+
+Diagnostics pages default to 25, max 100. Responses include source/page/size/total/
+revision/entries; revisions guard multipage export. Malformed queries return 400;
+stale application projection returns 409 (SQLite monitoring uses the existing
+report-query stale validation). Monitoring failures are projected from history,
+not appended to application errors. Old `/api/errors` remains compatible.
+
 - API responses use JSON except the monitoring stream.
 - Configuration validation failures return HTTP 400 JSON with an `error` field,
   including null entries inside the device or check arrays on save/import.

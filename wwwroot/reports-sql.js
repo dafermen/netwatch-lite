@@ -87,11 +87,11 @@ window.netwatchSqlReports = (() => {
   function metrics() {
     const available = reportsAvailable && !reportsBusy && !invalidReportRange();
     const values = reportsSqlState.devices.metrics;
-    for (const [element, key] of [[reportsRunCount, 'runs'], [reportsDeviceCount, 'devices'], [reportsRowCount, 'evaluations'], [reportsProblemCount, 'problems']]) element.textContent = available ? formatNumber(values[key] || 0) : '-';
-    reportsAvgAvailability.textContent = available && values.measured ? reportPercent(values.healthy / values.measured * 100) : '-';
-    reportsAvgAvailability.title = 'Healthy / known-status evaluations; not time-based uptime';
-    reportsHealthyCount.textContent = available && values.measured ? `${formatNumber(values.healthy)} / ${formatNumber(values.measured)}` : '';
-    reportsTableSummary.textContent = `${formatNumber(values.evaluations || 0)} evaluations`;
+    for (const [element, key] of [[reportsRunCount, 'runs'], [reportsDeviceCount, 'devices'], [reportsRowCount, 'evaluations'], [reportsProblemCount, 'problems']]) element.textContent = NetWatchI18n.text(available ? formatNumber(values[key] || 0) : '-');
+    reportsAvgAvailability.textContent = NetWatchI18n.text(available && values.measured ? reportPercent(values.healthy / values.measured * 100) : '-');
+    reportsAvgAvailability.title = NetWatchI18n.text('Healthy / known-status evaluations; not time-based uptime');
+    reportsHealthyCount.textContent = NetWatchI18n.text(available && values.measured ? `${formatNumber(values.healthy)} / ${formatNumber(values.measured)}` : '');
+    reportsTableSummary.textContent = NetWatchI18n.text(`${formatNumber(values.evaluations || 0)} evaluations`);
   }
   function groups(view) { return (!reportsAvailable || reportsBusy || invalidReportRange() ? [] : reportsSqlState?.[view].records || []).map(record => ({ ...record, profile: reportProfileKey({ region: record.region, supportGroup: record.support_group }), profileLabel: `${record.support_group || 'Unrecorded group'} / ${record.region || 'Unrecorded region'}` })); }
   function runs() {

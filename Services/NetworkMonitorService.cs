@@ -149,6 +149,7 @@ public sealed class NetworkMonitorService
             Facility = device.Facility,
             Category = device.Category,
             DeviceType = device.DeviceType,
+            InventoryKey = device.RuntimeKey,
             IsOnline = hasAvailableCheck,
             Status = status,
             LatencyMs = latencyMs,
@@ -326,6 +327,7 @@ public sealed class NetworkMonitorService
         var maxAttempts = Math.Max(1, settings.RetryCount + 1);
         var delayMs = Math.Max(0, settings.RetryDelayMs);
         var result = await operation();
+        var attempts = 1;
 
         for (var attempt = 1; attempt < maxAttempts && !isSuccessful(result); attempt++)
         {
@@ -335,8 +337,10 @@ public sealed class NetworkMonitorService
             }
 
             result = await operation();
+            attempts++;
         }
 
+        if (result is CheckResult httpResult) httpResult.Attempts = attempts;
         return result;
     }
 

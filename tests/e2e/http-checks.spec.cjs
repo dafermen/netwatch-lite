@@ -46,13 +46,13 @@ test('HTTP field help is accessible per check, wraps on mobile and retries remai
   await page.locator('#add-device').click();
   await page.locator('#device-monitoring-preset').selectOption('web');
   await expect(page.locator('[data-http-timeout-help]')).toContainText('10000 ms = 10 s');
-  await expect(page.locator('[data-http-timeout-help]')).toContainText('no cantidad de pings');
-  await expect(page.locator('[data-http-timeout-help]')).toContainText('0 = un intento; 2 = hasta tres si falla');
+  await expect(page.locator('[data-http-timeout-help]')).toContainText('not a ping count');
+  await expect(page.locator('[data-http-timeout-help]')).toContainText('0 = one attempt; 2 = up to three after failures');
   await expect(page.locator('[data-http-text-help]')).toContainText('READY');
-  await expect(page.locator('[data-http-text-help]')).toContainText('sensible a may\u00fasculas');
-  await expect(page.locator('[data-http-text-help]')).toContainText('Vac\u00edo: solo el c\u00f3digo esperado');
+  await expect(page.locator('[data-http-text-help]')).toContainText('case-sensitive');
+  await expect(page.locator('[data-http-text-help]')).toContainText('Blank: expected status only');
   await expect(page.locator('#device-shortcuts-help')).toHaveCount(0);
-  await expect(page.locator('#device-command-help')).toHaveText('Comando para copiar al portapapeles. No se ejecuta autom\u00e1ticamente.');
+  await expect(page.locator('#device-command-help')).toHaveText('Command to copy to the clipboard. It is never executed automatically.');
   for (const field of ['timeout', 'text']) {
     const input = page.locator(`[data-check-${field}]`);
     const help = page.locator(`[data-http-${field}-help]`);
@@ -144,7 +144,7 @@ test('HTTP failures appear in dashboard, history and export; Ping Only skips HTT
     }
     const results = page.locator('#results-body');
     await expect(results).toContainText('expected 200');
-    await expect(results).toContainText('expected text was not found');
+    await expect(results).toContainText('response did not contain the configured case-sensitive text');
     await expect(results).toContainText('150 ms timeout');
     await expect(results).toContainText('Redirects are not followed');
     await expect(results.locator('tr').filter({ hasText: 'Partial app' })).toContainText('Degraded');
@@ -155,7 +155,7 @@ test('HTTP failures appear in dashboard, history and export; Ping Only skips HTT
     await page.goto('/reports');
     await page.getByRole('tab', { name: 'Devices', exact: true }).click();
     await page.locator('#reports-table-body').getByRole('button', { name: 'Wrong content', exact: true }).click();
-    await expect(page.locator('#reports-detail-body')).toContainText('expected text was not found');
+    await expect(page.locator('#reports-detail-body')).toContainText('response did not contain the configured case-sensitive text');
     await page.getByRole('button', { name: 'Close evaluation', exact: true }).click();
     await expect(page.locator('#reports-detail-modal')).toBeHidden();
     await page.locator('#reports-table-body').getByRole('button', { name: 'Slow app', exact: true }).click();

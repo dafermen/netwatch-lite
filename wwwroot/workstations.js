@@ -48,18 +48,18 @@ function workstationModelName(model) {
 function populateWorkstationFilters() {
   const facilities = [...new Set(workstationDevices().map(device => device.facility || 'Unassigned'))].sort((a, b) => a.localeCompare(b));
   const facilitySelect = document.querySelector('#workstation-facility-filter');
-  facilitySelect.innerHTML = '<option value="">All facilities</option>' + facilities.map(facility =>
-    `<option value="${escapeAttribute(facility)}">${escapeHtml(facility)}</option>`).join('');
+  facilitySelect.innerHTML = NetWatchI18n.markup('<option value="">All facilities</option>') + facilities.map(facility =>
+    NetWatchI18n.html`<option value="${escapeAttribute(facility)}">${escapeHtml(facility)}</option>`).join('');
   if (workstationFilters.facility && !facilities.includes(workstationFilters.facility)) {
     facilitySelect.add(new Option(`Unavailable facility: ${workstationFilters.facility}`, workstationFilters.facility));
   }
   facilitySelect.value = workstationFilters.facility;
   const modelSelect = document.querySelector('#workstation-model-filter');
-  modelSelect.innerHTML = '<option value="">All models</option>' + ['printer', 'scanner'].map(kind => {
+  modelSelect.innerHTML = NetWatchI18n.markup('<option value="">All models</option>') + ['printer', 'scanner'].map(kind => {
     const models = (workstationConfiguration.peripheralCatalog ?? []).filter(model => model.kind === kind)
       .sort((a, b) => workstationModelName(a).localeCompare(workstationModelName(b)));
-    return `<optgroup label="${kind === 'printer' ? 'Printers' : 'Scanners'}">${models.map(model =>
-      `<option value="${escapeAttribute(model.id)}">${escapeHtml(workstationModelName(model))}</option>`).join('')}</optgroup>`;
+    return NetWatchI18n.html`<optgroup label="${NetWatchI18n.text(kind === 'printer' ? 'Printers' : 'Scanners')}">${models.map(model =>
+      NetWatchI18n.html`<option value="${escapeAttribute(model.id)}">${escapeHtml(workstationModelName(model))}</option>`).join('')}</optgroup>`;
   }).join('');
   if (workstationFilters.model && !(workstationConfiguration.peripheralCatalog ?? []).some(model => model.id === workstationFilters.model)) {
     modelSelect.add(new Option('Unavailable model in this support group', workstationFilters.model));
@@ -81,18 +81,18 @@ function updateWorkstationUrl() {
 
 function renderWorkstationGroup(device, key, models) {
   const group = workstationGroup(device, key);
-  if (group.status === 'unrecorded') return '<span class="badge text-bg-warning">Not recorded</span>';
-  if (group.status === 'none') return '<span class="text-secondary">None</span>';
+  if (group.status === 'unrecorded') return NetWatchI18n.markup('<span class="badge text-bg-warning">Not recorded</span>');
+  if (group.status === 'none') return NetWatchI18n.markup('<span class="text-secondary">None</span>');
   const names = [...new Set(group.items.map(item => {
     const model = models.get(item.modelId);
     return model ? workstationModelName(model) : item.modelId;
   }))];
-  return `<details class="workstation-peripheral-cell"><summary>Assigned (${group.items.length})<span class="d-block small text-secondary">${escapeHtml(names.join(', '))}</span></summary>
+  return NetWatchI18n.html`<details class="workstation-peripheral-cell"><summary>Assigned (${group.items.length})<span class="d-block small text-secondary">${escapeHtml(names.join(', '))}</span></summary>
     <ul class="workstation-peripheral-list">${group.items.map(item => {
       const model = models.get(item.modelId);
-      return `<li><span class="fw-semibold">${escapeHtml(model ? workstationModelName(model) : item.modelId)}</span>
-        <div class="small text-secondary">${escapeHtml([item.connection.toUpperCase(), peripheralLinkLabel(item.linkType), item.identifier, item.address].filter(Boolean).join(' | '))}</div>
-        ${item.notes ? `<div class="small">${escapeHtml(item.notes)}</div>` : ''}</li>`;
+      return NetWatchI18n.html`<li><span class="fw-semibold">${escapeHtml(model ? workstationModelName(model) : item.modelId)}</span>
+        <div class="small text-secondary">${escapeHtml([peripheralConnectionLabel(item.connection), peripheralLinkLabel(item.linkType), item.identifier, item.address].filter(Boolean).join(' | '))}</div>
+        ${item.notes ? NetWatchI18n.html`<div class="small">${escapeHtml(item.notes)}</div>` : ''}</li>`;
     }).join('')}</ul></details>`;
 }
 
@@ -100,9 +100,9 @@ function renderWorkstations() {
   const devices = workstationDevices();
   const models = new Map((workstationConfiguration.peripheralCatalog ?? []).map(model => [model.id, model]));
   const pending = device => workstationPending(device, 'printers') || workstationPending(device, 'scanners');
-  document.querySelector('#workstations-total').textContent = String(devices.length);
-  document.querySelector('#workstations-pending').textContent = String(devices.filter(pending).length);
-  document.querySelector('#workstations-recorded').textContent = String(devices.filter(device => !pending(device)).length);
+  document.querySelector('#workstations-total').textContent = NetWatchI18n.text(String(devices.length));
+  document.querySelector('#workstations-pending').textContent = NetWatchI18n.text(String(devices.filter(pending).length));
+  document.querySelector('#workstations-recorded').textContent = NetWatchI18n.text(String(devices.filter(device => !pending(device)).length));
   const query = workstationFilters.search.trim().toLowerCase();
   const filtered = devices.filter(device => {
     if (workstationFilters.facility && device.facility !== workstationFilters.facility) return false;
@@ -122,21 +122,21 @@ function renderWorkstations() {
   workstationFilters.page = Math.min(workstationFilters.page, pages);
   const start = (workstationFilters.page - 1) * workstationFilters.size;
   const visible = filtered.slice(start, start + workstationFilters.size);
-  workstationBody.innerHTML = visible.map(device => `<tr data-workstation-row role="row">
+  workstationBody.innerHTML = visible.map(device => NetWatchI18n.html`<tr data-workstation-row role="row">
     <td role="cell"><div class="fw-semibold">${escapeHtml(device.name)}</div><div class="small"><code>${escapeHtml(device.ip)}</code>${device.hostname ? ` | ${escapeHtml(device.hostname)}` : ''}</div>
-      <div class="small text-secondary">${escapeHtml(device.facility)} | ${escapeHtml(device.category)}</div>${device.enabled === false ? '<div class="small text-secondary">Monitoring disabled</div>' : ''}</td>
+      <div class="small text-secondary">${escapeHtml(device.facility)} | ${escapeHtml(device.category)}</div>${device.enabled === false ? NetWatchI18n.markup('<div class="small text-secondary">Monitoring disabled</div>') : ''}</td>
     <td role="cell" data-label="Printers">${renderWorkstationGroup(device, 'printers', models)}</td>
     <td role="cell" data-label="Scanners">${renderWorkstationGroup(device, 'scanners', models)}</td></tr>`).join('')
-    || `<tr><td colspan="3" class="text-secondary text-center py-4">${devices.length ? 'No workstations match these filters.' : 'No workstations in this support group.'}</td></tr>`;
+    || NetWatchI18n.html`<tr><td colspan="3" class="text-secondary text-center py-4">${NetWatchI18n.text(devices.length ? 'No workstations match these filters.' : 'No workstations in this support group.')}</td></tr>`;
   const selectedModel = models.get(workstationFilters.model);
   let summary = `${filtered.length} matching workstations`;
   if (workstationFilters.model) {
     const count = filtered.reduce((sum, device) => sum + workstationItems(device).filter(item => item.modelId === workstationFilters.model).length, 0);
     summary += selectedModel ? ` | ${count} assignments of ${workstationModelName(selectedModel)}` : ' | Model unavailable in this support group';
   }
-  document.querySelector('#workstations-match-summary').textContent = summary;
-  document.querySelector('#workstations-page-summary').textContent = filtered.length
-    ? `${start + 1}-${start + visible.length} of ${filtered.length}` : '0 of 0';
+  document.querySelector('#workstations-match-summary').textContent = NetWatchI18n.text(summary);
+  document.querySelector('#workstations-page-summary').textContent = NetWatchI18n.text(filtered.length
+    ? `${start + 1}-${start + visible.length} of ${filtered.length}` : '0 of 0');
   document.querySelector('#workstations-prev').disabled = workstationFilters.page <= 1;
   document.querySelector('#workstations-next').disabled = workstationFilters.page >= pages;
   updateWorkstationUrl();
@@ -153,12 +153,12 @@ async function loadWorkstations() {
   const version = ++workstationLoadVersion;
   workstationsLoaded = false;
   setWorkstationsBusy(true);
-  document.querySelector('#workstations-alert').textContent = '';
-  document.querySelector('#workstations-match-summary').textContent = 'Loading workstations...';
-  document.querySelector('#workstations-profile-label').textContent = '';
-  for (const id of ['total', 'pending', 'recorded']) document.querySelector(`#workstations-${id}`).textContent = '-';
-  workstationBody.innerHTML = '<tr><td colspan="3" class="text-secondary py-4">Loading...</td></tr>';
-  document.querySelector('#workstations-page-summary').textContent = '';
+  document.querySelector('#workstations-alert').textContent = NetWatchI18n.text('');
+  document.querySelector('#workstations-match-summary').textContent = NetWatchI18n.text('Loading workstations...');
+  document.querySelector('#workstations-profile-label').textContent = NetWatchI18n.text('');
+  for (const id of ['total', 'pending', 'recorded']) document.querySelector(`#workstations-${id}`).textContent = NetWatchI18n.text('-');
+  workstationBody.innerHTML = NetWatchI18n.markup('<tr><td colspan="3" class="text-secondary py-4">Loading...</td></tr>');
+  document.querySelector('#workstations-page-summary').textContent = NetWatchI18n.text('');
   try {
     await loadRegions({ showBusy: false, showErrors: false });
     const response = await fetch('/api/config');
@@ -166,15 +166,15 @@ async function loadWorkstations() {
     if (version !== workstationLoadVersion) return;
     if (!response.ok) throw new Error(payload.error || 'Unable to load workstation inventory.');
     workstationConfiguration = payload;
-    document.querySelector('#workstations-profile-label').textContent = `Support group: ${getActiveRegion()?.name || 'Active inventory'}`;
+    document.querySelector('#workstations-profile-label').textContent = NetWatchI18n.text(`Support group: ${getActiveRegion()?.name || 'Active inventory'}`);
     populateWorkstationFilters();
     workstationsLoaded = true;
   } catch (error) {
     if (version !== workstationLoadVersion) return;
     workstationConfiguration = { devices: [], peripheralCatalog: [] };
     workstationBody.innerHTML = '';
-    document.querySelector('#workstations-match-summary').textContent = '';
-    document.querySelector('#workstations-alert').textContent = error.message;
+    document.querySelector('#workstations-match-summary').textContent = NetWatchI18n.text('');
+    document.querySelector('#workstations-alert').textContent = NetWatchI18n.error(error.message);
   } finally {
     if (version === workstationLoadVersion) setWorkstationsBusy(false);
   }

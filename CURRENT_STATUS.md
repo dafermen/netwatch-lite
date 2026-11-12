@@ -1,6 +1,55 @@
 # Current Status
 
-Last updated: 2026-11-11
+Last updated: 2026-11-12
+
+## Multilingual Monitoring Work Order - 2026-11-11
+
+IN PROGRESS. The owner authorized eight connected changes: English/Spanish UI
+(English default, no mixed product copy), inclusive device/website entry names,
+Configuration grouping by Facility or Device Type, Run using all selected filters,
+quick per-entry monitoring enable/pause, shared Dashboard/Configuration filters,
+and visible/exportable diagnostics with actionable HTTP explanations.
+GitHub publication is ON HOLD for this delivery, superseding the rc.13 authorization.
+Produce a new immutable local portable folder, ZIP and SHA; preserve all older
+versions, private data and SQLite schema 2. No real URL probes are authorized by
+the screenshot alone; reproduce transport/status/timeout cases on synthetic servers.
+
+Implementation order: shared view/execution scope and quick Enabled controls;
+language catalogs and inclusive forms; diagnostics and redacted export; regression,
+backed-up local restart on port 5000 and a new neutral portable. Persisted names,
+catalog IDs, URLs and operator inventory are never translated or rewritten.
+Existing internal errors are already stored; add consultation/export rather than
+confusing expected HTTP failures with unhandled application exceptions.
+
+First implementation checkpoint: revision-checked inventory snapshots and bounded,
+single-use monitoring plans are implemented. Empty/stale/paused selections never
+become global runs. New opaque per-snapshot keys separate even identical inventory
+records; legacy clients remain compatible. Narrow monitoring participation writes
+change only Enabled. Dashboard view/run now shares the same Facility/type/category/
+search/status/participation predicate, including automatic runs. Configuration has
+the same facets in Normal/Bulk and grouping by Facility/Device Type, retaining
+original row indexes. A last-run receipt/details view keeps results inspectable.
+Twenty new API cases passed on JSON/SQLite; 12 new desktop/mobile browser cases
+passed on SQLite. Evidence: `artifacts/verification/workorder-20261111/`.
+Language catalogs (957 entries), draft-safe switching and private Diagnostics
+consultation/export are implemented. Full .NET passed 416 (34/28/354); seeded JS
+properties passed 2000 generated cases. Eight monitoring and six storage sampled
+mutants were killed against green baselines; packaging guards passed 58 each on
+PowerShell 5.1/7. npm/NuGet audits found no known vulnerabilities (NuGet required
+an unsandboxed retry after a denied cache/profile read). Static checks passed 16
+scripts, translation placeholders and 321 links. Historical baseline: 5347 files.
+Browser regression is ongoing. It found template slot issues affecting table,
+code and textarea values plus fast-close/export menu behavior. These are fixed
+and have targeted regressions. An initial-read race is also guarded: run/type
+controls stay disabled until a revision snapshot exists. Require the final full
+pass before packaging.
+The final focused acceptance passed 26 desktop/mobile cases, including delayed
+snapshot loading, repeated Type-only Run, changed/removed scopes, pause/resume,
+shared Configuration editing, language preference/draft guards and template safety.
+The complete browser matrix is running against frozen application assets.
+The source service is still rc.13 PID 34240. No cutover/new portable yet. Next:
+complete browser regression, inspect screenshots, record private backup/byte/API
+preservation, restart rc.14 on 5000 and generate neutral folder/ZIP/SHA. No GitHub.
 
 ## Dashboard Device Type And GitHub Delivery - 2026-11-11
 

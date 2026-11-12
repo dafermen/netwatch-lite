@@ -206,6 +206,42 @@ public sealed class JsonDeviceRepository
         }
     }
 
+    /// <summary>Returns a fresh inventory with revision-scoped keys, without saving operator data.</summary>
+    public async Task<MonitoringInventory> GetMonitoringInventoryAsync(CancellationToken cancellationToken = default)
+    {
+        await _reloadLock.WaitAsync(cancellationToken);
+        try
+        {
+            var (profile, _, configuration) = await ReadDeviceTypeConfigurationAsync(cancellationToken);
+            _configuration = configuration;
+            _loadedProfileId = profile.Id;
+            return MonitorPlans.Snapshot(profile.Id, configuration);
+        }
+        finally { _reloadLock.Release(); }
+    }
+
+    /// <summary>Changes only Enabled after a fresh profile/revision check; never posts a stale row.</summary>
+    public async Task<MonitoringInventory> SetMonitoringEnabledAsync(int index, MonitoringEnabledRequest request, CancellationToken cancellationToken)
+    {
+        await _reloadLock.WaitAsync(cancellationToken);
+        try
+        {
+            var (profile, path, configuration) = await ReadDeviceTypeConfigurationAsync(cancellationToken);
+            MonitorPlans.AssertRevision(MonitorPlans.Snapshot(profile.Id, configuration), request.ProfileId, request.Revision);
+            if (index < 0 || index >= configuration.Devices.Count) throw new InvalidDataException("Item was not found in the active configuration.");
+            var node = JsonSerializer.SerializeToNode(configuration.Devices[index])!;
+            node["enabled"] = request.Enabled;
+            configuration.Devices[index] = node.Deserialize<Device>()!;
+            Validate(configuration);
+            var normalized = Normalize(configuration, profile.Region, profile.Name);
+            await SaveNormalizedConfigurationAsync(path, normalized, createBackup: true, cancellationToken);
+            _configuration = normalized;
+            _loadedProfileId = profile.Id;
+            return MonitorPlans.Snapshot(profile.Id, normalized);
+        }
+        finally { _reloadLock.Release(); }
+    }
+
     /// <summary>Returns a fresh, consistent catalog snapshot for the active profile.</summary>
     public async Task<DeviceTypeCatalogSnapshot> GetDeviceTypeCatalogAsync(CancellationToken cancellationToken = default)
     {
