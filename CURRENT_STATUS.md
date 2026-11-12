@@ -38,13 +38,17 @@ SHA-256: 54169c3a0b6ac63e8d1fee3995f35ff8c23ea63b091c1736d26e0b35c473a308.
 Native generation/PS5.1 ZIP/PS7 folder checks each passed 38 routes/eight negative
 checks. Extra exact-selection, single-use, pause/resume and diagnostic checks passed.
 
-Historical audit OPEN: 5780/5781 baseline paths matched, including all 15 Data
+Historical observation CLOSED by owner confirmation: 5780/5781 baseline paths
+matched, including all 15 Data
 JSON. One extra archive is missing: artifacts/portable/NetWatch-Lite-v0.8.0-rc.11-win-x64.zip
 (initial SHA 9d2b69e06f745bcc270f2cf318641eec0d82396aea5ad3ab6ea8b8035059d4a3).
 Canonical rc.11 folder and artifacts/packages ZIP remain unchanged; that ZIP has
-a different hash, so it cannot silently replace the missing copy. Cause unknown;
-owner question pending. Do not claim a complete historical audit or recreate an
-old version without instruction. No existing file hash mismatched.
+a different hash, so it cannot replace the extra copy. The owner confirmed moving
+or deleting that additional ZIP and instructed leaving it as-is. Its absence is
+intentional and accepted; do not recreate it or apply this exception to other
+archives. Raw audit receipts/baseline remain unchanged (5780 matched, one absent),
+with an owner-confirmation addendum. No existing file hash mismatched. This closes
+the observation, not the separate stable-deployment/other-PC acceptance gates.
 
 Evidence: artifacts/verification/dotnet10-20261112; see
 [runtime validation](docs/VALIDATION_DOTNET10_2026-11-12.md).

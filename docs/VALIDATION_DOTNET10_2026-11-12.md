@@ -93,7 +93,7 @@ must not be packaged or published. See [runtime policy](RUNTIME.md) and
   `native-workorder-5e8faaf946e642d98bdd0cc017c4c45e` (actual rc.15 version checked).
   Earlier extra receipt with an old hardcoded report label is superseded.
 
-## Historical Audit Exception - Open
+## Historical Audit Exception - Owner Confirmed
 
 5780/5781 baseline paths matched exactly, including all 15 original Data JSON.
 The extra `artifacts/portable/NetWatch-Lite-v0.8.0-rc.11-win-x64.zip` is absent;
@@ -101,10 +101,14 @@ its initial SHA was `9d2b69e06f745bcc270f2cf318641eec0d82396aea5ad3ab6ea8b803505
 No present historical file has a hash mismatch. The canonical rc.11 folder and
 packages ZIP remain unchanged, but the canonical ZIP SHA is different
 (`4d9992d921442cabb7342df7fa82086d6ec6348c8904daa6e2c736496006e3cb`).
-The cause is not established. Owner clarification was requested; no file was
-silently restored/recompressed or baseline rewritten. package-audit.json records
-packagePassed=true separately from historicalAuditPassed=false. Do not describe
-the complete historical audit as green or stable deployment as approved.
+The owner subsequently confirmed moving/deleting that additional ZIP and
+explicitly instructed leaving it as-is. The observation is closed as an accepted,
+owner-managed absence; do not recreate the file or extend the exception to other
+archives. No portable was restored/recompressed and no baseline was rewritten.
+package-audit.json retains packagePassed=true and historicalAuditPassed=false
+as the original exact-path result. An owner-confirmation addendum records the
+resolution without rewriting evidence. This is not a claim that all 5781 paths
+still exist or that stable deployment is approved.
 
 The ZIP is an immutable build-time checkpoint; these subsequent source receipts
 do not change its docs/bytes. GitHub and remote CI were not updated or run.

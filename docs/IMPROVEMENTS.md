@@ -36,8 +36,9 @@ gates are in [ROADMAP.md](ROADMAP.md); queued work is not implemented work.
   See [runtime policy](RUNTIME.md) and [validation](VALIDATION_DOTNET10_2026-11-12.md).
   Local activation/portable delivery and stable deployment are separate gates.
   Final regression: 416 .NET, 444 browser passes; native/data-preservation receipts
-  are recorded in validation. One extra historical rc.11 ZIP path is missing,
-  cause/owner clarification pending; no blanket historical-audit approval.
+  are recorded in validation. The owner confirmed moving/deleting the extra
+  historical rc.11 ZIP and instructed leaving it as-is; that observation is closed.
+  Raw exact-path audit evidence is preserved, not relabeled as 5781 matches.
   No GitHub publication is authorized.
 
 ## Proposed Follow-Ups (Not Authorized)

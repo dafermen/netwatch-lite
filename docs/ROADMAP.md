@@ -6,7 +6,8 @@ Current authorized work: [supported runtime / IMP-009](RUNTIME.md), tracked in
 [runtime validation](VALIDATION_DOTNET10_2026-11-12.md). .NET 10 LTS source/regression
 passed (416 .NET/444 browser), with private compatibility/rollback proven. Local
 activation/new rc.15 folder/ZIP/SHA are delivered. SQLite schema 2/data preserved;
-one extra old rc.11 ZIP is missing, historical audit/owner clarification pending.
+the owner-confirmed move/removal of one extra rc.11 ZIP is an accepted exception,
+now closed without recreating the archive or rewriting the audit baseline.
 GitHub remains on hold. See CURRENT_STATUS for receipts and remaining acceptance.
 
 Preceding delivery: [multilingual monitoring / IMP-008](IMPROVEMENTS.md), tracked in
