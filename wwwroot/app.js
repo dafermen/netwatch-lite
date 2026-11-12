@@ -967,7 +967,7 @@ function reportNumber(value) {
 
 function reportDate(value) {
   const time = reportTime(value);
-  return time === null ? 'Not recorded' : formatDate(new Date(time).toISOString());
+  return time === null ? NetWatchI18n.text('Not recorded') : formatDate(new Date(time).toISOString());
 }
 
 function reportTime(value) {
@@ -1501,8 +1501,8 @@ function openReportDetail(id, trigger) {
   const facts = [
     ['Result', renderReportStatusBadge(row.status)], ['Recorded', escapeHtml(reportDate(row.checkedAt))],
     ['Support group', escapeHtml(reportProfileLabel(row))], ['Facility', escapeHtml(row.facility)],
-    ['Category', escapeHtml(row.category)], ['Address', escapeHtml(row.ip || 'Not recorded')],
-    ['Hostname', escapeHtml(row.hostname || 'Not recorded')], ['Mode', escapeHtml(getCheckModeLabel(row.checkMode))],
+    ['Category', escapeHtml(row.category)], ['Address', escapeHtml(row.ip || NetWatchI18n.text('Not recorded'))],
+    ['Hostname', escapeHtml(row.hostname || NetWatchI18n.text('Not recorded'))], ['Mode', escapeHtml(getCheckModeLabel(row.checkMode))],
     ['Original scope', escapeHtml(getRunScopeLabel(run?.scope))], ['Run duration', reportMilliseconds(row.durationMs)],
     ['Execution ID', escapeHtml(row.runId)]
   ];
@@ -4778,6 +4778,7 @@ function isPingOnlyMode(checkMode) {
 }
 
 function getCheckModeLabel(checkMode = getSelectedCheckMode()) {
+  if (checkMode === 'Not recorded') return NetWatchI18n.text('Not recorded');
   return NetWatchI18n.text(isPingOnlyMode(checkMode) ? 'Ping Only' : 'Full Check');
 }
 

@@ -39,7 +39,7 @@ and [SHA-256 checksum](https://github.com/dafermen/netwatch-lite/releases/downlo
 This is a validated prerelease, not stable-deployment approval. The public download
 matches the immutable local package; all four CI jobs passed for its source commit.
 
-The new Windows x64 candidate is `0.8.0-rc.13`, including dashboard
+The preceding published Windows x64 candidate is `0.8.0-rc.13`, including dashboard
 inventory search, copy-only device Commands, exact single-device checks, filter
 reset/header controls, neutral Configuration layout and transition-safe device
 deletion, plus the redesigned Reports Summary/Runs/Devices views, historical

@@ -69,6 +69,11 @@ These instructions are mandatory for any Codex session working on NetWatch Lite.
 
 ## Engineering Rules
 
+- Runtime support is a stable-deployment gate: .NET 8 ended support on
+  2026-11-10. Portables pin the final 8.0.34 patch, but remain evaluation builds.
+  IMP-009 requires a separately authorized/validated supported-runtime migration.
+  Do not silently retarget the framework or replace machine-wide runtimes.
+
 - Printer/scanner catalogs live in each support-group configuration, alongside
   workstation assignments. Keep them self-contained for copy/import/export;
   preserve both through normalization and row/bulk edits. Do not infer device

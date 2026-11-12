@@ -2,6 +2,11 @@
 
 ## Generate A Candidate
 
+The generator pins the final .NET 8 patch, **8.0.34**, instead of an older SDK
+runtime pack. .NET 8 ended support on 2026-11-10; this remains an evaluation
+package, not a supported stable deployment. A supported-runtime migration needs
+separate validation. See [Microsoft](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core).
+
 Run from the repository with the .NET 8 SDK and Windows PowerShell 5.1 or newer:
 
 ```powershell

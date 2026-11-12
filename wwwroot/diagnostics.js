@@ -99,7 +99,7 @@ window.NetWatchDiagnostics = (() => {
       const link = document.createElement('a'); link.href = url; link.download = `netwatch-${source}-diagnostics.${format}`;
       link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) { if (current === version) showPageAlert(byId('diagnostics-alert'), 'danger', error.message); }
-    finally { exporting = false; if (current === version) render(); }
+    finally { exporting = false; render(); }
   }
   document.querySelectorAll('[data-diagnostics-source]').forEach(button => button.addEventListener('click', () => {
     source = button.dataset.diagnosticsSource; page = 1;

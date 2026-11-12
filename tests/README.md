@@ -2,10 +2,13 @@
 
 ## Current Suites
 
-The current baseline is 85 .NET tests and 24 browser workflows, including
-Workstations filters/reverse lookup, paging/history navigation, profile isolation
-and read-only/error behavior. Tests also cover model reference validation, legacy compatibility,
-profile copying and preservation through row/bulk updates and import/export.
+The current .NET suite has 416 cases (34 unit, 28 integration, 354 contract).
+Browser workflows run at desktop/mobile sizes against isolated JSON or SQLite
+instances. New coverage includes English/Spanish UI, exact filtered runs, snapshot
+loading/staleness, pause/resume, Diagnostics/export and preservation of all CRUD
+values. Final executed browser counts and limits belong in the dated validation
+guide, not inferred from this inventory. See
+[current validation](../docs/VALIDATION_MULTILINGUAL_2026-11-12.md).
 
 - `NetWatch.UnitTests`: pure behavior and model defaults.
 - `NetWatch.IntegrationTests`: repositories with isolated file persistence.
@@ -13,6 +16,8 @@ profile copying and preservation through row/bulk updates and import/export.
   temporary runtime data, including the application shell and `/docs/` assets.
 - `e2e/`: real-browser desktop/mobile workflows with one isolated server and
   content/data root per test.
+- `javascript/`: pure filter properties/seeded fuzz and HTTP diagnostic mappings;
+  run `node --test tests/javascript/monitoring.test.cjs` from the repository root.
 
 Run all .NET suites:
 

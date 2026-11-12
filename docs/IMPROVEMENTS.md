@@ -22,7 +22,17 @@ gates are in [ROADMAP.md](ROADMAP.md); queued work is not implemented work.
   no exact selection token retain previous behavior. Old portables are immutable.
 - Evidence/limits: [Current validation](VALIDATION_MULTILINGUAL_2026-11-12.md).
 
-## IMP-007 - Dashboard Device Type Filter
+## IMP-009 - Supported Runtime Before Stable Deployment
+
+- Status: High-priority follow-up, not authorized/implemented as a major upgrade.
+- Found: 2026-11-12. .NET 8 support ended on 2026-11-10, per
+  [Microsoft](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core).
+- rc.14 keeps the target for compatibility; portables pin the final 8.0.34 patch.
+  This does not restore support. No machine-wide SDK/runtime was replaced.
+- Next: separately validate a supported LTS target, patching, native portable,
+  storage compatibility and rollback before stable deployment.
+
+## IMP-007 - Dashboard Device Type Filter (Historical rc.13)
 
 The rc.13 global automatic/presentation-only semantics below are historical;
 IMP-008 supersedes them for the current UI.

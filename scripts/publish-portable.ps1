@@ -27,7 +27,7 @@ try {
     try {
         dotnet publish $project -c Release -r win-x64 --self-contained true --artifacts-path $build -o $raw `
             "-p:Version=$Version" -p:NetWatchPortable=true -p:PublishSingleFile=false -p:PublishTrimmed=false `
-            -p:PublishReadyToRun=false -p:DebugType=None -p:GenerateDocumentationFile=false
+            -p:PublishReadyToRun=false -p:DebugType=None -p:GenerateDocumentationFile=false -p:RuntimeFrameworkVersion=8.0.34
         if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed. No version was promoted.' }
     } finally { Pop-Location }
     New-Item -ItemType Directory -Path $package | Out-Null

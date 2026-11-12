@@ -23,8 +23,16 @@ is separate. No schema migration or automatic corporate URL probes are performed
   retry after the sandbox denied profile/cache access. No dependency versions changed.
 - Static checks passed 16 scripts, 957 translation keys/placeholder parity and
   321 relative links. Historical/original-data baseline covers 5347 files.
-- Browser regression and native packaging: in progress.
-  Final counts/receipts are added only after completion.
+- Full browser matrix: **424 passed** (212 SQLite, 212 JSON), zero failures,
+  skips or retries. Receipts: `release-sqlite.json`, `release-json.json` under the
+  private evidence root. Both desktop and mobile are included.
+- Final focused acceptance: 26 desktop/mobile cases passed. After the final
+  read-only export/legacy-label changes, **80 targeted regressions passed**
+  (40 per provider) for Reports, languages and Diagnostics, including safe export
+  cancellation and neutral localized legacy measurements.
+- Native packaging remains at this source checkpoint. The archive freezes this
+  checkpoint; final native/hash receipts are recorded later in the source
+  checkout without rewriting the immutable ZIP.
 - A sandboxed testhost connection was blocked. That aborted attempt is not a pass;
   the complete .NET rerun outside that restriction passed.
 - Localization regression exposed table placeholder and ignored-code/textarea
@@ -38,11 +46,46 @@ Private evidence: `artifacts/verification/workorder-20261111/`. Do not package
 operational pilots, browser downloads, databases, backups or logs. Active SQLite
 and original JSON/historical archives require preservation checks before handoff.
 
+## Local Activation
+
+Source rc.14 is active on port 5000, PID 29836, backend commit 3a39dac. A private
+verified snapshot preceded restart. Before/after document bytes, all eight
+operational API snapshots and the 15 original Data JSON files matched. Schema 2
+stayed unchanged. Eleven served source assets matched their local SHA-256.
+Receipt: `activation-60ec61f0bde14e639528b51292344dcf/result.json` and
+`live-service.json`. No real target probes or GitHub operations were performed.
+
 ## Gate Limits
 
 The thirteen deployment gates require scoped evidence, not a blanket claim of
-exhaustive coverage. Final browser/package/audit receipts and source restart are
-pending at this checkpoint. Other-PC/operator acceptance, representative corporate
-proxy/SSO behavior, long-running load/resource tests and stable deployment approval
-remain owner gates. Anonymous HTTP does not reuse a browser session. Do not
+exhaustive coverage. Native package/audit receipts remain pending at this checkpoint.
+
+| Gate | Actual scope / remaining limit |
+| --- | --- |
+| Acceptance | Automated synthetic workflows; owner/other-PC acceptance pending |
+| Unit | 34 .NET cases and pure JS mappings |
+| Properties / invariants | 2000 seeded filter cases, preservation/exact scope contracts |
+| Mutation | Eight monitoring and six storage sampled mutants, not whole-app score |
+| Fuzz | Seeded predicates and malformed/bounded API inputs, not a sustained campaign |
+| Integration | 28 repository/storage cases |
+| Contract | 354 cases including JSON and SQLite |
+| End to end | 424 full-matrix desktop/mobile passes plus targeted regressions |
+| Regression | Existing CRUD, catalogs, profiles, reports, clipboard and data preservation |
+| Security | TLS/body/input bounds, redaction, escaping, CSV, rate limits and dependency audits; not a penetration test |
+| Concurrency / resilience | Busy/token retention, interrupted/stale reads, atomic persistence and safe export cancellation |
+| Performance / resources | Bounded plans/pages/exports/body/log counts; representative long-running load remains pending |
+| Compatibility / deployment | PS 5.1/7 guards and local source restart; native package/other-PC acceptance pending |
+
+Corporate proxy/SSO behavior, long-running load/resource tests and stable deployment
+approval remain owner gates. Anonymous HTTP does not reuse browser login. Do not
 automatically accept error codes, follow redirects or disable TLS to hide failures.
+The existing UI still loads Bootstrap/FontAwesome from CDNs; browser QA supplies
+their exact local copies. Verify those origins on the other PC. Self-contained
+means the .NET runtime is included, not that all frontend resources work offline.
+
+.NET 8 ended support on 2026-11-10, verified against
+[Microsoft](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core).
+The portable pins the final 8.0.34 patch, which does not restore support. A
+supported-runtime migration is a separate high-priority stable-deployment gate
+(IMP-009). The active shared runtime was not replaced. Package vulnerability
+audits do not establish framework support.

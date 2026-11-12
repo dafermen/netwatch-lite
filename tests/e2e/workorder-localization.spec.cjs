@@ -105,3 +105,19 @@ test('Language changes do not discard bulk or settings drafts without confirmati
   await expect(page.locator('[data-bulk-field="name"]').first()).toHaveValue('Unsaved name');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 });
+
+test('Legacy report measurements stay neutral and localized without translating the device name', async ({ page }) => {
+  await page.route('**/api/storage', route => route.fulfill({ contentType: 'application/json', body: '{"provider":"json"}' }));
+  await page.route('**/api/history', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ runs: [{
+    runId: 'legacy-language', checkMode: null, scope: { region: 'North', supportGroup: 'Team A' },
+    results: [{ name: 'Run', ip: '127.0.0.1', facility: 'Lab', category: 'Office', checks: [] }]
+  }] }) }));
+  await page.goto('/reports?lang=es');
+  await page.locator('#reports-tab-devices').click();
+  await expect(page.locator('#reports-table-body')).toContainText('Sin registrar');
+  await expect(page.locator('#reports-table-body')).not.toContainText('Not recorded');
+  await page.locator('#reports-table-body').getByRole('button', { name: 'Run', exact: true }).click();
+  await expect(page.locator('#reports-detail-body')).not.toContainText('Not recorded');
+  await expect(page.locator('#reports-detail-body')).toContainText('Sin registrar');
+  await expect(page.locator('#reports-detail-title')).toHaveText('Run');
+});

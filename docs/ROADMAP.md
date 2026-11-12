@@ -1,6 +1,12 @@
 # Coordinated Development Plan
 
-Last updated: 2026-11-10
+Last updated: 2026-11-12
+
+Current delivery: [multilingual monitoring / IMP-008](IMPROVEMENTS.md), tracked in
+[validation](VALIDATION_MULTILINGUAL_2026-11-12.md). English/Spanish UI, shared
+filters/grouping, exact filtered runs, monitoring pauses and private Diagnostics
+are implemented. The source runs rc.14 with SQLite schema 2 on port 5000; the
+new neutral portable is the remaining delivery step. GitHub publication is on hold.
 
 The user requested coordinated development of the discussed improvements. This
 plan sets the delivery order and safety gates. [IMPROVEMENTS.md](IMPROVEMENTS.md)

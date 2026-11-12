@@ -85,3 +85,35 @@ test('The browser collector strips URL query data, deduplicates and never naviga
   expect(data).not.toContain('user:pass');
   expect((await (await request.get('/api/history')).json()).runs).toHaveLength(0);
 });
+
+test('Changing filters during export cancels the old download and restores controls for the newer snapshot', async ({ page }) => {
+  let release, entered;
+  const gate = new Promise(resolve => { release = resolve; });
+  const started = new Promise(resolve => { entered = resolve; });
+  const downloads = [];
+  page.on('download', value => downloads.push(value));
+  await page.route('**/api/diagnostics?**', async route => {
+    const query = new URL(route.request().url()).searchParams;
+    const search = query.get('search') || '';
+    if (query.get('size') === '100' && !search) { entered(); await gate; }
+    return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ source: 'application', page: 1,
+      size: Number(query.get('size')), total: 1, revision: search || 'old', entries: [{ errorId: search ? 'new-reference' : 'old-reference',
+        source: 'browser', timestamp: '2026-11-12T00:00:00Z', message: 'Synthetic detail' }] }) });
+  });
+  try {
+    await page.goto('/diagnostics');
+    await expect(page.locator('#diagnostics-export')).toBeEnabled();
+    await page.locator('#diagnostics-export').click();
+    await page.locator('[data-diagnostics-export="json"]').click();
+    await started;
+    await page.locator('#diagnostics-search').fill('new');
+    await expect(page.locator('#diagnostics-body')).toContainText('new-reference');
+    release();
+    await expect(page.locator('#diagnostics-export')).toBeEnabled();
+    expect(downloads).toHaveLength(0);
+    await page.locator('#diagnostics-export').click();
+    const download = page.waitForEvent('download');
+    await page.locator('[data-diagnostics-export="json"]').click();
+    expect(await fs.readFile(await (await download).path(), 'utf8')).toContain('new-reference');
+  } finally { release(); }
+});

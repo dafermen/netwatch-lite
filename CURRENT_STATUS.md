@@ -46,10 +46,24 @@ pass before packaging.
 The final focused acceptance passed 26 desktop/mobile cases, including delayed
 snapshot loading, repeated Type-only Run, changed/removed scopes, pause/resume,
 shared Configuration editing, language preference/draft guards and template safety.
-The complete browser matrix is running against frozen application assets.
-The source service is still rc.13 PID 34240. No cutover/new portable yet. Next:
-complete browser regression, inspect screenshots, record private backup/byte/API
-preservation, restart rc.14 on 5000 and generate neutral folder/ZIP/SHA. No GitHub.
+The complete browser matrix passed 424 (212 SQLite / 212 JSON), zero failures,
+skips or retries; both viewports are included. Final targeted Reports/language/
+export regressions passed 80 cases (40 per provider) after the small read-only
+cancellation/legacy-label fixes. Application changes are frozen for packaging.
+Source rc.14 is now PID 29836 on port 5000, backend commit 3a39dac. Activation
+`activation-60ec61f0bde14e639528b51292344dcf/` verified a private pre-restart backup,
+unchanged document bytes/eight APIs/15 Data JSON and unchanged schema 2.
+`live-service.json` matched 11 served assets. New portable generation is pending;
+then record native ZIP/folder checks and all 5347 protected historical hashes.
+No GitHub. Other-PC acceptance, representative corporate proxy/SSO/long-running
+load, and stable deployment approval remain separate. Existing Bootstrap/FontAwesome
+CDN reachability must be checked on the target PC (the package includes .NET,
+not an assurance of offline frontend operation).
+Important support gate: .NET 8 ended support on 2026-11-10 (Microsoft policy).
+The portable generator now pins its final 8.0.34 patch instead of inheriting the
+SDK's older 8.0.28 pack. The active source still uses installed shared 8.0.28;
+no machine-wide runtime was replaced. IMP-009 tracks a separately validated
+supported-runtime upgrade before stable deployment. Audits are not support approval.
 
 ## Dashboard Device Type And GitHub Delivery - 2026-11-11
 
