@@ -1,12 +1,25 @@
 # Current Status
 
-Last updated: 2026-11-13
+Last updated: 2026-11-14
 
-## rc.17 Delivered Locally - Not Published
+## rc.17 GitHub Publication In Progress
+
+Owner explicitly authorized GitHub source and existing rc.17 ZIP/SHA publication
+on 2026-11-14, superseding the local-only hold from the preceding work order.
+Publish an evaluation prerelease, not stable latest; tag exact tested source
+132396c37ab2270bac8a4ecbafc915ba949b5538. Do not regenerate the immutable ZIP.
+The local ZIP checksum and metadata match the receipts below. Remote main is
+6cdbb6ad5795953298dbe535683dd96615aa2182; rc.17 has no remote tag/release yet.
+Next: push reviewed public source, wait for CI, upload ZIP/SHA as a draft, verify
+assets, publish and download/reconcile them. Keep port 5000 and private data intact.
+Publication evidence: artifacts/verification/publication-rc17-20261114.
+
+## rc.17 Local Delivery - 2026-11-13
 
 Owner authorized implementation of IMP-013/016/017/018/019 on 2026-11-13.
-Keep AND semantics; independent option lists do not mean OR. No new GitHub
-publication is authorized. Local portable must have a new folder/ZIP/SHA.
+Keep AND semantics; independent option lists do not mean OR. This original local
+work order did not authorize publication; the 2026-11-14 approval above does.
+Local portable must have a new folder/ZIP/SHA.
 
 Interruption safety: keep rc.16 binaries/assets and a verified DB backup in a
 private checkpoint before changing runtime/UI. Serve the old webroot until the
@@ -64,8 +77,8 @@ Resume: read this section first, then docs/IMPROVEMENTS.md and docs/ROADMAP.md.
 Evidence: artifacts/verification/ux17-20261113 plus the named native/mutation
 receipts. The ZIP is the primary file to copy, with its adjacent SHA-256.
 Post-generation documentation does not modify the immutable build-time package.
-Next: owner tests real sites/SSO and the ZIP on the destination PC; GitHub remains
-on hold for this delivery. Do not infer rc.17 evidence from older rc.16 receipts.
+Next: owner tests real sites/SSO and the ZIP on the destination PC. The original
+GitHub hold is superseded above. Do not infer rc.17 evidence from rc.16 receipts.
 
 ## Historical Intake - 2026-11-13
 

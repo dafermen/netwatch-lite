@@ -47,6 +47,13 @@ These instructions are mandatory for any Codex session working on NetWatch Lite.
 
 ## Safety Rules
 
+- On 2026-11-14 the owner explicitly authorized publishing rc.17 source and its
+  existing neutral portable ZIP/SHA to GitHub. This supersedes the rc.17 local
+  hold below, not stable-deployment approval. Tag the tested package source
+  132396c37ab2270bac8a4ecbafc915ba949b5538; never rebuild or overwrite rc.17 or
+  earlier artifacts. Keep the release a prerelease and preserve the stable latest.
+  Record actual publication/download/CI receipts in CURRENT_STATUS.
+
 - Work order 2026-11-13 authorizes local implementation of IMP-013/016/017/018/019,
   tests/docs/new immutable portable and local port-5000 activation, not another
   GitHub publication. Keep interruption checkpoints and CURRENT_STATUS current;
