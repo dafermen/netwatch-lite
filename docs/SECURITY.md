@@ -1,5 +1,19 @@
 # NetWatch Lite Security
 
+Configuration recovery vaults/downloads contain full private inventory, including
+notes and URLs. Exclude `configuration-versions/` from source/packages, restrict
+filesystem/download access, and keep recovery APIs behind internal controls.
+Two UI confirmations and profile/revision/hash preconditions prevent accidents
+and stale writes, not unauthorized access or verified attribution.
+
+HTTP redirect following is opt-in per saved check, default off. It allows
+authorized cross-origin HTTP/HTTPS GETs, bounded to five hops/one deadline, with
+strict TLS and no HTTPS downgrade, credentials, cookies or browser state. Known
+Microsoft login destinations are not fetched/treated as healthy; unknown custom
+login pages still require positive expectations or a browser check. This remains
+an internal outbound URL checker, not an SSRF-safe public endpoint. See
+[HTTP security/limits](HTTP_CHECKS.md) and [recovery](CONFIGURATION_RECOVERY.md).
+
 Authenticated checks use non-persistent Edge contexts with manual login, local
 same-origin session actions and bounded lifetime/concurrency. Never collect
 credentials, load a personal profile, save StorageState or package sessions.

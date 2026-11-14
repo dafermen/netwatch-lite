@@ -1,5 +1,12 @@
 # 0003 - Bounded HTTP Application Checks
 
+2026-11-13 amendment (IMP-018): redirects remain off by default. A per-check
+`followRedirects` opt-in follows up to five validated HTTP/HTTPS GET hops within
+one attempt deadline, with loop detection, strict TLS, no downgrade and no
+cookies/credentials/browser state. Known Microsoft login redirects/content are
+neutral, never authenticated health. See HTTP_CHECKS.md for the complete policy.
+The original no-follow decision below remains the compatibility baseline.
+
 ## Status
 
 Accepted - 2026-11-06.

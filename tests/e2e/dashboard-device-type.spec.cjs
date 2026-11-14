@@ -43,7 +43,7 @@ test('type filter combines with facility/search/status without writes or widenin
   await expect(page.locator('#run-group-check')).toBeDisabled();
   await page.locator('#dashboard-device-type').selectOption('web-app');
   await expect(rows(page)).toHaveCount(1);
-  await expect(page.locator('#group-check-select option')).toHaveText(['All categories', 'Websites']);
+  await expect(page.locator('#group-check-select option')).toHaveText(['All categories', 'Infrastructure', 'Shared', 'Websites']);
   await expect(page.locator('#dashboard-device-type option[value="web-app"]')).toHaveText(customTypeName);
   await expect(page.locator('#dashboard-device-type img')).toHaveCount(0);
   await page.locator('label[for="filter-offline"]').click();

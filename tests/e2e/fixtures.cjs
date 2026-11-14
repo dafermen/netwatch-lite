@@ -96,4 +96,13 @@ const test = base.extend({
   }, { auto: true }]
 });
 
-module.exports = { test, expect };
+async function confirmConfigImport(page) {
+  await expect(page.locator('#management-confirm-modal')).toBeVisible();
+  await expect(page.locator('#management-confirm-title')).toHaveText('Import configuration?');
+  await page.locator('#management-confirm').click();
+  await expect(page.locator('#management-confirm-title')).toHaveText('Final confirmation');
+  await page.locator('#management-confirm').click();
+  await expect(page.locator('#management-confirm-modal')).toBeHidden();
+}
+
+module.exports = { test, expect, confirmConfigImport };

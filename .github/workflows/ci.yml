@@ -75,7 +75,7 @@ jobs:
           $patterns = @(
             '\.(db|sqlite)(-[^/]*)?$',
             '(^|/)\.netwatch-runtime\.lock$',
-            '^(storage-backups|storage-exports|storage-restores)/',
+            '^(storage-backups|storage-exports|storage-restores|configuration-versions)/',
             '^storage-migration-.*\.json$',
             '\.backup\.json$',
             '^Data/config(\.backup)?\.json$',

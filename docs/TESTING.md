@@ -1,5 +1,15 @@
 # NetWatch Lite Testing Guide
 
+rc.17 recovery/monitoring evidence is recorded in
+[VALIDATION_RECOVERY_2026-11-13.md](VALIDATION_RECOVERY_2026-11-13.md), separately
+from older release receipts. Focused contracts are ConfigurationVersionsTests and
+HTTP opt-in redirect tests; browser workflows include configuration-recovery on
+both storage providers, languages and viewports. Test cancellations, stale file/
+profile/revision, write failure, exact bytes/hash and no unintended execution.
+Complete all thirteen deployment gates, not just the happy-path smoke check.
+`scripts/test-recovery-mutations.ps1` runs nine selected recovery/redirect mutants
+in isolated source copies and requires real failed-test receipts, not build errors.
+
 Authenticated-browser tests require installed Microsoft Edge. Contract tests use
 headless dedicated contexts and synthetic loopback sign-in, never corporate SSO,
 personal profiles or real MFA. See [browser validation](VALIDATION_BROWSER_2026-11-12.md).

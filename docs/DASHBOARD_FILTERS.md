@@ -1,5 +1,19 @@
 # Inventory Filters And Exact Execution
 
+## Independent Choices (rc.17)
+
+Device Type and Category option lists do not narrow each other on Dashboard or
+Configuration. Facility can still scope the category choices. The matching rule
+remains **AND**: Workstation + Websites shows only workstations in Websites, not
+their union. An incompatible pair correctly shows zero rows and cannot execute.
+Clear filters resets view state only, including enabled-only participation on
+Dashboard; it does not run checks, enable paused records or delete history.
+
+Monitoring participation now reads **Enabled for checks / Checks paused / All
+items** (translated in Spanish). This filters `enabled`, not online status and
+not Auto Refresh. All includes both states in the view, but execution always
+excludes paused records. Version text on main comes from the running backend.
+
 ## Shared Filters
 
 Dashboard and Configuration combine search, Facility, Device Type, Category,

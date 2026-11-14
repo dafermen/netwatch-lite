@@ -2,7 +2,7 @@
 
 For manual Microsoft sign-in/rendered-page validation, use the separate
 [authenticated browser check](BROWSER_CHECKS.md). The rules below apply only to
-anonymous `type: http`; its redirect/cookie/TLS behavior has not changed.
+anonymous `type: http`. Redirects remain off by default; opt-in support is below.
 
 ## Configure A Web Application
 
@@ -55,20 +55,33 @@ the backend machine can reach, preferably a read-only application health URL.
 | `timeoutMs` | 100-60000 ms; defaults to 10000. Independent of the global ping/TCP timeout. Applies per attempt, from request through required body reading. |
 | `expectedStatusCode` | Exact status 200-599; defaults to 200. Explicitly expecting an error status will count it as successful. |
 | `expectedText` | Optional literal, case-sensitive substring, at most 4096 characters. Empty means status-only. Whitespace is preserved. No regex, HTML parsing or JavaScript execution. |
+| `followRedirects` | Optional boolean, default false; HTTP-only. Follows up to five 301/302/303/307/308 redirects under one per-attempt deadline. |
 
 HTTP checks send anonymous GET requests with `NetWatch-Lite/1.0` as User-Agent.
-They do not follow redirects, share cookies, or send operator/browser login
-credentials. A 302 login redirect fails an expected 200 instead of validating
-the login page. Point to the final approved URL or explicitly expect the
-redirect status. TLS certificates are validated normally against the backend
+They never share cookies or send operator/browser login credentials. By default
+a 302 fails expected 200; explicitly expecting 302 only proves that redirect was
+returned. **Follow HTTP redirects (including 302)** is a saved, per-check opt-in,
+not a global switch or authentication. TLS certificates are validated against the backend
 machine's trust store; there is no bypass switch.
 
-If text is configured, at most 1 MiB of decompressed body is accepted. The
+Opt-in redirects allow relative and cross-origin HTTP/HTTPS GET destinations.
+Only monitor authorized safe-to-GET targets; host/network controls must restrict
+destinations. Loops, more than five hops, missing/invalid Location, embedded
+credentials, non-HTTP schemes and HTTPS-to-HTTP downgrade are blocked. Fragments
+are removed before requesting. Hops and final body share the same attempt timeout;
+redirects are not retries. No Authorization, Cookie or Referer is carried along.
+Built-in Microsoft login destinations are stopped before fetching; recognizable
+authentication/error content is also neutral AuthenticationRequired, not health.
+Unknown/custom login pages cannot all be detected: use a stable positive expected
+text or an authenticated browser check for protected applications.
+
+If text or redirect following is configured, at most 1 MiB of decompressed body is accepted. The
 declared character encoding is used, or UTF-8 when absent. Over-limit and
 unsupported-encoding responses fail clearly. Text matching requires the whole
 bounded response to finish; finding a substring in an unfinished stream is
-not enough. Status-only checks finish at response headers and do not prove
-that the response body is complete.
+not enough. Default no-follow status-only checks finish at response headers and
+do not prove body completion. Opt-in checks read the bounded body even without
+expected text, to reject recognized login/error documents. This is not rendering.
 
 Existing global concurrency and retry settings apply. With `retryCount=N`,
 there are at most N+1 attempts, each with its own timeout and the configured
@@ -82,6 +95,7 @@ Configure retries in **Configuration > Settings**: **Retries** accepts 0-5
 accepts 0-10000 milliseconds between failed attempts. Use **Save Settings**.
 These settings belong to the active support group and apply to Ping, TCP and
 HTTP; they are not a per-URL retry override. A successful attempt stops retries.
+AuthenticationRequired is not retried as an outage.
 
 The HTTP editor has concise English/Spanish helper text below Timeout and Expected text,
 following the explicit UI language (English by default).
@@ -103,6 +117,8 @@ failures, searchable references and private filtered exports. Dashboard details
 explain 404/redirect/timeout/DNS/TLS/incomplete-response cases without bypassing
 security or automatically accepting a failed expectation. New HTTP records include
 actual `attempts` and optional transport `diagnosticCode`; old records remain unknown.
+Opt-in redirect results additionally include `redirectCount` and `finalUrl`
+(query/fragment removed), available in Dashboard details even after success.
 See [diagnostics](DIAGNOSTICS.md) and [exact filter execution](DASHBOARD_FILTERS.md).
 
 Dashboard's TCP / HTTP column shows actual status, elapsed time, target and
@@ -116,6 +132,8 @@ present on body-read timeouts. Status strings include:
 | Status | Meaning / action |
 | --- | --- |
 | `Success` | Configured status and optional text matched. |
+| `AuthenticationRequired` | Opt-in HTTP reached a known login destination/content; not confirmed health or downtime. Use a browser check. |
+| `RedirectBlocked` | Invalid/unsafe destination, loop or more than five hops; inspect the diagnostic code. |
 | `UnexpectedStatus` | Inspect the returned code, server health, authentication requirement or redirect. |
 | `ExpectedTextMissing` | Check the expected case/content; a 200 error/login/maintenance page is not sufficient. |
 | `TimedOut` | Check server latency and reachability; adjust the deadline deliberately. |
@@ -137,6 +155,11 @@ definitions survive device edits/copies, bulk updates, profile copies and JSON
 import/export. Old application binaries do not support HTTP checks; back up
 configuration before upgrading or rolling back, and do not save new profiles
 through an older binary.
+
+rc.16 understands HTTP but not the new redirect flag/recovery UI. The private
+rollback pilot covers unchanged existing data, not saving new opt-in definitions
+through an older build. Keep the matching rc.17 binary/UI with new configuration;
+use verified offline copies for a deliberate rollback.
 
 This adds outbound requests to configured destinations, including internal and
 loopback addresses by design. It is not an SSRF-safe public API. Only trusted

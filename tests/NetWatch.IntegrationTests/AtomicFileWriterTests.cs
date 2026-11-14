@@ -94,6 +94,33 @@ public sealed class AtomicFileWriterTests : IDisposable
         Assert.Empty(Directory.GetFiles(_directory, "*.tmp"));
     }
 
+    [Fact]
+    public async Task NoBackupByteWrites_SustainRepeatedAtomicReplacement()
+    {
+        byte[] expected=[];
+        for(var n=0;n<160;n++)
+        {
+            expected=System.Text.Encoding.UTF8.GetBytes("{\"sequence\":"+n+",\"payload\":\""+new string('x',n*5)+"\"}");
+            await AtomicFileWriter.WriteBytesAsync(Destination,expected,createBackup:false);
+            Assert.Equal(expected,await File.ReadAllBytesAsync(Destination));
+        }
+        Assert.False(File.Exists(Path.ChangeExtension(Destination,".backup.json")));
+        Assert.Empty(Directory.GetFiles(_directory,"*.tmp"));
+    }
+
+    [Fact]
+    public async Task PermanentWindowsReader_FailsBoundedlyWithoutReplacingBytes()
+    {
+        if(!OperatingSystem.IsWindows()) return;
+        await AtomicFileWriter.WriteTextAsync(Destination,"original");
+        using var reader=new FileStream(Destination,FileMode.Open,FileAccess.Read,FileShare.ReadWrite);
+        var watch=System.Diagnostics.Stopwatch.StartNew();
+        await Assert.ThrowsAsync<IOException>(()=>AtomicFileWriter.WriteBytesAsync(Destination,[1,2,3],createBackup:false));
+        Assert.InRange(watch.ElapsedMilliseconds,400,5000);
+        Assert.Equal("original",await File.ReadAllTextAsync(Destination));
+        Assert.Empty(Directory.GetFiles(_directory,"*.tmp"));
+    }
+
     private sealed class FailingConverter : JsonConverter<int>
     {
         public override int Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>

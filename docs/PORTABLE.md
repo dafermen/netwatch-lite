@@ -1,5 +1,11 @@
 # Versioned Windows Portables
 
+The rc.17 local work order does not authorize GitHub publication. Generate a new
+immutable versioned folder + ZIP + SHA-256, never replace rc.16 or older archives.
+Configuration recovery vaults (`configuration-versions/`), like active data and
+browser sessions, are private and must not enter the package. Its UI build label
+must match the executable's version; test `/api/build` in the extracted copy.
+
 rc.16 includes a pinned Microsoft.Playwright driver (117 exact SHA-256-checked
 files), not Edge, cookies, sessions or personal profiles. Microsoft Edge and an
 interactive desktop are prerequisites only for [authenticated browser checks](BROWSER_CHECKS.md).

@@ -194,10 +194,24 @@ app.MapGet("/api/storage", (LocalDataStore storage) => Results.Ok(new
 {
     provider = storage.Provider, schemaVersion = storage.IsSqlite ? LocalDataStore.CurrentSchemaVersion : (int?)null, engineVersion = storage.EngineVersion
 }));
+app.MapGet("/api/build", (HttpResponse response, LocalDataStore storage) =>
+{
+    response.Headers.CacheControl = "no-store";
+    var assembly = typeof(Program).Assembly;
+    var info = assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+        .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().SingleOrDefault()?.InformationalVersion
+        ?? assembly.GetName().Version?.ToString() ?? "unknown";
+    var parts = info.Split('+', 2);
+    return Results.Ok(new { version = parts[0], build = parts.Length == 2 ? parts[1] : null,
+        runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+        provider = storage.Provider, schemaVersion = storage.IsSqlite ? LocalDataStore.CurrentSchemaVersion : (int?)null,
+        engineVersion = storage.EngineVersion });
+});
 app.MapStorageEndpoints();
 app.MapMonitoringEndpoints();
 app.MapBrowserCheckEndpoints();
 app.MapDiagnosticEndpoints();
+app.MapConfigurationVersionEndpoints();
 
 // Reloads the active support group JSON from disk without restarting the application.
 app.MapPost("/api/reload", async (JsonDeviceRepository deviceRepository) =>

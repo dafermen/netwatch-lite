@@ -53,4 +53,10 @@ public sealed class CheckResult
     /// <summary>Actual HTTP attempt count; absent in legacy history and checks without this measurement.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public int? Attempts { get; set; }
+    /// <summary>Redirect hops followed by an opted-in anonymous HTTP attempt.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public int? RedirectCount { get; init; }
+    /// <summary>Final anonymous HTTP destination without query or fragment.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? FinalUrl { get; init; }
 }

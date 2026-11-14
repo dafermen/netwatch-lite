@@ -1,4 +1,4 @@
-const { test, expect } = require('./fixtures.cjs');
+const { test, expect, confirmConfigImport } = require('./fixtures.cjs');
 const fs = require('node:fs/promises');
 
 const inventory = () => ({
@@ -73,6 +73,7 @@ test('printer and scanner links survive edits, duplicate models, copy, bulk and 
     expect(device.workstationPeripherals.scanners.items[0].linkType).toBe('cabled');
   }
   await page.locator('#import-config-file').setInputFiles({ name: 'peripheral-links.json', mimeType: 'application/json', buffer: Buffer.from(text) });
+  await confirmConfigImport(page);
   await expect(page.locator('#config-alert')).toContainText('2 devices loaded');
   expect((await request.post('/api/regions', { data: { name: 'Copied links', copyFromActive: true } })).ok()).toBeTruthy();
   const copied = await (await request.get('/api/config')).json();

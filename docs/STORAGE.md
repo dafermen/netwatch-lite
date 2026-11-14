@@ -1,5 +1,12 @@
 # Local Storage And SQLite
 
+rc.17 adds private profile configuration recovery documents without changing
+schema 2. SQLite snapshot + import/restore commit together. JSON writes the
+recovery vault first; a failed replacement can leave an extra safe recovery point.
+Offline migration and JSON reversal exports include `configuration-versions/`.
+No automatic retention/deletion is applied to these points; see the
+[recovery contract](CONFIGURATION_RECOVERY.md). Never include them in Git/portables.
+
 NetWatch supports SQLite schema 2 and a compatible JSON mode. See
 [ADR 0007](adr/0007-sqlite-relational-projections.md), extending
 [ADR 0006](adr/0006-sqlite-document-persistence.md), for the model and tradeoffs.

@@ -232,7 +232,8 @@ public sealed class NetworkMonitorService
     /// <returns>Healthy when every check succeeded, Degraded when some checks succeeded, otherwise Down.</returns>
     private static DeviceStatus ComputeStatus(IReadOnlyCollection<CheckResult> checkResults)
     {
-        var definitive = checkResults.Where(result => result.Type != "browser" || result.Status is not ("AuthenticationRequired" or "NotEvaluated" or "BrowserUnavailable" or "NavigationBlocked" or "UnexpectedDestination" or "SessionLimit")).ToArray();
+        var definitive = checkResults.Where(result => result.Status != "AuthenticationRequired" &&
+            (result.Type != "browser" || result.Status is not ("NotEvaluated" or "BrowserUnavailable" or "NavigationBlocked" or "UnexpectedDestination" or "SessionLimit"))).ToArray();
         if (definitive.Length == 0 && checkResults.Count > 0)
             return checkResults.Any(result => result.Status == "AuthenticationRequired") ? DeviceStatus.AuthenticationRequired : DeviceStatus.Unknown;
         if (definitive.Any(result => !result.IsAvailable))
@@ -283,7 +284,7 @@ public sealed class NetworkMonitorService
             {
                 return await RunWithRetryAsync(
                     () => _httpChecks.CheckAsync(check, cancellationToken),
-                    result => result.IsAvailable,
+                    result => result.IsAvailable || result.Status == "AuthenticationRequired",
                     settings,
                     cancellationToken);
             }

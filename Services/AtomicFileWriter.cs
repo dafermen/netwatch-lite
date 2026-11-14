@@ -24,6 +24,10 @@ public static class AtomicFileWriter
         }, cancellationToken);
     }
 
+    /// <summary>Publishes exact document bytes, including unknown JSON fields and encoding markers.</summary>
+    public static Task WriteBytesAsync(string filePath, byte[] bytes, CancellationToken cancellationToken = default, bool createBackup = true) =>
+        WriteAsync(filePath, async stream => await stream.WriteAsync(bytes, cancellationToken), cancellationToken, createBackup);
+
     /// <summary>Copies a file completely before publishing the destination.</summary>
     public static Task CopyAsync(string sourcePath, string filePath, bool overwrite,
         CancellationToken cancellationToken = default)
@@ -43,6 +47,7 @@ public static class AtomicFileWriter
         var directory = Path.GetDirectoryName(destination)!;
         Directory.CreateDirectory(directory);
         var temporary = Path.Combine(directory, $".netwatch-{Guid.NewGuid():N}.tmp");
+        var retainStagedRecovery = false;
         try
         {
             await using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write,
@@ -69,17 +74,25 @@ public static class AtomicFileWriter
                     }
                     break;
                 }
-                catch (IOException exception) when (attempt < 6 && (exception.HResult & 0xffff) is 32 or 33)
+                catch (IOException exception) when (attempt < 6 &&
+                    ((exception.HResult & 0xffff) is 32 or 33 ||
+                     (exception.HResult & 0xffff) == 1175 && File.Exists(temporary) && File.Exists(destination)))
                 {
-                    // Windows readers without delete sharing can temporarily block atomic replacement.
+                    // ReplaceFileW 1175 retains both names; unlike 1176/1177 it is safe to retry.
                     await Task.Delay(25 * (attempt + 1), cancellationToken);
+                }
+                catch (IOException exception) when ((exception.HResult & 0xffff) is 1176 or 1177)
+                {
+                    // Native partial replacement: retain the staged bytes for offline recovery.
+                    retainStagedRecovery = true;
+                    throw;
                 }
             }
         }
         finally
         {
             // Cleanup must not hide a serialization or filesystem failure.
-            try { File.Delete(temporary); }
+            try { if (!retainStagedRecovery) File.Delete(temporary); }
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
         }

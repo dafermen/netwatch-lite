@@ -1,5 +1,36 @@
 # NetWatch Lite API
 
+## Build And Configuration Recovery (rc.17)
+
+`GET /api/build` returns the running assembly's `version` and optional source
+`build` suffix, actual `runtime`, storage `provider`, `schemaVersion` and
+`engineVersion`. No filesystem paths or operator/inventory data. No-store.
+
+Modern imports upload `configFile` (.json, 1 byte through 5 MiB):
+
+| Endpoint | Contract |
+| --- | --- |
+| `POST /api/config/import/preview` | Read-only validation; `X-NetWatch-Profile`. Returns profile, revision, file SHA-256 and current/incoming counts. |
+| `POST /api/config/import/commit` | Same file plus `X-NetWatch-Profile`, `X-NetWatch-Revision`, `X-NetWatch-Import-SHA256`. Creates a pre-change point and replaces only the reviewed profile. Returns count/configuration. |
+| `GET /api/config/versions` | Active-profile metadata/revision/capacity and at most 20 points; no saved payloads. |
+| `POST /api/config/versions/{id}/preview` | Returns source/destination counts, hash and metadata. |
+| `POST /api/config/versions/{id}/download` | Downloads exact private saved bytes as JSON; invalid original JSON remains downloadable. |
+| `POST /api/config/versions/{id}/restore` | Validates payload, first saves current configuration, then restores selected profile bytes. |
+| `POST /api/config/versions/{id}/delete` | Explicitly removes only the selected point, not current inventory/history. |
+
+Version POSTs use JSON `{ "profileId": "...", "revision": "...", "sha256": "..." }`.
+The restore SHA is required; all actions recheck profile/revision. Stale scope or
+file hash returns 409, invalid/full/corrupt history or configuration returns 400,
+unexpected storage failure uses the existing sanitized diagnostics/reference
+middleware. Successful/validation recovery responses are no-store. The legacy import API remains and
+now also snapshots, without interactive confirmations. UI confirmations prevent
+accidents, not unauthorized API access. See [recovery bounds](CONFIGURATION_RECOVERY.md).
+
+HTTP checks accept optional `followRedirects: true`; omitted/false keeps old
+behavior and is omitted on save. Opt-in results add `redirectCount` and sanitized
+`finalUrl`. `AuthenticationRequired` is neutral and not retried as downtime;
+`RedirectBlocked` includes a safe diagnostic code. See [HTTP](HTTP_CHECKS.md).
+
 Authenticated checks add `type: browser` and guarded `POST /api/browser-sessions`.
 See [browser-check API/states](BROWSER_CHECKS.md#api-and-compatibility). They do not
 authenticate NetWatch or change HTTP probes. Numeric statuses 0/1/2 are preserved;

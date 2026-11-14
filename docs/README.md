@@ -11,6 +11,8 @@ other development tools.
 
 ## Core Documents
 
+- [Configuration recovery](CONFIGURATION_RECOVERY.md): two confirmations, private versions, preview/download/restore.
+
 - [Supported .NET runtime](RUNTIME.md): .NET 10 LTS, servicing, local SDK and rollback.
 
 - [Interface languages](UI_LANGUAGES.md): English default, Spanish preference and data boundaries.
@@ -39,6 +41,8 @@ other development tools.
 - [Architecture Decisions](adr/README.md): decisions that materially affect the system.
 
 ## Other Documentation
+
+- [Recovery and monitoring UX rc.17 - 2026-11-13](VALIDATION_RECOVERY_2026-11-13.md)
 
 - [.NET 10 migration and local rc.15 - 2026-11-12](VALIDATION_DOTNET10_2026-11-12.md)
 

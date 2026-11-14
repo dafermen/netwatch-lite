@@ -161,6 +161,131 @@ public sealed class HttpCheckServiceTests
         Assert.Null(sockets.SslOptions.RemoteCertificateValidationCallback);
     }
 
+    private static DeviceCheck RedirectCheck(int timeout = 1000) => new() { Type = "http",
+        Url = "https://example.invalid/start?private=original", TimeoutMs = timeout, FollowRedirects = true, ExpectedText = "READY" };
+    private static HttpResponseMessage Redirect(string location, int status = 302)
+    {
+        var response = new HttpResponseMessage((HttpStatusCode)status);
+        response.Headers.TryAddWithoutValidation("Location", location);
+        response.Headers.TryAddWithoutValidation("Set-Cookie", "private=session");
+        return response;
+    }
+
+    [Theory]
+    [InlineData(301)] [InlineData(302)] [InlineData(303)] [InlineData(307)] [InlineData(308)]
+    public async Task OptIn_FollowsRelativeThenCrossOriginWithoutState(int status)
+    {
+        var calls = 0;
+        var result = await Service((request, _) =>
+        {
+            Assert.Null(request.Headers.Authorization);
+            Assert.False(request.Headers.Contains("Cookie"));
+            Assert.Equal(HttpMethod.Get, request.Method);
+            return Task.FromResult(++calls switch {
+                1 => Redirect("/next?private=second", status),
+                2 => Redirect("https://other.invalid/final?private=third#section", status),
+                _ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("READY") }
+            });
+        }).CheckAsync(RedirectCheck(), default);
+        Assert.True(result.IsAvailable); Assert.Equal(3, calls); Assert.Equal(2, result.RedirectCount);
+        Assert.Equal("https://other.invalid/final", result.FinalUrl);
+        Assert.DoesNotContain("private", System.Text.Json.JsonSerializer.Serialize(result));
+    }
+
+    [Fact]
+    public async Task DefaultOff_CanExplicitlyExpect302ButDoesNotFollowIt()
+    {
+        var calls = 0;
+        var result = await Service((_, _) => { calls++; return Task.FromResult(Redirect("https://login.microsoftonline.com/secret")); })
+            .CheckAsync(Check(code: 302), default);
+        Assert.True(result.IsAvailable); Assert.Equal(1, calls);
+        Assert.Null(result.RedirectCount); Assert.Null(result.FinalUrl);
+    }
+
+    [Theory]
+    [InlineData("http://other.invalid/plain", "HttpsDowngrade")]
+    [InlineData("file:///C:/secret", "InvalidRedirect")]
+    [InlineData("https://name:password@other.invalid/", "InvalidRedirect")]
+    [InlineData("/start?private=original", "RedirectLoop")]
+    public async Task UnsafeOrLoopingRedirects_StopBeforeNextRequest(string location, string diagnostic)
+    {
+        var calls = 0;
+        var result = await Service((_, _) => { calls++; return Task.FromResult(Redirect(location)); })
+            .CheckAsync(RedirectCheck(), default);
+        Assert.Equal(1, calls); Assert.False(result.IsAvailable); Assert.Equal("RedirectBlocked", result.Status);
+        Assert.Equal(diagnostic, result.DiagnosticCode);
+        Assert.DoesNotContain("password", result.Message + result.FinalUrl);
+    }
+
+    [Fact]
+    public async Task HopLimit_IsBoundedAndNeverReturnsHealthy()
+    {
+        var calls = 0;
+        var result = await Service((_, _) => Task.FromResult(Redirect("/hop/" + ++calls)))
+            .CheckAsync(RedirectCheck(), default);
+        Assert.Equal(HttpCheckService.MaxRedirects + 1, calls);
+        Assert.Equal(5, result.RedirectCount); Assert.Equal("RedirectLimit", result.DiagnosticCode);
+    }
+
+    [Theory]
+    [InlineData("https://login.microsoftonline.com/common/authorize?private=token")]
+    [InlineData("https://login.windows.net/common/authorize")]
+    [InlineData("https://login.live.com/")]
+    public async Task IdentityProviderRedirect_IsNeutralAndNeverFetched(string location)
+    {
+        var calls = 0;
+        var result = await Service((_, _) => { calls++; return Task.FromResult(Redirect(location)); })
+            .CheckAsync(RedirectCheck(), default);
+        Assert.Equal(1, calls); Assert.Equal("AuthenticationRequired", result.Status);
+        Assert.False(result.IsAvailable); Assert.DoesNotContain("private", result.FinalUrl!);
+    }
+
+    [Fact]
+    public async Task LoginContentOnApplicationOrigin_IsNotHealthy()
+    {
+        var result = await Service((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            { Content = new StringContent("READY Sign in to your account") })).CheckAsync(RedirectCheck(), default);
+        Assert.Equal("AuthenticationRequired", result.Status); Assert.Equal("AuthenticationContent", result.DiagnosticCode);
+    }
+
+    [Fact]
+    public async Task RedirectHops_ShareOneDeadlineIncludingFinalBody()
+    {
+        var calls = 0;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var result = await Service(async (_, token) =>
+        {
+            calls++; await Task.Delay(80, token);
+            return Redirect("/hop/" + calls);
+        }).CheckAsync(RedirectCheck(200), default);
+        Assert.Equal("TimedOut", result.Status); Assert.InRange(calls, 1, 3);
+        Assert.InRange(clock.ElapsedMilliseconds, 100, 3000);
+    }
+
+    [Fact]
+    public async Task MissingLocation_IsControlled()
+    {
+        var result = await Service((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Redirect)))
+            .CheckAsync(RedirectCheck(), default);
+        Assert.Equal("InvalidRedirect", result.DiagnosticCode);
+    }
+
+    [Fact]
+    public async Task DeterministicRedirectFuzz_AlwaysBoundsRequestsAndRejectsUnfinishedChains()
+    {
+        var random=new Random(20261113);
+        for(var n=0;n<200;n++)
+        {
+            var calls=0;var cycle=random.Next(1,10);
+            var location=n%3==0?"/cycle/":n%3==1?"file:///private/":"https://user:secret@other.invalid/";
+            var result=await Service((_,_)=>Task.FromResult(Redirect(location+(++calls%cycle))))
+                .CheckAsync(RedirectCheck(),default);
+            Assert.False(result.IsAvailable);Assert.Equal("RedirectBlocked",result.Status);
+            Assert.InRange(calls,1,6);Assert.InRange(result.RedirectCount!.Value,0,5);
+            Assert.DoesNotContain("secret",result.Message+result.FinalUrl);
+        }
+    }
+
     private sealed class TestClientFactory(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new(new StubHandler(send)) { Timeout = Timeout.InfiniteTimeSpan };

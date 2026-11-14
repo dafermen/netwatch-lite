@@ -46,6 +46,7 @@ tests/.app/
 storage-backups/
 storage-exports/
 storage-restores/
+configuration-versions/
 storage-migration-*.json
 *.backup.json
 .netwatch-*.tmp

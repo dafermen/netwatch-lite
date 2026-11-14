@@ -15,7 +15,7 @@
       if (actual >= 300 && actual < 400) {
         title = `HTTP ${actual} - Redirect`;
         summary += ' Redirects are not followed.';
-        action = 'Use the final authorized URL, or explicitly expect the redirect. Browser login sessions are not used.';
+        action = 'Use the final authorized URL, enable Follow HTTP redirects, or explicitly expect the redirect. Browser login sessions are not used.';
       } else if (actual === 404) {
         title = 'HTTP 404 - Not found';
         action = 'Verify the exact URL path and application health endpoint from the backend host.';
@@ -23,6 +23,13 @@
         title = `HTTP ${actual} - Access required`;
         action = 'This check is anonymous. Use an approved health endpoint that does not require a browser login.';
       } else if (actual >= 500) action = 'The server or gateway reported an error. Inspect its health and server/proxy logs.';
+    } else if (status === 'AuthenticationRequired') {
+      title = 'HTTP - Authentication required';
+      summary = 'Authentication is required; application health was not confirmed.';
+      action = 'Use an authenticated browser check and sign in manually, or use an approved anonymous health endpoint.';
+    } else if (status === 'RedirectBlocked') {
+      title = 'HTTP redirect blocked'; summary = 'The redirect chain was invalid, unsafe, looping or longer than five hops.';
+      action = 'Verify the redirect destinations. HTTPS downgrade, embedded credentials and non-HTTP destinations are not allowed.';
     } else if (status === 'TimedOut') {
       title = 'HTTP timeout';
       summary = check.timeoutMs ? `HTTP check exceeded the ${check.timeoutMs} ms timeout.` : 'The HTTP deadline was exceeded.';

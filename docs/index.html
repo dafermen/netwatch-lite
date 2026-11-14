@@ -355,7 +355,7 @@
       <h2>Checks HTTP/HTTPS</h2>
       <p>En Configuration, seleccione HTTP / HTTPS y registre URL, timeout, codigo esperado y texto opcional. Full Check ejecuta estas verificaciones; Ping Only las omite. El estado agregado refleja fallos HTTP aunque el servidor acepte conexiones TCP.</p>
       <p>El timeout por intento acepta 100-60000 ms y usa 10000 por defecto. El codigo esperado usa 200 por defecto; el texto es literal y distingue mayusculas. Dashboard y Reports muestran codigo real, duracion y mensajes de error.</p>
-      <p>Se hace GET anonimo desde el backend, sin seguir redirecciones, compartir cookies, iniciar sesion ni ejecutar JavaScript. Se valida TLS y se limita el contenido descomprimido a 1 MiB cuando se busca texto. No publique este verificador sin controles de acceso y destinos permitidos. Consulte <a href="HTTP_CHECKS.md">la guia HTTP/HTTPS</a>.</p>
+      <p>Se hace GET anonimo desde el backend, sin cookies, credenciales ni JavaScript. Las redirecciones estan deshabilitadas por defecto; cada check puede habilitar hasta cinco saltos seguros bajo el mismo timeout, sin bajar de HTTPS a HTTP. Llegar al login de Microsoft no confirma salud. Se valida TLS y se limita el contenido descomprimido a 1 MiB cuando se valida texto o se habilitan redirecciones. No publique este verificador sin controles de acceso y destinos permitidos. Consulte <a href="HTTP_CHECKS.md">la guia HTTP/HTTPS</a>.</p>
       <p>Para aplicaciones con inicio de sesion manual use el check separado
 <strong>Authenticated browser</strong>: abre Edge dedicado en el PC del servicio,
 distingue sesion requerida de sitio caido y no guarda cookies en el portable.
@@ -578,7 +578,7 @@ dotnet run</pre>
         <li>Los temas se administran desde <code>/themes</code> y se guardan en el almacenamiento activo.</li>
         <li>Las instalaciones nuevas usan SQLite con un check de ping neutro a <code>127.0.0.1</code> y el tema <code>NetWatch Default</code>.</li>
         <li>En modo JSON se crean los archivos runtime faltantes; un inventario JSON existente no se importa automaticamente a SQLite.</li>
-        <li>Import JSON rechaza archivos vacios, archivos que no terminan en <code>.json</code>, archivos mayores de 5 MB, JSON invalido y configuraciones que no pasen validacion.</li>
+        <li>Import JSON rechaza archivos vacios, archivos que no terminan en <code>.json</code>, archivos mayores de 5 MB, JSON invalido y configuraciones que no pasen validacion. La interfaz pide dos confirmaciones y conserva primero la configuracion actual. <a href="CONFIGURATION_RECOVERY.md">Historial de configuracion, descarga y recuperacion por perfil</a>.</li>
         <li>La aplicacion inicia en modo manual; el auto refresh solo empieza cuando el operador activa el boton y repite el full check segun <code>settings.intervalSeconds</code>.</li>
         <li>Los botones de facility permiten enfocar y ejecutar una sede especifica cuando existen cientos de dispositivos.</li>
         <li>Los grupos de facility y categoria se contraen al finalizar un recorrido y muestran barras verdes, naranjas o rojas segun el estado.</li>

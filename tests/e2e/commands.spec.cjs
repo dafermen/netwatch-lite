@@ -1,4 +1,4 @@
-const { test, expect } = require('./fixtures.cjs');
+const { test, expect, confirmConfigImport } = require('./fixtures.cjs');
 const fs = require('node:fs/promises');
 
 const command = '"C:\\Program Files (x86)\\Remote Client\\guest.exe" "desk.example.test"';
@@ -76,6 +76,7 @@ test('command editing, copying, bulk save and JSON round trip preserve literal c
   const text = await fs.readFile(await download.path(), 'utf8');
   expect(JSON.parse(text).devices.map(device => device.command)).toEqual([editedCommand, editedCommand]);
   await page.locator('#import-config-file').setInputFiles({ name: 'commands.json', mimeType: 'application/json', buffer: Buffer.from(text) });
+  await confirmConfigImport(page);
   await expect(page.locator('#config-alert')).toContainText('2 devices loaded');
   await page.goto('/');
   await page.locator('#device-search').fill('Bulk copied desk');

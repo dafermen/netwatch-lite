@@ -23,12 +23,21 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 
 ## Portable Download
 
+Local candidate `0.8.0-rc.17` adds two-stage import confirmation and private
+[configuration recovery history](docs/CONFIGURATION_RECOVERY.md), independent
+Device Type/Category option lists (matching remains AND), clearer monitoring
+participation labels, the actual running build on Dashboard/About, and
+default-off bounded [HTTP redirects](docs/HTTP_CHECKS.md). It does not add SSO
+or reuse browser cookies for HTTP. Tests/package/activation evidence is in
+[rc.17 validation](docs/VALIDATION_RECOVERY_2026-11-13.md) and CURRENT_STATUS.
+This work order is local only; the published GitHub download below remains rc.16.
+
 Published prerelease `0.8.0-rc.16` adds a separate **Authenticated browser** check with
 manual sign-in in a dedicated Edge window, distinguishing authentication required
 from site failures. See the [setup and limits](docs/BROWSER_CHECKS.md) and
 [validation record](docs/VALIDATION_BROWSER_2026-11-12.md). Microsoft Edge and an
 interactive desktop are required for this check; no browser sessions, credentials
-or personal profiles are included in the portable. Anonymous HTTP is unchanged.
+or personal profiles are included in the portable. Anonymous HTTP default behavior is unchanged.
 
 It retains .NET 10 LTS/runtime 10.0.15, SQLite schema 2 and rc.14/15 features:
 English/Spanish UI, shared exact execution filters, grouping, pause/resume,

@@ -107,7 +107,12 @@ public sealed class JsonRegionProfileRepository
     /// </summary>
     /// <param name="cancellationToken">Token used to cancel file operations.</param>
     /// <returns>The profile currently used by dashboard and configuration endpoints.</returns>
-    public async Task<RegionProfile> GetActiveProfileAsync(CancellationToken cancellationToken = default)
+    public Task<RegionProfile> GetActiveProfileAsync(CancellationToken cancellationToken = default) =>
+        WithActiveProfileTransactionAsync(profile => Task.FromResult(profile), cancellationToken);
+
+    // Match profile mutations: acquire the profile lock before the storage transaction.
+    // The callback must not reenter this repository while the lock is held.
+    internal async Task<T> WithActiveProfileTransactionAsync<T>(Func<RegionProfile, Task<T>> action, CancellationToken cancellationToken)
     {
         await _profileLock.WaitAsync(cancellationToken);
 
@@ -116,8 +121,9 @@ public sealed class JsonRegionProfileRepository
             return await _storage.WithTransactionAsync(async () =>
             {
                 var configuration = await LoadConfigurationUnsafeAsync(cancellationToken);
-                return configuration.Profiles.First(current =>
+                var profile = configuration.Profiles.First(current =>
                     string.Equals(current.Id, configuration.ActiveProfileId, StringComparison.OrdinalIgnoreCase));
+                return await action(profile);
             }, cancellationToken);
         }
         catch
@@ -665,14 +671,14 @@ public sealed class JsonRegionProfileRepository
             .ToList();
     }
 
-    private static string CreateUniqueProfileId(string name, IEnumerable<RegionProfile> profiles)
+    private string CreateUniqueProfileId(string name, IEnumerable<RegionProfile> profiles, bool reserveRecoveryIds = true)
     {
         var baseId = Slugify(name);
         var ids = profiles.Select(profile => profile.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var candidate = baseId;
         var suffix = 2;
 
-        while (ids.Contains(candidate))
+        while (ids.Contains(candidate) || reserveRecoveryIds && _storage.Exists(ConfigurationVersionStorage.PathFor(_environment.ContentRootPath, candidate)))
         {
             candidate = $"{baseId}-{suffix}";
             suffix += 1;
@@ -735,7 +741,7 @@ public sealed class JsonRegionProfileRepository
     {
         var currentPath = ResolveProfileDeviceFilePath(currentFile);
         var currentDirectory = Path.GetDirectoryName(currentPath)!;
-        var newFile = $"regions/{CreateUniqueProfileId(newName, profiles.Where(profile => !string.Equals(profile.File, currentFile, StringComparison.OrdinalIgnoreCase)))}.json";
+        var newFile = $"regions/{CreateUniqueProfileId(newName, profiles.Where(profile => !string.Equals(profile.File, currentFile, StringComparison.OrdinalIgnoreCase)), reserveRecoveryIds: false)}.json";
         var newPath = ResolveProfileDeviceFilePath(newFile);
 
         if (string.Equals(currentPath, newPath, StringComparison.OrdinalIgnoreCase))

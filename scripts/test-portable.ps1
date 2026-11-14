@@ -45,7 +45,7 @@ try {
             $report.negativeChecks += "damaged:$relative"
         } finally { [IO.File]::WriteAllBytes($path, $bytes) }
     }
-    foreach ($privateName in @('config.json', 'netwatch.db', 'netwatch.db-wal', '.netwatch-runtime.lock', 'storage-policy.json', '.playwright/package/session.json')) {
+    foreach ($privateName in @('configuration-versions/private.backup.json', 'config.json', 'netwatch.db', 'netwatch.db-wal', '.netwatch-runtime.lock', 'storage-policy.json', '.playwright/package/session.json')) {
     $privateProbe = Join-Path $copy $privateName
     try {
         Write-NewPortableText $privateProbe '{"privateTestSentinel":true}'
@@ -102,6 +102,8 @@ try {
         '/management.js', '/docs/PORTABLE.md', '/docs/STORAGE.md', '/docs/RUNTIME.md', '/docs/adr/0008-dotnet10-lts.md', '/docs/VALIDATION_DOTNET10_2026-11-12.md',
         '/api/storage', '/api/config', '/api/regions', '/api/themes', '/api/history', '/api/integrations')
     if ($ExpectedStorageSchema -eq 2) { $routes += @('/reports-sql.js','/storage.js','/api/reports/query','/api/inventory/query','/api/storage/policy','/api/storage/audit','/api/storage/backups') }
+    $hasRecovery = Test-Path -LiteralPath (Join-Path $copy 'wwwroot/configuration-versions.js')
+    if ($hasRecovery) { $routes += @('/build-info.js','/configuration-versions.js','/api/build','/api/config/versions','/docs/CONFIGURATION_RECOVERY.md','/docs/VALIDATION_RECOVERY_2026-11-13.md') }
     foreach ($route in $routes) {
         $response = $client.GetAsync($base + $route).GetAwaiter().GetResult()
         try {
@@ -114,8 +116,48 @@ try {
                 $storage = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
                 if ($storage.provider -ne 'sqlite' -or $storage.schemaVersion -ne $ExpectedStorageSchema) { throw "Clean first run did not use SQLite schema $ExpectedStorageSchema." }
             }
+            if ($route -eq '/api/build') {
+                $build = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
+                if ($build.version -ne $metadata.version -or $build.runtime -ne '.NET 10.0.15' -or $build.provider -ne 'sqlite' -or $build.schemaVersion -ne 2) { throw 'Running package build/runtime/storage does not match its release metadata.' }
+                if (-not $response.Headers.CacheControl.NoStore) { throw 'Build metadata must not be cached.' }
+            }
             $report.routes += [ordered]@{ path = $route; status = 200 }
         } finally { $response.Dispose() }
+    }
+    if ($hasRecovery) {
+        $before = $client.GetStringAsync("$base/api/config").GetAwaiter().GetResult()
+        $state = $client.GetStringAsync("$base/api/config/versions").GetAwaiter().GetResult() | ConvertFrom-Json
+        if (@($state.versions).Count -ne 0) { throw 'Neutral package unexpectedly has recovery payloads.' }
+        $json = '{"devices":[{"name":"Portable recovery synthetic","ip":"127.0.0.1","checks":[{"type":"http","url":"http://127.0.0.1:1/health","followRedirects":true}]}]}'
+        function Send-RecoveryUpload([string]$Route, $Guard) {
+            $request = New-Object Net.Http.HttpRequestMessage([Net.Http.HttpMethod]::Post, ($base + $Route))
+            try {
+                $form = New-Object Net.Http.MultipartFormDataContent
+                $form.Add((New-Object Net.Http.StringContent($json, [Text.Encoding]::UTF8, 'application/json')), 'configFile', 'synthetic.json')
+                $request.Content = $form
+                $null = $request.Headers.TryAddWithoutValidation('X-NetWatch-Profile', [string]$Guard.profileId)
+                if ($Guard.revision) { $null = $request.Headers.TryAddWithoutValidation('X-NetWatch-Revision', [string]$Guard.revision) }
+                if ($Guard.sha256) { $null = $request.Headers.TryAddWithoutValidation('X-NetWatch-Import-SHA256', [string]$Guard.sha256) }
+                return $client.SendAsync($request).GetAwaiter().GetResult()
+            } finally { $request.Dispose() }
+        }
+        $preview = Send-RecoveryUpload '/api/config/import/preview' $state
+        try { if (-not $preview.IsSuccessStatusCode) { throw 'Native import preview failed.' }; $guard = $preview.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json } finally { $preview.Dispose() }
+        if ($client.GetStringAsync("$base/api/config").GetAwaiter().GetResult() -ne $before) { throw 'Native import preview mutated configuration.' }
+        $commit = Send-RecoveryUpload '/api/config/import/commit' $guard
+        try { if (-not $commit.IsSuccessStatusCode) { throw 'Native reviewed import failed.' } } finally { $commit.Dispose() }
+        $repeat = Send-RecoveryUpload '/api/config/import/commit' $guard
+        try { if ([int]$repeat.StatusCode -ne 409) { throw 'Native stale import was not rejected.' } } finally { $repeat.Dispose() }
+        $state = $client.GetStringAsync("$base/api/config/versions").GetAwaiter().GetResult() | ConvertFrom-Json
+        if (@($state.versions).Count -ne 1) { throw 'Native import did not preserve the previous configuration.' }
+        $restoreGuard = @{ profileId=$state.profileId; revision=$state.revision; sha256=$state.versions[0].sha256 } | ConvertTo-Json
+        $content = New-Object Net.Http.StringContent($restoreGuard, [Text.Encoding]::UTF8, 'application/json')
+        try {
+            $restored = $client.PostAsync("$base/api/config/versions/$($state.versions[0].id)/restore", $content).GetAwaiter().GetResult()
+            try { if (-not $restored.IsSuccessStatusCode) { throw 'Native configuration recovery failed.' } } finally { $restored.Dispose() }
+        } finally { $content.Dispose() }
+        if ($client.GetStringAsync("$base/api/config").GetAwaiter().GetResult() -ne $before) { throw 'Native recovery changed the original configuration.' }
+        $report.recoveryChecks = 'Preview is read-only; reviewed import, stale rejection and profile recovery passed.'
     }
     if (-not (Test-Path -LiteralPath (Join-Path $copy 'netwatch.db') -PathType Leaf)) { throw 'SQLite first-run database missing.' }
     foreach ($file in @('regions.json', 'themes.json', 'integrations.json', 'monitor-history.json', 'storage-policy.json')) {

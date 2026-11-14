@@ -72,6 +72,9 @@ public static class StorageMaintenance
                 Add(Contained(root, Path.Combine(dataRoot, profile.File)), required: true);
         }
         foreach (var path in known.ToArray()) Add(Path.ChangeExtension(path, ".backup.json"));
+        var versions = Contained(root, "configuration-versions");
+        if (Directory.Exists(versions))
+            foreach (var path in Directory.EnumerateFiles(versions, "*.backup.json", SearchOption.TopDirectoryOnly)) Add(path);
         if (known.Count == 0) throw new InvalidDataException("No existing JSON documents were found to migrate.");
         var sources = new SortedDictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
         foreach (var path in known)

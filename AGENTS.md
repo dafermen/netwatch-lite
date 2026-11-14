@@ -47,15 +47,32 @@ These instructions are mandatory for any Codex session working on NetWatch Lite.
 
 ## Safety Rules
 
+- Work order 2026-11-13 authorizes local implementation of IMP-013/016/017/018/019,
+  tests/docs/new immutable portable and local port-5000 activation, not another
+  GitHub publication. Keep interruption checkpoints and CURRENT_STATUS current;
+  an assistant usage-limit interruption must leave the last working deployment
+  and backups intact, never trigger an automatic database rollback.
+
 - The owner authorized GitHub source/new portable publication for the authenticated
   browser-check delivery on 2026-11-12, superseding the preceding rc.14/15 hold.
   Publish only reviewed public source and neutral ZIP/SHA, never sessions, private
   data or verification copies. This does not authorize a stable deployment.
 - Do not commit runtime operational data. These files must stay private and ignored: `Data/config.json`, `Data/config.backup.json`, `Data/regions.json`, `Data/regions/`, `Data/themes.json`, `Data/monitor-history.json`, `Data/app-errors.json`, and `Data/integrations.json`.
 - Portable releases must include only safe sample data such as `Data/config.sample.json`.
+- Configuration recovery vaults under `configuration-versions/` are private.
+  Imports/restores must preserve the current full profile first, reject stale
+  profile/revision/file hashes and retain both explicit UI confirmations. SQLite
+  changes commit together; JSON writes the vault first and can leave an extra
+  pre-change point on failure. Never prune points automatically or replace a live
+  database for profile recovery. See docs/CONFIGURATION_RECOVERY.md.
+  Recovery acquires repository reload, profile and storage locks in that order.
+  Never hold a SQLite writer while waiting for the profile lock; use the shared
+  active-profile transaction callback and do not reenter the profile repository.
 - Never package database/sidecar/lease files or storage-backups/storage-exports.
   Include SQLite/native dependency notices, and validate a clean SQLite first run.
 - Build portables with `scripts/publish-portable.ps1 -Version <new-version>`.
+  Keep the project's default Version current for ordinary dotnet run/build;
+  Dashboard/About must read actual assembly metadata, never a folder label.
   Keep immutable extracted folders under `artifacts/portable/` and ZIP/checksum
   pairs under `artifacts/packages/`. Never overwrite/delete a historical version.
   Every delivery must include the versioned folder, compressed ZIP and SHA-256
@@ -111,10 +128,13 @@ These instructions are mandatory for any Codex session working on NetWatch Lite.
   or claim redaction guarantees anonymity.
 - HTTP/HTTPS definitions use `type: http`. Preserve their URL/expectations in
   all configuration workflows. Keep deadlines across body reads, bounded
-  decompressed content, strict TLS, no cookies/redirects and sanitized results.
+  decompressed content, strict TLS, no cookies and sanitized results. Redirects
+  remain off unless a saved check explicitly opts in under IMP-018; bound all
+  hops in one attempt deadline and do not treat identity-provider login as health.
   This internal URL checker is not a public or authenticated browser monitor.
-- Authenticated checks use a separate `type: browser`; never add cookies or
-  redirect following to anonymous HTTP checks. Use dedicated non-persistent Edge
+- Authenticated checks use a separate `type: browser`; never reuse their session
+  state or browser cookies in anonymous HTTP checks. The opt-in IMP-018 redirect mode
+  is not authentication. Use dedicated non-persistent Edge
   contexts with manual sign-in, bounded lifetime/concurrency and origin guards.
   Never read an existing personal profile, save/export browser state or package
   credentials. Authentication-required/unevaluated states are not site downtime.

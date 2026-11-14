@@ -35,6 +35,11 @@ public sealed class DeviceCheck
     [JsonPropertyName("expectedText")]
     public string? ExpectedText { get; init; }
 
+    /// <summary>Opt-in anonymous HTTP redirects; absent/false retains legacy behavior.</summary>
+    [JsonPropertyName("followRedirects")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool FollowRedirects { get; init; }
+
     /// <summary>Additional trusted HTTPS identity-provider origins for an interactive browser check.</summary>
     [JsonPropertyName("authenticationOrigins")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

@@ -1,4 +1,4 @@
-const { test, expect } = require('./fixtures.cjs');
+const { test, expect, confirmConfigImport } = require('./fixtures.cjs');
 const fs = require('node:fs/promises');
 
 const notes = 'Location: Floor 2 - Reception\nUsed by: Front desk\t<img src=x onerror=alert(1)> & "quotes"';
@@ -50,6 +50,7 @@ test('notes survive editing, copying, bulk changes, JSON round trips and profile
   const text = await fs.readFile(await download.path(), 'utf8');
   expect(JSON.parse(text).devices.map(device => device.notes ?? null)).toEqual([editedNotes, null, editedNotes]);
   await page.locator('#import-config-file').setInputFiles({ name: 'notes.json', mimeType: 'application/json', buffer: Buffer.from(text) });
+  await confirmConfigImport(page);
   await expect(page.locator('#config-alert')).toContainText('3 devices loaded');
   expect((await request.post('/api/regions', { data: { name: 'Copied notes profile', copyFromActive: true } })).ok()).toBeTruthy();
   expect((await (await request.get('/api/config')).json()).devices.map(device => device.notes ?? null)).toEqual([editedNotes, null, editedNotes]);

@@ -140,7 +140,7 @@ public sealed class HttpMonitoringTests
         using var client = factory.CreateClient();
         var configuration = Config(new DeviceCheck
         {
-            Type = "HTTP", Url = " https://example.invalid/health ", ExpectedText = " READY\n", TimeoutMs = 3000, ExpectedStatusCode = 202
+            Type = "HTTP", Url = " https://example.invalid/health ", ExpectedText = " READY\n", TimeoutMs = 3000, ExpectedStatusCode = 202, FollowRedirects = true
         });
         (await client.PostAsJsonAsync("/api/config", configuration)).EnsureSuccessStatusCode();
         (await client.PostAsync("/api/reload", null)).EnsureSuccessStatusCode();
@@ -157,6 +157,31 @@ public sealed class HttpMonitoringTests
         Assert.Equal(" READY\n", check.ExpectedText);
         Assert.Equal(3000, check.TimeoutMs);
         Assert.Equal(202, check.ExpectedStatusCode);
+        Assert.True(check.FollowRedirects);
+    }
+
+    [Theory]
+    [InlineData("json","/redirect-ok","Healthy","Success")]
+    [InlineData("sqlite","/redirect-ok","Healthy","Success")]
+    [InlineData("json","/redirect-login","AuthenticationRequired","AuthenticationRequired")]
+    [InlineData("sqlite","/redirect-login","AuthenticationRequired","AuthenticationRequired")]
+    [InlineData("json","/redirect-tls","Down","TlsError")]
+    [InlineData("sqlite","/redirect-tls","Down","TlsError")]
+    public async Task OptInRedirects_UseRealTransportAndNeutralAuthentication(string provider,string path,string deviceStatus,string checkStatus)
+    {
+        await using var server=await ProbeServer.StartAsync();
+        using var factory=new NetWatchApplicationFactory(null,provider);using var client=factory.CreateClient();
+        var config=Config(new DeviceCheck {Type="http",Url=server.Http+path+"?private=token",FollowRedirects=true,TimeoutMs=2000});
+        config=new MonitorConfiguration {Devices=config.Devices,Settings=new MonitorSettings {RetryCount=2,RetryDelayMs=0}};
+        (await client.PostAsJsonAsync("/api/config",config)).EnsureSuccessStatusCode();
+        var response=await client.PostAsync("/api/monitor/run",null);response.EnsureSuccessStatusCode();
+        var result=JsonNode.Parse(await response.Content.ReadAsStringAsync())!["results"]![0]!;
+        Assert.Equal(deviceStatus,result["status"]!.GetValue<string>());
+        var check=Assert.Single(result["checks"]!.AsArray())!;
+        Assert.Equal(checkStatus,check["status"]!.GetValue<string>());
+        Assert.Equal(checkStatus=="TlsError"?3:1,check["attempts"]!.GetValue<int>());
+        Assert.Equal(1,check["redirectCount"]!.GetValue<int>());
+        Assert.DoesNotContain("private=",await client.GetStringAsync("/api/history"));
     }
 
     public static IEnumerable<object[]> InvalidCases()
@@ -232,6 +257,9 @@ public sealed class HttpMonitoringTests
             app.MapGet("/ok", () => Results.Text("Service READY"));
             app.MapGet("/unavailable", () => Results.StatusCode(503));
             app.MapGet("/redirect", () => Results.Redirect("/redirect-target"));
+            app.MapGet("/redirect-ok", () => Results.Redirect("/ok?private=redirect"));
+            app.MapGet("/redirect-login", () => Results.Redirect("https://login.microsoftonline.com/common/authorize?private=secret"));
+            app.MapGet("/redirect-tls", () => Results.Redirect(server.Https+"/ok"));
             app.MapGet("/redirect-target", () => { Interlocked.Increment(ref server.RedirectTargetRequests); return Results.Ok(); });
             app.MapGet("/flaky", () => Results.StatusCode(Interlocked.Increment(ref server.FlakyRequests) == 1 ? 503 : 200));
             app.MapGet("/slow", async context =>

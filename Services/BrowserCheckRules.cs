@@ -12,6 +12,7 @@ public static class BrowserCheckRules
     /// <summary>Validates a browser definition without echoing private URL values.</summary>
     public static string? ValidationError(DeviceCheck check)
     {
+        if (check.FollowRedirects) return "followRedirects applies only to anonymous HTTP checks.";
         if (HttpCheckService.ValidationError(check) is { } error) return error;
         var uri = new Uri(check.Url!.Trim());
         if (uri.Scheme != "https" && !uri.IsLoopback) return "Browser checks require HTTPS, except for loopback test sites.";

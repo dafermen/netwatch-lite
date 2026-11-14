@@ -45,7 +45,7 @@ foreach ($path in @('Data/config.json', 'config.json', 'netwatch.db', 'netwatch.
     Assert-Rejected { Assert-PortablePublicPath $path }
 }
 foreach ($path in Get-PortablePublicFiles) { Assert-PortablePublicPath $path }; $script:passed++
-foreach ($path in @('storage-policy.json','Data/storage-policy.json','storage-restores/recovered/netwatch.db','storage-backups/managed/auto.db', '.playwright/package/private.json', '.playwright/profile/Cookies', 'playwright/.auth/session.json')) {
+foreach ($path in @('configuration-versions/private.backup.json','configuration-versions/private.md','storage-policy.json','Data/storage-policy.json','storage-restores/recovered/netwatch.db','storage-backups/managed/auto.db', '.playwright/package/private.json', '.playwright/profile/Cookies', 'playwright/.auth/session.json')) {
     Assert-Rejected { Assert-PortablePublicPath $path }
 }
 $new = Resolve-PortableChild $root 'nested/new.json'

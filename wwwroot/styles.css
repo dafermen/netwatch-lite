@@ -647,13 +647,14 @@ body {
 .language-control { width: 9.5rem; flex: none; }
 .config-filter-bar {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(11rem, 1.25fr) 2rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(11rem, 0.75fr);
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem;
   border-bottom: 1px solid var(--bs-border-color);
 }
 .config-filter-bar > *, .config-grouping-control { min-width: 0; }
+#clear-config-filters { grid-column: 4; justify-self: end; }
 .last-run-receipt { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; }
 .last-run-receipt[hidden] { display: none; }
 .monitoring-toggle { display: inline-flex; align-items: center; gap: 0.4rem; min-height: 1.5rem; margin: 0; }
@@ -683,11 +684,18 @@ body {
 }
 @media (max-width: 1199.98px) {
   .config-filter-bar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #clear-config-filters { grid-column: auto; justify-self: start; }
 }
 @media (max-width: 575.98px) {
   .config-filter-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .config-grouping-control { grid-column: 1 / -1; }
+  #config-monitoring-filter { grid-column: 1 / -1; }
   .monitoring-filter-control { width: 100%; }
+  #configuration-versions-modal .table, #configuration-versions-body { display: block; width: 100%; min-width: 0; }
+  #configuration-versions-modal thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  #configuration-versions-body tr { display: block; padding: 0.5rem 0; border-bottom: 1px solid var(--bs-border-color); }
+  #configuration-versions-body td { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 0.5rem; border: 0; padding: 0.3rem 0; min-width: 0; overflow-wrap: anywhere; }
+  #configuration-versions-body td::before { content: attr(data-label); color: var(--bs-secondary-color); font-size: 0.8rem; }
 }
 
 .config-toolbar {
@@ -757,6 +765,7 @@ body {
   min-width: 56rem;
   table-layout: fixed;
 }
+.config-devices-table th { white-space: normal; overflow-wrap: anywhere; }
 
 .config-col-name {
   width: 18%;
@@ -779,7 +788,7 @@ body {
 }
 
 .config-col-checks {
-  width: 4.5rem;
+  width: 8rem;
 }
 
 .config-col-actions {

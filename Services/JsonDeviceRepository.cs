@@ -8,7 +8,7 @@ namespace NetWatch.Services;
 /// <summary>
 /// Loads, validates, normalizes, and caches the editable JSON monitoring configuration.
 /// </summary>
-public sealed class JsonDeviceRepository
+public sealed partial class JsonDeviceRepository
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -466,6 +466,7 @@ public sealed class JsonDeviceRepository
                             Type = "http", Url = check.Url!.Trim(),
                             TimeoutMs = check.TimeoutMs ?? HttpCheckService.DefaultTimeoutMs,
                             ExpectedStatusCode = check.ExpectedStatusCode ?? 200,
+                            FollowRedirects = check.FollowRedirects,
                             ExpectedText = string.IsNullOrEmpty(check.ExpectedText) ? null : check.ExpectedText
                         } : string.Equals(check.Type, "browser", StringComparison.OrdinalIgnoreCase)
                             ? new DeviceCheck { Type="browser",Url=check.Url!.Trim(),TimeoutMs=check.TimeoutMs ?? 15000,
@@ -521,7 +522,7 @@ public sealed class JsonDeviceRepository
                 throw new InvalidDataException("Imported file does not contain a configuration object.");
             }
 
-            return await SaveAsync(configuration, cancellationToken, expectedProfileId);
+            return await ImportWithHistoryAsync(configuration, cancellationToken, expectedProfileId);
         }
         catch (JsonException ex)
         {
@@ -681,6 +682,7 @@ public sealed class JsonDeviceRepository
     /// <returns>True for ping checks and tcp checks with a valid port from 1 to 65535.</returns>
     private static bool IsValidCheck(DeviceCheck check)
     {
+        if (check.FollowRedirects && !string.Equals(check.Type, "http", StringComparison.OrdinalIgnoreCase)) return false;
         if (string.Equals(check.Type, "browser", StringComparison.OrdinalIgnoreCase)) return BrowserCheckRules.ValidationError(check) is null;
         if (check.AuthenticationOrigins is not null) return false;
         if (string.Equals(check.Type, "ping", StringComparison.OrdinalIgnoreCase))

@@ -1,12 +1,105 @@
 # Improvement Backlog
 
-Last updated: 2026-11-12
+Last updated: 2026-11-13
 
 User-reported improvements are recorded here with stable IDs. A pending entry
 is not approval to implement it. Keep implementation and validation status
 explicit; technical/release risks remain in [CURRENT_STATUS.md](../CURRENT_STATUS.md).
 The user requested coordination on 2026-11-09. Delivery order and cross-cutting
 gates are in [ROADMAP.md](ROADMAP.md); queued work is not implemented work.
+
+## Owner Notes - 2026-11-13 (Implementation In Validation)
+
+Subsequent approval on 2026-11-13: implement IMP-013/016/017/018/019 locally,
+with safety checkpoints, tests/docs/new portable and port-5000 activation.
+Statuses below describe the original intake until each stage is validated;
+CURRENT_STATUS tracks execution. No additional GitHub publication is authorized.
+
+The initial note-taking request did not authorize changes. The subsequent work
+order above authorizes the local candidate; rc.16 remains the published baseline.
+No database schema migration, live database restore or publication is included.
+
+## IMP-016 - Independent Filter Lists And Clear Filters
+
+- Reported: 2026-11-13, Dashboard/main. The owner initially mentioned OR, then
+  explicitly clarified: independent Device Type/Category lists, **retain AND**.
+- Requested: choosing a type must not restrict the Category choices, and choosing
+  a category must not restrict the type choices. This is not a union of matches.
+  Keep Facility/search/status/monitoring constraints and exact execution guards.
+- Review the discoverability of the existing Clear filters icon beside search;
+  do not add a duplicate reset or conflate clearing filters with deleting results.
+  Current reset clears search/Facility/type/category/status and returns monitoring
+  participation to its enabled-only default; it does not enable paused items.
+- Acceptance: either list remains available after selecting the other; an
+  incompatible pair legitimately produces zero matches and disables Run. Manual
+  and automatic checks use only the visible enabled intersection. Clearing never
+  writes inventory, deletes history or starts checks. Preserve unavailable-value,
+  in-flight scope and Configuration draft protections when standardizing views.
+- Status: implemented and browser-validated locally; portable validation pending. The clarification supersedes the initial
+  OR wording, not the shipped AND predicate documented in DASHBOARD_FILTERS.
+
+## IMP-017 - Confirmed Imports And Configuration Version History
+
+- Reported: 2026-11-13. Current file selection posts the import without an explicit
+  replacement confirmation. Priority: prevent accidental loss of configuration.
+- Requested: two explicit confirmations before replacing the active profile.
+  Prefer a first review of destination/file/counts followed by a clear final
+  replacement confirmation, rather than two identical blind prompts. Cancel at
+  either stage must leave data unchanged and must not send the import mutation.
+- Proposed complement: a private per-support-group list of full configuration
+  versions, including a verified pre-import snapshot, timestamp, bounded source
+  metadata and counts. Keep settings, devices and all catalogs together. This is
+  distinct from execution history, audit field diffs and whole-database backups.
+- A restore should preview the selected version, confirm its destination, first
+  preserve the current configuration and apply a guarded profile-only write.
+  Never replace a live SQLite file or roll back unrelated profiles/history/global
+  settings. Capture profile/revision together; reject stale or switched scope.
+- Reuse current storage/transaction/audit mechanisms where appropriate. Validate
+  before mutation and abort if required snapshot creation fails. Existing JSON
+  compatibility and private-data exclusions remain mandatory; do not invent
+  verified operator identity from local audit entries.
+- Acceptance: both cancellations, malformed input, backup/write failure, reload,
+  stale profile/revision, repeated import, version listing/preview and recovery
+  preserve the expected data. Specify bounded retention before adding automatic
+  rotation; never delete manual/upgrade backups or historical release archives.
+- Status: implemented locally with guarded preview/commit, per-profile history,
+  exact-byte download/restore, 20-point/80-MiB no-auto-prune bounds and two UI
+  confirmations. Fault, stale, integrity and concurrent-write tests passed;
+  full JSON/SQLite browser regression passed; portable evidence is pending. See CONFIGURATION_RECOVERY.md.
+
+## IMP-018 - Opt-In HTTP Redirect Following
+
+- Reported: 2026-11-13; owner marked important. Add a per-HTTP-check checkbox for
+  redirect support (notably HTTP 302), **disabled by default**. Missing fields in
+  current configurations must preserve today's no-follow behavior.
+- Distinguish following a redirect from simply accepting status 302. When enabled,
+  validate the approved final response/status/text, with bounded hops/loop detection
+  and one end-to-end attempt deadline covering the chain and required body read.
+- Preserve strict TLS, no HTTPS downgrade, supported URL schemes, sanitized
+  diagnostics and anonymous/no-cookie behavior. Define cross-origin policy before
+  implementation; never silently reuse personal or dedicated browser sessions.
+  A Microsoft login page returning 200 must not be presented as authenticated
+  application availability. Protected-site validation still uses browser checks.
+- Acceptance: default off/legacy imports, allowed redirect to final 200, loop,
+  missing/invalid destination, excessive hops, timeout, unsafe scheme/downgrade,
+  TLS failure, login redirect and preservation through edit/copy/import/export in
+  both storage providers. No global redirect switch affecting existing probes.
+- Status: implemented locally, default off, anonymous GET across allowed schemes/
+  origins, five hops, one deadline, strict TLS/no downgrade and neutral known
+  login detection. Unit/real-loopback/full browser regression passed; portable
+  validation pending. See HTTP_CHECKS.md for limits/custom-login caveats.
+
+## IMP-019 - Explain Monitoring Participation
+
+- Reported: 2026-11-13. Clarify the main selector Monitoring on / Monitoring paused /
+  All items; consider clearer bilingual labels without mixing owned UI languages.
+- Verified current behavior: it only filters the existing `enabled` flag. On shows
+  enabled items, Paused shows disabled items, All shows both. It is not Online/
+  Offline status and does not toggle automatic refresh or modify configuration.
+- Runs always exclude paused items, including with All selected. An enabled item
+  can be offline or not yet checked. Automatic refresh is a separate control.
+- Status: selectors renamed bilingually to Enabled for checks / Checks paused /
+  All items, without changing enabled/status/Auto Refresh semantics. Browser-validated.
 
 ## IMP-008 - Multilingual Monitoring And Diagnostics
 
@@ -79,6 +172,13 @@ owner's authenticated-browser work order on 2026-11-12. See IMP-014/current stat
   would distinguish an old portable from the source service without exposing
   database paths, inventory or credentials. Current About identifies .NET 10 LTS
   but does not expose a live build/version endpoint.
+  Owner reiterated this on 2026-11-13: show a compact **actual running build** on
+  main and the full version/build in About. Read running assembly metadata rather
+  than hardcoding a release number or inferring it from static files. Keep runtime/
+  provider/schema details read-only in About and never expose private file paths,
+  inventory or credentials. Verify source versus portable and both UI languages.
+  Status: implemented locally from actual running assembly/runtime/storage metadata;
+  bilingual main/About validated; native-package validation pending. No duplicate ID.
 
 These are recommendations only. Prioritize offline assets for portable usability;
 prioritize access controls first if the service will be shared beyond a trusted PC.

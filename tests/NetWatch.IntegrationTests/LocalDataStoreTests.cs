@@ -124,11 +124,14 @@ public sealed class LocalDataStoreTests : IDisposable
         await File.WriteAllTextAsync(PathOf("monitor-history.json"), """
             {"runs":[{"runId":"duplicate","legacyUnknown":null},{"runId":"duplicate","legacyUnknown":4}]}
             """);
+        Directory.CreateDirectory(PathOf("configuration-versions"));
+        await File.WriteAllTextAsync(PathOf("configuration-versions/"+new string('A',64)+".backup.json"),
+            "{\"SchemaVersion\":1,\"ProfileId\":\"team\",\"Entries\":[],\"future\":7}",new UTF8Encoding(true));
         var original = Directory.GetFiles(_root, "*.json", SearchOption.AllDirectories)
             .ToDictionary(path => path, File.ReadAllBytes);
         var migrated = await StorageMaintenance.MigrateAsync(_root, new(), new());
         Assert.False(migrated.AlreadyMigrated);
-        Assert.Equal(3, migrated.DocumentCount);
+        Assert.Equal(4, migrated.DocumentCount);
         Assert.NotNull(migrated.BackupDirectory);
         foreach (var source in original)
         {
@@ -139,7 +142,7 @@ public sealed class LocalDataStoreTests : IDisposable
         Assert.True((await StorageMaintenance.MigrateAsync(_root, new(), new())).AlreadyMigrated);
         Assert.Equal(hash, SHA256.HashData(await File.ReadAllBytesAsync(PathOf("netwatch.db"))));
         var export = PathOf("rollback");
-        Assert.Equal(3, await StorageMaintenance.ExportAsync(PathOf("netwatch.db"), export));
+        Assert.Equal(4, await StorageMaintenance.ExportAsync(PathOf("netwatch.db"), export));
         foreach (var source in original)
             Assert.Equal(source.Value, await File.ReadAllBytesAsync(Path.Combine(export, Path.GetRelativePath(_root, source.Key))));
         var store = Store();

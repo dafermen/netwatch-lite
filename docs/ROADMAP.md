@@ -1,8 +1,28 @@
 # Coordinated Development Plan
 
-Last updated: 2026-11-12
+Last updated: 2026-11-13
 
-Current authorized work: [manual authenticated browser checks / IMP-014](BROWSER_CHECKS.md),
+## New Intake - 2026-11-13
+
+Implementation approved subsequently on 2026-11-13 for IMP-013/016/017/018/019.
+Use CURRENT_STATUS's rc.17 stages/checkpoints. Approval is local, not GitHub
+publication or a schema migration. The original intake below is historical.
+
+The owner requested notes, not a new release work order. Queue IMP-016/017/018/019
+and extend existing IMP-013; scope/acceptance are in [IMPROVEMENTS](IMPROVEMENTS.md).
+The owner clarified that Device Type/Category must have independent option lists
+but retain AND filtering. Do not implement a union or loosen MonitorPlans guards.
+
+Authorized local implementation is in validation: confirmed imports/private
+profile recovery, actual running build, independent options with AND matching,
+participation labels and opt-in bounded redirects. See CURRENT_STATUS and
+VALIDATION_RECOVERY_2026-11-13.md. The old intake did not authorize implementation;
+the later owner work order did. No schema migration, archive replacement, GitHub
+publication or stable deployment is authorized. Recovery never replaces a live DB.
+
+## Previous Authorized Delivery
+
+Previous authorized work: [manual authenticated browser checks / IMP-014](BROWSER_CHECKS.md),
 with tests/docs/new rc.16 folder/ZIP/SHA and GitHub publication authorized on
 2026-11-12. This supersedes the historical publication holds below, not stable
 deployment or real corporate acceptance. See [validation](VALIDATION_BROWSER_2026-11-12.md).

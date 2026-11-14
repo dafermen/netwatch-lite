@@ -1,5 +1,25 @@
 # Changelog
 
+## Configuration Recovery And Monitoring UX 0.8.0-rc.17 - 2026-11-13
+
+- Two distinct confirmations before UI import; read-only review and file/profile/
+  revision guards prevent stale or duplicate replacement. A verified private
+  pre-change point is required before import/restore.
+- Per-profile configuration history with preview, exact-byte download, guarded
+  two-stage restore and explicit deletion; 20-point/80-MiB bounds, no automatic
+  deletion, SQLite transaction and JSON backup-first compatibility. Schema stays 2.
+- Independent Device Type/Category choices with AND matching/exact enabled runs;
+  discoverable Clear filters command and clearer monitoring-participation labels.
+- Running assembly version on main and version/build/runtime/storage in About.
+- Per-HTTP default-off redirect following: five hops, one deadline, strict TLS,
+  no downgrade/cookies/credentials, neutral known-login detection and diagnostics.
+  Protected sites still need the separate manually authenticated browser check.
+- Bilingual desktop/mobile regression and fault/integrity/concurrency contracts;
+  bounded atomic JSON retries now cover Windows ReplaceFileW 1175 only while both
+  paths remain present; no delete/copy fallback or partial-state retries.
+  see docs/VALIDATION_RECOVERY_2026-11-13.md for actual pending/final receipts. Local-only
+  work order: no new GitHub publication; historical archives remain immutable.
+
 ## Authenticated Browser Checks And Portable 0.8.0-rc.16 - 2026-11-12
 
 - Added separate browser checks using installed Edge, dedicated non-persistent

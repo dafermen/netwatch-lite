@@ -1,6 +1,70 @@
 # Current Status
 
-Last updated: 2026-11-12
+Last updated: 2026-11-13
+
+## rc.17 Work Order - In Progress
+
+Owner authorized implementation of IMP-013/016/017/018/019 on 2026-11-13.
+Keep AND semantics; independent option lists do not mean OR. No new GitHub
+publication is authorized. Local portable must have a new folder/ZIP/SHA.
+
+Interruption safety: keep rc.16 binaries/assets and a verified DB backup in a
+private checkpoint before changing runtime/UI. Serve the old webroot until the
+new matching backend/UI pass isolated tests. Never overwrite an archive, reset
+user changes, restore a live DB file or activate incomplete code. Local files
+persist if the assistant is interrupted; checkpoints/status are the resume path,
+not a promise that an OpenAI usage limit can be predicted or avoided.
+
+Stages:
+1. Complete: stable checkpoint artifacts/checkpoints/rc16-20261113-cdba71b6,
+   verified before.db, eight matching APIs. PID 20620 serves frozen rc.16 webroot
+   on port 5000 with the original content root/SQLite. Do not restart a half-build.
+2. Implemented, initial contracts passed: transactional pre-change versions and
+   guarded import/restore APIs (SQLite schema unchanged). JSON snapshots are
+   durably written before replacement; a failed write can leave a safe extra point.
+3. Implemented: two confirmations/history UI, actual assembly version in main/
+   About (including ordinary dotnet run), independent choices with AND matching,
+   clearer participation labels and default-off anonymous redirects. Final backend:
+   517 passed (91 unit/30 integration/396 contract), plus 26 focused recovery cases.
+   Raw bytes/BOM/unknowns, concurrent/stale/renamed scope, capacity, repair, tamper,
+   snapshot/replacement failure and deleted-profile ID isolation passed. Nine
+   selected mutants killed (uxmut-82f56479), including the lock-order inversion.
+   Windows 1175 was reproduced in an initial JSON stress baseline and now receives
+   bounded path-preserving retry, not a delete/copy fallback or live DB rollback.
+   Historical/original baseline: 6790 files/15 Data JSON, earlier 6224 also matched.
+   Profile metadata participates in revisions; profile locking precedes SQLite.
+   Refreshed pilot f58b30b2907f4afa83457803049b6ce8 matched eight APIs, raw documents,
+   SQL counts, rc.16 reversal and original JSON. Schema remains 2.
+   Full browser suites passed: final JSON 240 / SQLite 240, plus 42 final SQLite
+   retests after the concurrency refinement. No failures/skips/retries. Static
+   script/language/link checks and 2000 JS filter cases passed; dependency audits
+   reported zero advisories; 75 packaging guards passed on each PS5.1/7.
+4. Pending: post-package privacy/history audit, rc.17 ZIP/SHA/native checks and
+   backed-up local activation on port 5000. Real corporate checks stay operator-owned.
+
+Resume: read this section first, then docs/IMPROVEMENTS.md and docs/ROADMAP.md.
+Do not infer completion from rc.16 receipts. Record actual checkpoint paths and
+phase results below as they become available.
+
+## Historical Intake - 2026-11-13
+
+Documentation-only intake; rc.16 code/data/runtime and published archives are
+unchanged. No GitHub push, new portable, import, restore or service restart is
+authorized/performed by recording these notes.
+
+- IMP-016: independent Device Type/Category lists and review Clear filters. Owner
+  clarified to retain AND, not a real OR union. Preserve exact enabled scopes.
+- IMP-013 extended: actual build on main and in About; reuse existing backlog ID.
+- IMP-017: two confirmations before import; design private per-profile full
+  configuration version listing/preview/guarded recovery, not a live DB restore.
+- IMP-018: per-HTTP-check redirect option, default off, with bounded safe following
+  and no false healthy result at a login page. Existing HTTP behavior stays intact.
+- IMP-019: explain/review monitoring participation labels. Enabled/paused/all is
+  not online/offline or automatic refresh; paused items are never run.
+
+See [backlog and acceptance](docs/IMPROVEMENTS.md) and [coordination](docs/ROADMAP.md).
+The later implementation approval is tracked at the top of this file. Do not
+reuse rc.16's receipts as evidence for the rc.17 candidate.
 
 ## Authenticated Browser Checks - rc.16 Delivered And Published
 

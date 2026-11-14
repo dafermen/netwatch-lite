@@ -1,4 +1,4 @@
-const { test, expect } = require('./fixtures.cjs');
+const { test, expect, confirmConfigImport } = require('./fixtures.cjs');
 const fs = require('node:fs/promises');
 
 const device = (name, facility = 'Lab') => ({
@@ -88,9 +88,11 @@ test('delete confirmation closes for confirm and cancel during its opening trans
 
 test('JSON import, export and invalid import preserve saved data', async ({ page }) => {
   await page.goto('/config');
+  await expect(page.locator('#import-config')).toBeEnabled();
   await page.locator('#import-config-file').setInputFiles({
     name: 'inventory.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(configuration([device('Imported Device')])) )
   });
+  await confirmConfigImport(page);
   await expect(page.locator('#config-alert')).toContainText('1 devices loaded');
   const downloaded = page.waitForEvent('download');
   await page.locator('#export-config').click();

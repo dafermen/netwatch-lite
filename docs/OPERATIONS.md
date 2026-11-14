@@ -1,5 +1,22 @@
 # NetWatch Lite Operations
 
+Configuration > Configuration history is a private, bounded per-profile recovery
+tool. UI imports/restores ask twice and preserve the current full configuration
+first. At capacity, download/delete a chosen recovery point; there is no automatic
+rotation. This is not an online whole-database restore. See
+[configuration recovery](CONFIGURATION_RECOVERY.md). Keep the previous runtime
+and a verified offline-compatible backup before activation; interruptions or
+assistant usage limits must never trigger automatic live database rollback.
+
+Dashboard/About show the actual running build from `/api/build`, useful for
+distinguishing a stale portable/service. About also shows actual runtime/storage.
+
+If Windows reports partial file replacement (1176/1177), stop further writes and
+inspect the private sibling `.netwatch-*.tmp` plus any document backup offline.
+Those staged bytes are deliberately retained; do not delete/apply them blindly.
+Ordinary serialization, cancellation and sharing failures still clean up their
+temporary file. Error 1175 only retries while both original paths remain present.
+
 Authenticated checks require installed Edge and an interactive desktop on the
 NetWatch host. Manage sessions from localhost, complete sign-in manually and
 confirm it before monitoring. Restart/copy/expiry requires signing in again;

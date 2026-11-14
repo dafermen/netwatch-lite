@@ -2473,14 +2473,17 @@ function renderHttpChecks(checks = []) {
     const duration = check.durationMs != null && Number.isFinite(Number(check.durationMs)) ? `${Number(check.durationMs)} ms` : '-';
     return NetWatchI18n.html`
     <div class="http-check-result mt-1">
-      <span class="badge ${check.isAvailable ? "text-bg-success" : "text-bg-danger"}">
+      <span class="badge ${check.isAvailable ? "text-bg-success" : check.status === 'AuthenticationRequired' ? 'text-bg-warning' : "text-bg-danger"}">
         <i class="fa-solid ${check.isAvailable ? "fa-check" : "fa-xmark"} me-1"></i>${escapeHtml(NetWatchI18n.text(diagnostic.title))} &middot; ${escapeHtml(duration)}
       </span>
       <div class="small text-secondary text-break">${escapeHtml(check.url || "")}</div>
-      ${!check.isAvailable ? NetWatchI18n.html`<div class="small text-danger">${escapeHtml(NetWatchI18n.text(diagnostic.summary))}</div><details class="small mt-1 http-diagnostic"><summary>Details</summary>
+      ${!check.isAvailable ? NetWatchI18n.html`<div class="small ${check.status === 'AuthenticationRequired' ? 'text-secondary' : 'text-danger'}">${escapeHtml(NetWatchI18n.text(diagnostic.summary))}</div>` : ''}
+      ${!check.isAvailable || check.redirectCount != null ? NetWatchI18n.html`<details class="small mt-1 http-diagnostic"><summary>Details</summary>
         <p class="mb-1">${escapeHtml(NetWatchI18n.text(diagnostic.action))}</p><dl class="http-diagnostic-facts"><dt>Diagnostic code</dt><dd><code>${escapeHtml(diagnostic.code)}</code></dd>
         ${check.expectedStatusCode != null ? NetWatchI18n.html`<dt>Expected status</dt><dd>${Number(check.expectedStatusCode)}</dd>` : ''}
         ${check.timeoutMs != null ? NetWatchI18n.html`<dt>Timeout (ms)</dt><dd>${Number(check.timeoutMs)}</dd>` : ''}
+        ${check.redirectCount != null ? NetWatchI18n.html`<dt>Redirects followed</dt><dd>${Number(check.redirectCount)}</dd>` : ''}
+        ${check.finalUrl ? NetWatchI18n.html`<dt>Final URL</dt><dd class="text-break">${escapeHtml(check.finalUrl)}</dd>` : ''}
         ${check.attempts != null ? NetWatchI18n.html`<dt>Attempts</dt><dd>${Number(check.attempts)}</dd>` : ''}</dl></details>` : ""}
     </div>`;
   }).join("");
@@ -2578,7 +2581,7 @@ function requestImportConfig() {
 }
 
 async function importConfigFile(file) {
-  if (!file) {
+  if (!file || configurationBusy) {
     return;
   }
 
@@ -2601,19 +2604,8 @@ async function importConfigFile(file) {
   clearConfigAlert();
 
   try {
-    const formData = new FormData();
-    formData.append("configFile", file);
-
-    const response = await fetch("/api/config/import", {
-      method: "POST",
-      headers: { 'X-NetWatch-Profile': regionState.activeProfileId || '' },
-      body: formData
-    });
-    const payload = await readJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(payload.error || payload.detail || `Import failed with ${response.status}`);
-    }
+    const payload = await reviewedConfigurationImport(file);
+    if (!payload) return;
 
     applyConfigPayload(payload.configuration);
     renderConfigDevices();
@@ -2621,7 +2613,7 @@ async function importConfigFile(file) {
     markDashboardConfigurationStale();
     showConfigAlert("success", `Imported JSON into the active support group. ${formatNumber(payload.count)} devices loaded.`);
   } catch (error) {
-    showConfigAlert("danger", `JSON import failed: ${error.message}`);
+    showConfigAlert("danger", `JSON import failed: ${NetWatchI18n.error(error.message, error.traceId)}`);
     console.error(error);
   } finally {
     setConfigBusy(false, { showSaveSpinner: false });
@@ -3055,7 +3047,6 @@ function renderGroupCheckOptions(devices, { preserveSelection = false } = {}) {
     : devices ?? [];
   const categories = Array.from(new Set(
     scopedDevices
-      .filter(matchesDashboardDeviceType)
       .map(device => device.category || "Uncategorized")))
     .sort((left, right) => left.localeCompare(right));
 
@@ -3105,7 +3096,7 @@ function renderConfigFilterOptions() {
   };
   setOptions(configFilters.facility, [...new Set(devices.map(item => item.facility || 'Unassigned'))].sort().map(value => ({ value, label: value })), activeConfigFilters.facility, 'All facilities');
   setOptions(configFilters.deviceType, (configState.deviceTypes ?? []).map(type => ({ value: type.id, label: deviceTypeDisplayName(type) })), activeConfigFilters.deviceType, 'All device types');
-  const scope = devices.filter(item => NetWatchFilters.matches(item, { facility: activeConfigFilters.facility, deviceType: activeConfigFilters.deviceType }));
+  const scope = devices.filter(item => NetWatchFilters.matches(item, { facility: activeConfigFilters.facility }));
   setOptions(configFilters.category, [...new Set(scope.map(item => item.category || 'Uncategorized'))].sort().map(value => ({ value, label: value })), activeConfigFilters.category, 'All categories');
   configFilters.status.value = activeConfigFilters.status;
   configFilters.monitoring.value = activeConfigFilters.monitoring;
@@ -4117,6 +4108,7 @@ function readCheckRows() {
       }
       const authenticationOrigins = row.querySelector('[data-check-origins]').value.split(/[\r\n,]+/).map(value => value.trim()).filter(Boolean);
       checks.push({ type, url, timeoutMs, expectedStatusCode, expectedText: expectedText || null,
+        ...(type === 'http' && row.querySelector('[data-check-redirects]').checked ? { followRedirects: true } : {}),
         ...(type === 'browser' ? { authenticationOrigins: authenticationOrigins.length ? authenticationOrigins : null } : {}) });
       continue;
     }
@@ -4241,6 +4233,7 @@ function addCheckRow(check = { type: "ping" }) {
       <label class="http-check-wide"><span class="form-label">URL to monitor</span><input class="form-control form-control-sm" type="url" maxlength="2048" placeholder="https://app.example.com/health" data-check-url required></label>
       <div><label class="form-label" for="${helpKey}-timeout">Timeout (ms)</label><input class="form-control form-control-sm" type="number" min="100" max="60000" step="1" id="${helpKey}-timeout" data-check-timeout aria-describedby="${helpKey}-timeout-help" required><div class="form-text" id="${helpKey}-timeout-help" data-http-timeout-help>Maximum wait per HTTP attempt (10000 ms = 10 s), not a ping count. Retries: Settings &gt; Retries (0 = one attempt; 2 = up to three after failures).</div></div>
       <label><span class="form-label">Expected status</span><input class="form-control form-control-sm" type="number" min="200" max="599" step="1" data-check-status required></label>
+      <label class="http-check-wide form-check" data-redirect-fields><input class="form-check-input" type="checkbox" data-check-redirects><span class="form-check-label">Follow HTTP redirects (including 302)</span></label>
       <div class="http-check-wide"><label class="form-label" for="${helpKey}-text">Expected text (optional)</label><textarea class="form-control form-control-sm" rows="2" maxlength="4096" id="${helpKey}-text" data-check-text aria-describedby="${helpKey}-text-help"></textarea><div class="form-text" id="${helpKey}-text-help" data-http-text-help>Optional literal response text (for example READY), case-sensitive. Blank: expected status only. No JavaScript or browser login session is used.</div></div>
       <label class="http-check-wide" data-browser-fields hidden><span class="form-label">Additional authentication origins (optional)</span><textarea class="form-control form-control-sm" rows="2" maxlength="2056" data-check-origins placeholder="https://sso.example.com"></textarea></label>
     </fieldset>`;
@@ -4255,6 +4248,7 @@ function addCheckRow(check = { type: "ping" }) {
   row.querySelector("[data-check-timeout]").value = check.timeoutMs ?? 10000;
   row.querySelector("[data-check-status]").value = check.expectedStatusCode ?? 200;
   row.querySelector("[data-check-text]").value = check.expectedText ?? "";
+  row.querySelector('[data-check-redirects]').checked = check.followRedirects === true;
   row.querySelector('[data-check-origins]').value = (check.authenticationOrigins ?? []).join('\n');
   checksList.append(row);
   updateCheckPortState(row);
@@ -4273,6 +4267,8 @@ function updateCheckPortState(row) {
   portInput.hidden = isHttp;
   row.querySelector('[data-browser-fields]').hidden = !isBrowser;
   row.querySelector('[data-check-origins]').disabled = !isBrowser;
+  row.querySelector('[data-redirect-fields]').hidden = isBrowser;
+  row.querySelector('[data-check-redirects]').disabled = isBrowser || !isHttp || configurationBusy;
   const statusInput = row.querySelector('[data-check-status]');
   statusInput.readOnly = isBrowser;
   if (isBrowser) statusInput.value = 200;
@@ -4348,6 +4344,7 @@ function setConfigBusy(isBusy, { showSaveSpinner = true } = {}) {
   reloadConfigButton.disabled = isBusy;
   exportConfigButton.disabled = isBusy;
   importConfigButton.disabled = isBusy;
+  document.querySelector('#configuration-versions').disabled = isBusy || !configurationVersionsModal;
   addDeviceButton.disabled = isBusy;
   configNormalViewButton.disabled = isBusy;
   configBulkViewButton.disabled = isBusy;

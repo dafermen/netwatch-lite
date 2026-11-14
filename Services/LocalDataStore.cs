@@ -205,6 +205,11 @@ public sealed partial class LocalDataStore
         ? WriteBytesAsync(path, Encoding.UTF8.GetBytes(text), cancellationToken)
         : AtomicFileWriter.WriteTextAsync(path, text, cancellationToken);
 
+    /// <summary>Writes an exact verified document without reconstructing it from a projection.</summary>
+    public Task WriteDocumentAsync(string path, byte[] bytes, CancellationToken cancellationToken = default) => IsSqlite
+        ? WriteBytesAsync(path, bytes, cancellationToken)
+        : AtomicFileWriter.WriteBytesAsync(path, bytes, cancellationToken);
+
     private Task WriteBytesAsync(string path, byte[] bytes, CancellationToken cancellationToken, bool createBackup = true, bool overwrite = true)
     {
         Write((connection, transaction) =>

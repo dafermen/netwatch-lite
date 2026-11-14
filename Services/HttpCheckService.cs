@@ -5,7 +5,7 @@ using NetWatch.Models;
 
 namespace NetWatch.Services;
 
-/// <summary>Bounded, anonymous GET probes. No cookies, credentials or redirect following.</summary>
+/// <summary>Bounded anonymous GET probes; optional manual redirects, never cookies or credentials.</summary>
 public sealed class HttpCheckService(IHttpClientFactory clientFactory)
 {
     /// <summary>Named client, isolated from future integration clients.</summary>
@@ -16,6 +16,8 @@ public sealed class HttpCheckService(IHttpClientFactory clientFactory)
     public const int MaxTimeoutMs = 60000;
     /// <summary>Maximum decompressed body bytes read for text matching.</summary>
     public const int MaxBodyBytes = 1024 * 1024;
+    /// <summary>Maximum redirect hops in one opted-in attempt.</summary>
+    public const int MaxRedirects = 5;
 
     /// <summary>Creates a pooled transport with strict TLS and no redirect or cookie state.</summary>
     public static HttpMessageHandler CreateHandler() => new SocketsHttpHandler
@@ -64,6 +66,9 @@ public sealed class HttpCheckService(IHttpClientFactory clientFactory)
         var expectedCode = check.ExpectedStatusCode ?? 200;
         var clock = Stopwatch.StartNew();
         int? statusCode = null;
+        var current = uri;
+        var redirects = 0;
+        var visited = new HashSet<string>(StringComparer.Ordinal) { uri.AbsoluteUri };
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeoutMs);
 
@@ -80,56 +85,87 @@ public sealed class HttpCheckService(IHttpClientFactory clientFactory)
             DurationMs = clock.ElapsedMilliseconds,
             Message = message,
             DiagnosticCode = diagnosticCode,
-            Attempts = 1
+            Attempts = 1,
+            RedirectCount = check.FollowRedirects ? redirects : null,
+            FinalUrl = check.FollowRedirects ? current.GetLeftPart(UriPartial.Path) : null
         };
 
         try
         {
             using var client = clientFactory.CreateClient(ClientName);
-            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-            request.Version = HttpVersion.Version11;
-            request.VersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
-            request.Headers.UserAgent.ParseAdd("NetWatch-Lite/1.0");
-            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
-            statusCode = (int)response.StatusCode;
-            if (statusCode != expectedCode)
-                return Result(false, "UnexpectedStatus", $"HTTP {statusCode}; expected {expectedCode}."
-                    + (statusCode is >= 300 and < 400 ? " Redirects are not followed." : ""));
-
-            if (!string.IsNullOrEmpty(check.ExpectedText))
+            while (true)
             {
-                if (response.Content.Headers.ContentLength > MaxBodyBytes)
-                    return Result(false, "ResponseTooLarge", "Response exceeds the 1 MiB text-validation limit.");
-
-                await using var stream = await response.Content.ReadAsStreamAsync(deadline.Token);
-                using var body = new MemoryStream();
-                var buffer = new byte[16384];
-                int length;
-                while ((length = await stream.ReadAsync(buffer, deadline.Token)) > 0)
+                deadline.Token.ThrowIfCancellationRequested();
+                if (check.FollowRedirects && IsIdentityProvider(current))
+                    return Result(false, "AuthenticationRequired", "The destination requires authentication. Use a manually authenticated browser check.", "AuthenticationRedirect");
+                using var request = new HttpRequestMessage(HttpMethod.Get, current);
+                request.Version = HttpVersion.Version11;
+                request.VersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
+                request.Headers.UserAgent.ParseAdd("NetWatch-Lite/1.0");
+                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
+                statusCode = (int)response.StatusCode;
+                if (check.FollowRedirects && statusCode is 301 or 302 or 303 or 307 or 308)
                 {
-                    if (body.Length + length > MaxBodyBytes)
+                    if (!response.Headers.TryGetValues("Location", out var locations))
+                        return Result(false, "RedirectBlocked", "The redirect has no valid Location header.", "InvalidRedirect");
+                    var values = locations.ToArray();
+                    if (values.Length != 1 || values[0].Length > 2048 || values[0].Any(char.IsControl)
+                        || !Uri.TryCreate(current, values[0], out var next)
+                        || next.AbsoluteUri.Length > 2048 || next.UserInfo.Length > 0
+                        || next.Scheme is not ("http" or "https") || string.IsNullOrEmpty(next.Host))
+                        return Result(false, "RedirectBlocked", "The redirect destination is invalid or unsafe.", "InvalidRedirect");
+                    if (current.Scheme == "https" && next.Scheme != "https")
+                        return Result(false, "RedirectBlocked", "HTTPS to HTTP redirects are blocked.", "HttpsDowngrade");
+                    next = new UriBuilder(next) { Fragment = "" }.Uri;
+                    if (!visited.Add(next.AbsoluteUri))
+                        return Result(false, "RedirectBlocked", "A redirect loop was detected.", "RedirectLoop");
+                    if (redirects >= MaxRedirects)
+                        return Result(false, "RedirectBlocked", "The maximum of five redirects was exceeded.", "RedirectLimit");
+                    redirects++;
+                    current = next;
+                    continue;
+                }
+                if (statusCode != expectedCode)
+                    return Result(false, "UnexpectedStatus", $"HTTP {statusCode}; expected {expectedCode}."
+                        + (!check.FollowRedirects && statusCode is >= 300 and < 400 ? " Redirects are not followed." : ""));
+
+                if (!string.IsNullOrEmpty(check.ExpectedText) || check.FollowRedirects)
+                {
+                    if (response.Content.Headers.ContentLength > MaxBodyBytes)
                         return Result(false, "ResponseTooLarge", "Response exceeds the 1 MiB text-validation limit.");
-                    body.Write(buffer, 0, length);
-                }
 
-                var encoding = Encoding.UTF8;
-                var charset = response.Content.Headers.ContentType?.CharSet?.Trim('"');
-                if (!string.IsNullOrWhiteSpace(charset))
-                {
-                    try { encoding = Encoding.GetEncoding(charset); }
-                    catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+                    await using var stream = await response.Content.ReadAsStreamAsync(deadline.Token);
+                    using var body = new MemoryStream();
+                    var buffer = new byte[16384];
+                    int length;
+                    while ((length = await stream.ReadAsync(buffer, deadline.Token)) > 0)
                     {
-                        return Result(false, "UnsupportedEncoding", "Response declares an unsupported text encoding.");
+                        if (body.Length + length > MaxBodyBytes)
+                            return Result(false, "ResponseTooLarge", "Response exceeds the 1 MiB text-validation limit.");
+                        body.Write(buffer, 0, length);
                     }
-                }
-                var text = encoding.GetString(body.GetBuffer(), 0, (int)body.Length);
-                if (!text.Contains(check.ExpectedText, StringComparison.Ordinal))
-                    return Result(false, "ExpectedTextMissing", $"HTTP {statusCode}; expected text was not found (case-sensitive).");
-            }
 
-            return Result(true, "Success", string.IsNullOrEmpty(check.ExpectedText)
-                ? $"HTTP {statusCode}; expected status matched."
-                : $"HTTP {statusCode}; expected status and text matched.");
+                    var encoding = Encoding.UTF8;
+                    var charset = response.Content.Headers.ContentType?.CharSet?.Trim('"');
+                    if (!string.IsNullOrWhiteSpace(charset))
+                    {
+                        try { encoding = Encoding.GetEncoding(charset); }
+                        catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+                        {
+                            return Result(false, "UnsupportedEncoding", "Response declares an unsupported text encoding.");
+                        }
+                    }
+                    var text = encoding.GetString(body.GetBuffer(), 0, (int)body.Length);
+                    if (check.FollowRedirects && BrowserCheckRules.IsAuthenticationContent(text))
+                        return Result(false, "AuthenticationRequired", "The response is an authentication page, not confirmed application health.", "AuthenticationContent");
+                    if (!string.IsNullOrEmpty(check.ExpectedText) && !text.Contains(check.ExpectedText, StringComparison.Ordinal))
+                        return Result(false, "ExpectedTextMissing", $"HTTP {statusCode}; expected text was not found (case-sensitive).");
+                }
+
+                return Result(true, "Success", string.IsNullOrEmpty(check.ExpectedText)
+                    ? $"HTTP {statusCode}; expected status matched."
+                    : $"HTTP {statusCode}; expected status and text matched.");
+            }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -155,4 +191,7 @@ public sealed class HttpCheckService(IHttpClientFactory clientFactory)
             return Result(false, "ResponseReadError", "The response connection ended while reading content.");
         }
     }
+
+    private static bool IsIdentityProvider(Uri uri) => BrowserCheckRules.MicrosoftOrigins
+        .Any(origin => new Uri(origin).IdnHost.Equals(uri.IdnHost, StringComparison.OrdinalIgnoreCase));
 }

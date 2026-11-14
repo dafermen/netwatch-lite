@@ -7,7 +7,7 @@
   <link rel="icon" type="image/png" href="/netwatch-lite-favicon.png">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
-  <link href="/styles.css?v=rc14-20261112" rel="stylesheet">
+  <link href="/styles.css?v=rc17-20261113" rel="stylesheet">
 </head>
 <body>
   <div class="app-shell">
@@ -79,6 +79,7 @@
           </button>
           <div>
             <h1 class="h5 mb-0">NetWatch Lite</h1>
+            <div class="text-secondary small" id="running-version" data-i18n-skip></div>
             <div class="text-secondary small" id="current-page-label">Dashboard</div>
           </div>
         </div>
@@ -206,7 +207,7 @@
                 aria-label="Search devices"
                 placeholder="Search devices"
                 autocomplete="off">
-              <button class="btn btn-outline-secondary" type="button" id="clear-dashboard-filters" title="Clear all dashboard filters" aria-label="Clear all dashboard filters" disabled><i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i></button>
+              <button class="btn btn-outline-secondary" type="button" id="clear-dashboard-filters" title="Clear all dashboard filters" aria-label="Clear all dashboard filters" disabled><i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i><span class="d-none d-md-inline ms-1">Clear filters</span></button>
             </div>
 
             <div class="dashboard-toolbar-actions">
@@ -240,8 +241,8 @@
                 </button>
               </div>
 
-              <select class="form-select form-select-sm monitoring-filter-control" id="dashboard-monitoring" aria-label="Monitoring filter">
-                <option value="enabled">Monitoring on</option><option value="paused">Monitoring paused</option><option value="all">All items</option>
+              <select class="form-select form-select-sm monitoring-filter-control" id="dashboard-monitoring" aria-label="Monitoring participation" title="Monitoring participation">
+                <option value="enabled">Enabled for checks</option><option value="paused">Checks paused</option><option value="all">All items</option>
               </select>
               <div class="btn-group btn-group-sm status-filter-group" role="group" aria-label="Device status filters">
                 <input type="radio" class="btn-check" name="status-filter" id="filter-all" value="all" checked>
@@ -318,6 +319,7 @@
                 Import JSON
               </button>
               <input class="visually-hidden" type="file" id="import-config-file" accept="application/json,.json">
+              <button class="btn btn-outline-secondary btn-sm" type="button" id="configuration-versions"><i class="fa-solid fa-clock-rotate-left me-1" aria-hidden="true"></i>Configuration history</button>
               <button class="btn btn-outline-secondary btn-sm" type="button" id="reload-config">
                 <i class="fa-solid fa-rotate-right me-1"></i>
                 Reload
@@ -434,7 +436,7 @@
                   <select class="form-select form-select-sm" id="config-device-type-filter" aria-label="Device Type filter"><option value="">All device types</option></select>
                   <select class="form-select form-select-sm" id="config-category-filter" aria-label="Category filter"><option value="">All categories</option></select>
                   <select class="form-select form-select-sm" id="config-status-filter" aria-label="Status filter"><option value="all">All statuses</option><option value="online">Online</option><option value="offline">Offline</option><option value="problems">Problems</option><option value="pending">Not checked</option></select>
-                  <select class="form-select form-select-sm" id="config-monitoring-filter" aria-label="Monitoring filter"><option value="all">All items</option><option value="enabled">Monitoring on</option><option value="paused">Monitoring paused</option></select>
+                  <select class="form-select form-select-sm" id="config-monitoring-filter" aria-label="Monitoring participation" title="Monitoring participation"><option value="all">All items</option><option value="enabled">Enabled for checks</option><option value="paused">Checks paused</option></select>
                   <div class="input-group input-group-sm config-grouping-control"><label class="input-group-text" for="config-grouping" title="Group by"><i class="fa-solid fa-object-group" aria-hidden="true"></i></label><select class="form-select" id="config-grouping" aria-label="Group by"><option value="facility">Group by facility</option><option value="deviceType">Group by device type</option></select></div>
                   <button class="btn btn-outline-secondary btn-sm icon-button" id="clear-config-filters" type="button" title="Clear configuration filters" aria-label="Clear configuration filters"><i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i></button>
                 </div>
@@ -973,7 +975,7 @@
                 <li>Invalid JSON is reported in the UI/API so it can be corrected.</li>
                 <li>Reports separates Summary, Runs and Devices with shared historical filters, recorded-check details and private CSV/JSON downloads. Healthy evaluations is a sample ratio, not continuous uptime. <a href="/docs/REPORTS.md">Reports guide</a>.</li>
                 <li>TCP checks verify whether a socket connection can be opened.</li>
-                <li>HTTP/HTTPS checks send an anonymous GET with a per-attempt timeout, expected status and optional case-sensitive response text. Errors and duration appear in Dashboard and Reports. Redirects are not followed and TLS certificates must be valid. <a href="/docs/HTTP_CHECKS.md">HTTP check guide</a>.</li>
+                <li>HTTP/HTTPS checks send an anonymous GET with a per-attempt timeout, expected status and optional case-sensitive response text. Redirects are off by default; opt-in checks follow at most five safe hops. TLS certificates must be valid and browser sessions are never used. <a href="/docs/HTTP_CHECKS.md">HTTP check guide</a>.</li>
               </ul>
             </section>
 
@@ -1071,6 +1073,7 @@
         </section>
 
         <section id="about-page" data-page="/about" hidden>
+          <dl class="row small mb-3" id="build-details" aria-label="Running build"></dl>
           <div class="about-hero">
             <img class="about-logo" src="/netwatch-lite-logo.png" alt="NetWatch Lite logo">
             <div>
@@ -1328,6 +1331,17 @@
     </div>
   </div>
 
+  <div class="modal fade" id="configuration-versions-modal" tabindex="-1" aria-labelledby="configuration-versions-title" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+      <div class="modal-header"><h2 class="modal-title fs-5" id="configuration-versions-title">Configuration history</h2><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close configuration history"></button></div>
+      <div class="modal-body">
+        <div id="configuration-versions-alert" role="status"></div>
+        <div class="small text-secondary mb-3" id="configuration-versions-summary"></div>
+        <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Saved</th><th>Reason</th><th>Items</th><th>Actions</th></tr></thead><tbody id="configuration-versions-body"></tbody></table></div>
+        <div id="configuration-version-preview" class="small text-break" hidden></div>
+      </div>
+    </div></div>
+  </div>
   <div class="modal fade" id="last-run-modal" tabindex="-1" aria-labelledby="last-run-title" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
       <div class="modal-header"><h2 class="modal-title fs-5" id="last-run-title">Last execution</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close last execution"></button></div>
@@ -1336,11 +1350,13 @@
   </div>
   <div class="modal fade" id="diagnostics-detail-modal" tabindex="-1" aria-labelledby="diagnostics-detail-title" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h2 class="modal-title fs-5" id="diagnostics-detail-title">Diagnostic details</h2><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close diagnostic details"></button></div><div class="modal-body" id="diagnostics-detail-body"></div></div></div></div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="/i18n-es.js?v=rc16-20261112"></script>
+  <script src="/i18n-es.js?v=rc17-20261113"></script>
   <script src="/i18n.js?v=rc14-20261112"></script>
   <script src="/inventory-filters.js?v=rc16-20261112"></script>
-  <script src="/http-diagnostics.js?v=rc14-20261112"></script>
+  <script src="/http-diagnostics.js?v=rc17-20261113"></script>
   <script src="/management.js?v=rc14-20261112"></script>
+  <script src="/configuration-versions.js?v=rc17-20261113"></script>
+  <script src="/build-info.js?v=rc17-20261113"></script>
   <script src="/browser-checks.js?v=rc16-20261112"></script>
   <script src="/monitoring-ui.js?v=rc16-20261112"></script>
   <script src="/diagnostics.js?v=rc16-20261112"></script>
@@ -1349,6 +1365,6 @@
   <script src="/workstations.js?v=rc14-20261112"></script>
   <script src="/reports-sql.js?v=rc14-20261112"></script>
   <script src="/storage.js?v=rc14-20261112"></script>
-  <script src="/app.js?v=rc16-20261112"></script>
+  <script src="/app.js?v=rc17-20261113"></script>
 </body>
 </html>

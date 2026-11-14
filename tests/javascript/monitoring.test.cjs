@@ -31,7 +31,9 @@ test('HTTP explanations separate status failures, transport failures and text ex
     [{ status: 'ExpectedTextMissing', statusCode: 200 }, 'HTTP 200 - Text not matched', 'stable literal'],
     [{ status: 'HttpError', diagnosticCode: 'ResponseEnded' }, 'Incomplete HTTP response', 'premature connection'],
     [{ status: 'TlsError' }, 'TLS verification failed', 'Do not disable TLS'],
-    [{ status: 'ConnectionError', diagnosticCode: 'ProxyTunnelError' }, 'Proxy connection failed', 'system proxy']
+    [{ status: 'ConnectionError', diagnosticCode: 'ProxyTunnelError' }, 'Proxy connection failed', 'system proxy'],
+    [{ status: 'AuthenticationRequired', statusCode: 302 }, 'HTTP - Authentication required', 'sign in manually'],
+    [{ status: 'RedirectBlocked', diagnosticCode: 'RedirectLoop' }, 'HTTP redirect blocked', 'HTTPS downgrade']
   ];
   for (const [value, title, action] of cases) {
     const result = diagnostics.describe({ ...value, isAvailable: false, message: 'PRIVATE RAW EXCEPTION' });

@@ -1,4 +1,4 @@
-const { test, expect } = require('./fixtures.cjs');
+const { test, expect, confirmConfigImport } = require('./fixtures.cjs');
 const fs = require('node:fs/promises');
 
 const location = 'Floor 2 - Office 204 <img src=x onerror=alert(1)> & "desk"';
@@ -59,6 +59,7 @@ test('location preserves Notes and Facility through edit, copy, bulk, JSON and p
   expect(JSON.parse(text).devices.map(device => device.location ?? null)).toEqual([editedLocation, null, editedLocation]);
   expect(JSON.parse(text).devices.every(device => device.notes === notes && device.facility === 'Site A')).toBeTruthy();
   await page.locator('#import-config-file').setInputFiles({ name: 'locations.json', mimeType: 'application/json', buffer: Buffer.from(text) });
+  await confirmConfigImport(page);
   await expect(page.locator('#config-alert')).toContainText('3 devices loaded');
   expect((await request.post('/api/regions', { data: { name: 'Copied location profile', copyFromActive: true } })).ok()).toBeTruthy();
   const copied = await (await request.get('/api/config')).json();
