@@ -1,6 +1,6 @@
 # Changelog
 
-## Configuration Recovery And Monitoring UX 0.8.0-rc.17 - 2026-11-13
+## Configuration Recovery And Monitoring UX 0.8.0-rc.17 - 2026-11-14
 
 - Two distinct confirmations before UI import; read-only review and file/profile/
   revision guards prevent stale or duplicate replacement. A verified private
@@ -17,8 +17,13 @@
 - Bilingual desktop/mobile regression and fault/integrity/concurrency contracts;
   bounded atomic JSON retries now cover Windows ReplaceFileW 1175 only while both
   paths remain present; no delete/copy fallback or partial-state retries.
-  see docs/VALIDATION_RECOVERY_2026-11-13.md for actual pending/final receipts. Local-only
-  work order: no new GitHub publication; historical archives remain immutable.
+  See docs/VALIDATION_RECOVERY_2026-11-13.md for final evidence and limitations.
+- Delivered locally on 2026-11-13; owner authorized GitHub publication on
+  2026-11-14. Published the existing ZIP/SHA as a prerelease after all four source
+  CI jobs passed, tagging its exact tested source 132396c. No rebuild, private
+  data, previous-release replacement, stable promotion or backend/Pages deployment.
+  Downloaded ZIP/SHA match local bytes; old tags/releases and 6790 local historical/
+  original files remained unchanged.
 
 ## Authenticated Browser Checks And Portable 0.8.0-rc.16 - 2026-11-12
 

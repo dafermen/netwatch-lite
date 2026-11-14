@@ -2,16 +2,31 @@
 
 Last updated: 2026-11-14
 
-## rc.17 GitHub Publication In Progress
+## rc.17 Delivered And Published
 
 Owner explicitly authorized GitHub source and existing rc.17 ZIP/SHA publication
 on 2026-11-14, superseding the local-only hold from the preceding work order.
-Publish an evaluation prerelease, not stable latest; tag exact tested source
-132396c37ab2270bac8a4ecbafc915ba949b5538. Do not regenerate the immutable ZIP.
-The local ZIP checksum and metadata match the receipts below. Remote main is
-6cdbb6ad5795953298dbe535683dd96615aa2182; rc.17 has no remote tag/release yet.
-Next: push reviewed public source, wait for CI, upload ZIP/SHA as a draft, verify
-assets, publish and download/reconcile them. Keep port 5000 and private data intact.
+Published an evaluation prerelease, not stable latest, tagging exact tested
+source 132396c37ab2270bac8a4ecbafc915ba949b5538. Do not regenerate the immutable ZIP.
+The local ZIP checksum/manifest/provenance match the receipts below. Public main
+is 0394038fc7a4568633cabe9958cb87ef781b6fa9 before the final documentation receipt;
+annotated tag v0.8.0-rc.17 points to the exact package source. Release 445141042
+is now published with both assets, whose digests matched local before publishing.
+Release: https://github.com/dafermen/netwatch-lite/releases/tag/v0.8.0-rc.17.
+Do not recreate the tag/release or clobber assets on resume. All four source CI
+jobs passed (43575295012): backend/static/guards/mutations, JSON/SQLite browsers
+and isolated native portable. Existing Node-20 Actions warning is IMP-015.
+Post-publication audit passed at 2026-11-14T08:40:41Z: downloaded ZIP and SHA
+sidecar are byte/hash-identical to local; package manifest/provenance verified.
+ZIP: 92514810 bytes, SHA-256
+caf599060965df9b1ba9642a21b0c61413ab67bea73ed04cfc22fddbbc1fb020.
+All 6790 historical/original files, seven previous releases/assets and nine old
+tags remained unchanged. There are now eight releases/ten tags; stable latest
+remains v0.6.2. No private data upload, backend/Pages deployment, archive rebuild
+or service restart. Runtime metadata confirms rc.17 on port 5000, schema 2.
+These final publication notes are documentation-only, not a new binary build.
+Next: owner tests real sites/SSO and the ZIP on the destination PC. Future builds
+need a new unused version and separate publication approval; never overwrite rc.17.
 Publication evidence: artifacts/verification/publication-rc17-20261114.
 
 ## rc.17 Local Delivery - 2026-11-13
@@ -71,7 +86,8 @@ Stages:
    original JSON matched; no migration, fallback or database rollback occurred.
    Read-only live Dashboard/About UI checks passed without writes/check attempts
    or screenshots of private inventory. Reload an existing tab to load rc.17 UI.
-   Real corporate/other-PC acceptance remains operator-owned. No GitHub push.
+   Real corporate/other-PC acceptance remains operator-owned. No GitHub push was
+   part of that local delivery; the separate publication follow-up is above.
 
 Resume: read this section first, then docs/IMPROVEMENTS.md and docs/ROADMAP.md.
 Evidence: artifacts/verification/ux17-20261113 plus the named native/mutation

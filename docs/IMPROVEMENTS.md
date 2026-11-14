@@ -1,6 +1,6 @@
 # Improvement Backlog
 
-Last updated: 2026-11-13
+Last updated: 2026-11-14
 
 User-reported improvements are recorded here with stable IDs. A pending entry
 is not approval to implement it. Keep implementation and validation status
@@ -8,17 +8,19 @@ explicit; technical/release risks remain in [CURRENT_STATUS.md](../CURRENT_STATU
 The user requested coordination on 2026-11-09. Delivery order and cross-cutting
 gates are in [ROADMAP.md](ROADMAP.md); queued work is not implemented work.
 
-## Owner Notes - 2026-11-13 (Delivered Locally As rc.17)
+## Owner Notes - 2026-11-13 (Delivered And Published As rc.17)
 
 Subsequent approval on 2026-11-13: implement IMP-013/016/017/018/019 locally,
 with safety checkpoints, tests/docs/new portable and port-5000 activation.
 The five items below are implemented, validated and delivered locally in rc.17;
 CURRENT_STATUS and VALIDATION_RECOVERY_2026-11-13.md hold receipts and external
-acceptance limits. No additional GitHub publication is authorized.
+acceptance limits. On 2026-11-14 the owner additionally authorized publication:
+the reviewed source/tag and existing immutable ZIP/SHA are now a GitHub
+prerelease. This supersedes the local hold, not stable-deployment approval.
 
 The initial note-taking request did not authorize changes. The subsequent work
-order above authorizes the local candidate; rc.16 remains the published baseline.
-No database schema migration, live database restore or publication is included.
+order above authorized the local candidate. The later publication approval does
+not authorize a schema migration, live database restore or future releases.
 
 ## IMP-016 - Independent Filter Lists And Clear Filters
 

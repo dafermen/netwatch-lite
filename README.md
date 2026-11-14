@@ -23,19 +23,20 @@ GitHub repository: [https://github.com/dafermen/netwatch-lite](https://github.co
 
 ## Portable Download
 
-Local candidate `0.8.0-rc.17` adds two-stage import confirmation and private
+Published prerelease `0.8.0-rc.17` adds two-stage import confirmation and private
 [configuration recovery history](docs/CONFIGURATION_RECOVERY.md), independent
 Device Type/Category option lists (matching remains AND), clearer monitoring
 participation labels, the actual running build on Dashboard/About, and
 default-off bounded [HTTP redirects](docs/HTTP_CHECKS.md). It does not add SSO
 or reuse browser cookies for HTTP. Tests/package/activation evidence is in
 [rc.17 validation](docs/VALIDATION_RECOVERY_2026-11-13.md) and CURRENT_STATUS.
-This work order is local only; the published GitHub download below remains rc.16.
-The local rc.17 folder/ZIP/SHA and backed-up port-5000 activation are complete;
-reload an existing browser tab to see its build label. The immutable ZIP keeps
-build-time docs; post-generation validation receipts remain in the repository.
+The owner authorized publication on 2026-11-14. The existing validated folder/
+ZIP/SHA was published without rebuilding or replacing older versions. Source CI
+passed all four jobs. The backed-up local service remains on port 5000; reload an
+existing browser tab to see its build label. The immutable ZIP keeps build-time
+docs; post-generation validation/publication receipts remain in the repository.
 
-Published prerelease `0.8.0-rc.16` adds a separate **Authenticated browser** check with
+It retains rc.16's separate **Authenticated browser** check with
 manual sign-in in a dedicated Edge window, distinguishing authentication required
 from site failures. See the [setup and limits](docs/BROWSER_CHECKS.md) and
 [validation record](docs/VALIDATION_BROWSER_2026-11-12.md). Microsoft Edge and an
@@ -49,12 +50,14 @@ diagnostics/export and draft-safe Configuration loading. See
 [languages](docs/UI_LANGUAGES.md). The owner authorized GitHub publication for
 this delivery; CURRENT_STATUS records actual package/publication receipts.
 
-[Windows x64 ZIP 0.8.0-rc.16](https://github.com/dafermen/netwatch-lite/releases/download/v0.8.0-rc.16/NetWatch-Lite-v0.8.0-rc.16-win-x64.zip)
-and [SHA-256 checksum](https://github.com/dafermen/netwatch-lite/releases/download/v0.8.0-rc.16/NetWatch-Lite-v0.8.0-rc.16-win-x64.zip.sha256).
+[Windows x64 ZIP 0.8.0-rc.17](https://github.com/dafermen/netwatch-lite/releases/download/v0.8.0-rc.17/NetWatch-Lite-v0.8.0-rc.17-win-x64.zip)
+and [SHA-256 checksum](https://github.com/dafermen/netwatch-lite/releases/download/v0.8.0-rc.17/NetWatch-Lite-v0.8.0-rc.17-win-x64.zip.sha256).
+Release page: [v0.8.0-rc.17](https://github.com/dafermen/netwatch-lite/releases/tag/v0.8.0-rc.17).
 This is an evaluation prerelease, not stable-deployment approval. Real corporate
 login/Conditional Access and another-PC acceptance remain operator-owned.
 
-The preceding published Windows x64 candidate is `0.8.0-rc.13`, including dashboard
+The preceding public rc.16 and older releases remain unchanged. Earlier published
+Windows x64 candidate `0.8.0-rc.13` includes dashboard
 inventory search, copy-only device Commands, exact single-device checks, filter
 reset/header controls, neutral Configuration layout and transition-safe device
 deletion, plus the redesigned Reports Summary/Runs/Devices views, historical

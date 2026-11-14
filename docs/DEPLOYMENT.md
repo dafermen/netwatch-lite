@@ -3,7 +3,7 @@
 Use this checklist before tagging, packaging, demoing, committing a stable
 milestone, or deploying the application.
 
-rc.15 requires .NET 10 LTS (runtime 10.0.15 or newer 10.0 patch) for framework-
+rc.15 and later require .NET 10 LTS (runtime 10.0.15 or newer 10.0 patch) for framework-
 dependent hosting; the portable contains 10.0.15. Replace the complete application,
 not just its DLL. Follow [runtime servicing/rollback](RUNTIME.md) and retain a
 verified private backup. No schema change accompanies this migration. See
@@ -12,8 +12,11 @@ verified private backup. No schema change accompanies this migration. See
 rc.14 and later require matching backend and UI for snapshot/plan execution, monitoring
 switches and Diagnostics. Do not deploy its JS alone over rc.13. Its automatic
 runs intentionally use all active filters. SQLite remains schema 2; back up before
-updating. Only a local evaluation portable is authorized; GitHub publication is
-on hold. See [current validation](VALIDATION_MULTILINGUAL_2026-11-12.md).
+updating. The original rc.14/15 publication holds were superseded for rc.16 and
+rc.17 by explicit owner approvals; these remain evaluation prereleases, not
+stable-deployment approval. See [current rc.17 validation](VALIDATION_RECOVERY_2026-11-13.md)
+and CURRENT_STATUS for actual publication receipts. Publish an existing verified
+ZIP/SHA without rebuilding or replacing any version; see [portables](PORTABLE.md).
 
 A deployment is not ready until every quality gate below has recorded evidence.
 If a gate cannot be executed, document the reason, risk, compensating control,

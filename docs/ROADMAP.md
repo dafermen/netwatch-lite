@@ -1,12 +1,24 @@
 # Coordinated Development Plan
 
-Last updated: 2026-11-13
+Last updated: 2026-11-14
+
+## Current Delivery - rc.17 Published
+
+On 2026-11-14 the owner authorized publishing rc.17 source and its existing
+portable ZIP/SHA. All four source CI jobs passed; the new annotated tag targets
+the exact tested package commit 132396c, not a later documentation receipt.
+[rc.17 prerelease](https://github.com/dafermen/netwatch-lite/releases/tag/v0.8.0-rc.17)
+is published without rebuilding/replacing previous artifacts or promoting stable
+latest. See CURRENT_STATUS and the dated validation guide for reconciliation.
+No hosted-backend/Pages deployment or future release is authorized. Operator
+corporate/other-PC acceptance and stable-deployment gates remain separate.
 
 ## New Intake - 2026-11-13
 
 Implementation approved subsequently on 2026-11-13 for IMP-013/016/017/018/019.
-Use CURRENT_STATUS's rc.17 stages/checkpoints. Approval is local, not GitHub
-publication or a schema migration. The original intake below is historical.
+Use CURRENT_STATUS's rc.17 stages/checkpoints. That original approval was local,
+not a schema migration; the later publication approval is recorded above.
+The original intake below is historical.
 
 The owner requested notes, not a new release work order. Queue IMP-016/017/018/019
 and extend existing IMP-013; scope/acceptance are in [IMPROVEMENTS](IMPROVEMENTS.md).
@@ -18,8 +30,9 @@ profile recovery, actual running build, independent options with AND matching,
 participation labels and opt-in bounded redirects, with tests, immutable ZIP/SHA
 and backed-up local activation complete. See CURRENT_STATUS and
 VALIDATION_RECOVERY_2026-11-13.md. The old intake did not authorize implementation;
-the later owner work order did. No schema migration, archive replacement, GitHub
-publication or stable deployment is authorized. Recovery never replaces a live DB.
+the later owner work order did. Publication was authorized separately on
+2026-11-14. No schema migration, archive replacement or stable deployment is
+authorized. Recovery never replaces a live DB.
 
 ## Previous Authorized Delivery
 

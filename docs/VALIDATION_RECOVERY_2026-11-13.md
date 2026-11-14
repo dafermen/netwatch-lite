@@ -1,8 +1,9 @@
 # Recovery And Monitoring UX Validation - 2026-11-13
 
 Status: source and immutable portable validated; rc.17 active locally on port 5000.
-Not published to GitHub; not a stable/public deployment approval.
-Scope: IMP-013/016/017/018/019. AND filtering is retained. No GitHub publication.
+Published as a GitHub prerelease on 2026-11-14 under separate owner approval;
+not a stable/public-service deployment approval.
+Scope: IMP-013/016/017/018/019. AND filtering is retained.
 
 ## Safety Checkpoint
 
@@ -57,7 +58,8 @@ the preceding 6224-file baseline also matched. Post-package reconciliation passe
 
 ## Native Portable
 
-Local clean source: `132396c37ab2270bac8a4ecbafc915ba949b5538`. No GitHub push.
+Clean package source/tag target: `132396c37ab2270bac8a4ecbafc915ba949b5538`.
+The original local delivery had no push; publication followed on 2026-11-14.
 Folder `artifacts/portable/NetWatch-Lite-v0.8.0-rc.17-win-x64` and matching ZIP/SHA
 under `artifacts/packages`. ZIP: 92514810 bytes; SHA-256:
 `caf599060965df9b1ba9642a21b0c61413ab67bea73ed04cfc22fddbbc1fb020`.
@@ -105,4 +107,29 @@ Private receipts are under `artifacts/verification/ux17-20261113`, mutation run
 `uxmut-82f56479` and the named packaging guard runs. Use loopback/synthetic
 fixtures. Real corporate SSO, another-PC acceptance, hardware/disk faults and
 production load remain owner/environment validation, not claims from these
-local checks. No GitHub publication or stable/public deployment is authorized.
+local checks. The owner authorized rc.17 GitHub publication on 2026-11-14, not a
+stable/public-service deployment or future release.
+
+## GitHub Publication - 2026-11-14
+
+[v0.8.0-rc.17](https://github.com/dafermen/netwatch-lite/releases/tag/v0.8.0-rc.17)
+is an evaluation prerelease. Public main includes the reviewed source and later
+documentation receipts; the annotated tag points to the exact package source
+132396c37ab2270bac8a4ecbafc915ba949b5538. No archive was regenerated.
+
+All four source CI jobs passed in
+[43575295012](https://github.com/dafermen/netwatch-lite/actions/runs/43575295012):
+backend/static/guards/mutations, full JSON and SQLite browser workflows, and
+isolated CI portable validation. The existing non-blocking Actions Node-20
+deprecation warning remains tracked in IMP-015; no workflow-major change here.
+
+The draft's two uploaded asset sizes/digests matched the existing local ZIP/SHA
+before publication. Downloaded published ZIP and checksum are byte/hash-identical
+to local. The post-publication audit matched all 6790 historical/original files,
+seven previous releases/assets and nine previous tag objects. Stable latest
+remains v0.6.2; only the new rc.17 release/tag/assets were added. The accepted
+extra rc.11 ZIP absence is unchanged. Private before/after/CI/download receipts
+are in artifacts/verification/publication-rc17-20261114; CURRENT_STATUS records
+the publication result. No private receipts were uploaded.
+Later repository documentation does not change the immutable build-time package.
+No separately hosted backend or GitHub Pages deployment was performed.

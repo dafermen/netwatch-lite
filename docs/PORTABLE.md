@@ -1,12 +1,16 @@
 # Versioned Windows Portables
 
-The rc.17 local work order does not authorize GitHub publication. Generate a new
-immutable versioned folder + ZIP + SHA-256, never replace rc.16 or older archives.
+The owner authorized GitHub source and existing rc.17 ZIP/SHA publication on
+2026-11-14, superseding the preceding local-only hold. The
+[rc.17 prerelease](https://github.com/dafermen/netwatch-lite/releases/tag/v0.8.0-rc.17)
+is published; CURRENT_STATUS records verified download/CI/history receipts.
+Never regenerate rc.17 or replace older archives;
+every future build requires a new immutable versioned folder + ZIP + SHA-256.
 Configuration recovery vaults (`configuration-versions/`), like active data and
 browser sessions, are private and must not enter the package. Its UI build label
 must match the executable's version; test `/api/build` in the extracted copy.
 
-rc.16 includes a pinned Microsoft.Playwright driver (117 exact SHA-256-checked
+rc.16 and later include a pinned Microsoft.Playwright driver (117 exact SHA-256-checked
 files), not Edge, cookies, sessions or personal profiles. Microsoft Edge and an
 interactive desktop are prerequisites only for [authenticated browser checks](BROWSER_CHECKS.md).
 The explicit driver allowlist is separate from the public documentation/UI list;
@@ -24,7 +28,7 @@ Run from the repository with SDK 10.0.404 (or newer .NET 10 SDK) and Windows Pow
 ```powershell
 cd C:\Projects\netwatch-lite
 .\scripts\test-packaging.ps1
-.\scripts\publish-portable.ps1 -Version 0.8.0-rc.15
+.\scripts\publish-portable.ps1 -Version 0.8.0-rc.18
 ```
 
 `-Version` is required. Use a new full version on every build, including a new
@@ -32,12 +36,15 @@ prerelease suffix when rebuilding a candidate. The version is passed to .NET
 publish and checked against the resulting assembly metadata. It is not inferred
 from the last directory name. The initial supported target is Windows x64.
 
-The current local candidate is `0.8.0-rc.15`, upgrading to supported .NET 10 LTS
-and retaining the rc.14 English/Spanish UI, inclusive
-device/website forms, shared filters/grouping, exact filtered manual/automatic
-checks, pause/resume and private diagnostics. GitHub publication is ON HOLD for
-this candidate. rc.13 is the preceding public prerelease. See
-[current runtime validation](VALIDATION_DOTNET10_2026-11-12.md).
+The command uses an example next version, not approval to build or publish it;
+confirm that version is unused first. The existing tested candidate is
+`0.8.0-rc.17`: guarded configuration recovery, independent filter choices with
+AND matching, actual build labels and default-off bounded HTTP redirects. See
+[rc.17 validation](VALIDATION_RECOVERY_2026-11-13.md). It retains rc.16's manual
+authenticated browser checks and .NET 10 LTS/runtime 10.0.15, SQLite schema 2,
+English/Spanish UI, shared exact filtered execution, pause/resume and diagnostics.
+rc.16 is the preceding public prerelease; rc.14/15 were local deliveries whose
+original publication holds do not apply to the authorized rc.17 delivery.
 
 The preceding rc.13 includes the dashboard inventory
 preview/search, copy-only Command, individual checks and filter/header controls,
@@ -60,8 +67,8 @@ does not import it. Follow migration instructions in a new deployment folder.
 All rc.7 and earlier artifacts remain immutable.
 Candidate rc.9 adds accessible Shortcuts/Command descriptions only. rc.8 is also
 immutable. GitHub publication always requires explicit owner authorization;
-the owner authorized the rc.13 source/portable delivery on 2026-11-11, not future
-releases or stable deployment. See [current status](../CURRENT_STATUS.md).
+the rc.13/16/17 approvals apply only to those deliveries, not future releases or
+stable deployment. See [current status](../CURRENT_STATUS.md).
 Candidate rc.10 removes the Shortcuts note and adds per-check Timeout/Expected
 text descriptions, keeping Command help. rc.9 and all earlier outputs remain immutable.
 Candidate rc.11 adds SQLite schema-2 relational projections/SQL Reports,
@@ -97,6 +104,20 @@ The new portable folder, ZIP and SHA-256 sidecar must all exist before delivery
 is considered successful. Always deliver all three, not just the folder. The ZIP
 is the primary file to copy/share and must accompany every new version, as a
 standing user requirement. Do not commit generated artifacts.
+
+## Publish An Existing Candidate
+
+Publication is separate from generation and requires explicit owner approval.
+Verify the existing ZIP, sidecar and manifest/provenance before pushing reviewed
+public source. Tag the package's exact `sourceCommit`, not a later documentation
+receipt commit. Wait for CI, upload only the neutral ZIP/SHA to a new draft,
+verify both asset digests, then publish as a prerelease without replacing stable
+latest. Download both published assets into a new verification folder and compare
+their bytes/hashes. Reconcile earlier tags/releases/assets and local archives.
+Never use force-push or asset clobber to repair a version conflict. Do not upload
+private verification receipts. Record the release URL, tag, checksums and CI in
+CURRENT_STATUS and the dated validation guide. Later repository documentation
+does not rewrite the immutable package's build-time documentation or manifest.
 
 ## History And Failure Rules
 
