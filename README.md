@@ -31,6 +31,9 @@ default-off bounded [HTTP redirects](docs/HTTP_CHECKS.md). It does not add SSO
 or reuse browser cookies for HTTP. Tests/package/activation evidence is in
 [rc.17 validation](docs/VALIDATION_RECOVERY_2026-11-13.md) and CURRENT_STATUS.
 This work order is local only; the published GitHub download below remains rc.16.
+The local rc.17 folder/ZIP/SHA and backed-up port-5000 activation are complete;
+reload an existing browser tab to see its build label. The immutable ZIP keeps
+build-time docs; post-generation validation receipts remain in the repository.
 
 Published prerelease `0.8.0-rc.16` adds a separate **Authenticated browser** check with
 manual sign-in in a dedicated Edge window, distinguishing authentication required

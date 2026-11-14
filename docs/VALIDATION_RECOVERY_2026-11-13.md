@@ -1,6 +1,7 @@
 # Recovery And Monitoring UX Validation - 2026-11-13
 
-Status: source validated; candidate 0.8.0-rc.17 package/activation pending.
+Status: source and immutable portable validated; rc.17 active locally on port 5000.
+Not published to GitHub; not a stable/public deployment approval.
 Scope: IMP-013/016/017/018/019. AND filtering is retained. No GitHub publication.
 
 ## Safety Checkpoint
@@ -52,9 +53,37 @@ eight API responses, exact exported document bytes, schema-2 SQL counts and rc.1
 rollback, preserving original JSON. Candidate readiness was 1328 ms / 68087808
 working-set bytes in that small existing-data run; not a production load test.
 The pre-release archive/original baseline has 6790 files, including 15 Data JSON;
-the preceding 6224-file baseline also matched. Post-package reconciliation is pending.
+the preceding 6224-file baseline also matched. Post-package reconciliation passed.
+
+## Native Portable
+
+Local clean source: `132396c37ab2270bac8a4ecbafc915ba949b5538`. No GitHub push.
+Folder `artifacts/portable/NetWatch-Lite-v0.8.0-rc.17-win-x64` and matching ZIP/SHA
+under `artifacts/packages`. ZIP: 92514810 bytes; SHA-256:
+`caf599060965df9b1ba9642a21b0c61413ab67bea73ed04cfc22fddbbc1fb020`.
+568 physical files/567 manifest entries, 98 public assets, 117 pinned driver files.
+
+Generation, PowerShell 5.1 ZIP extraction and PowerShell 7 folder-copy validation
+each passed 47 routes/12 negatives, neutral SQLite first run, correct running
+build/runtime/storage and native reviewed import/stale rejection/profile restore.
+Receipts: `4e05da2bffcf43558a2252fa35897a05`, `d3a0c93fd0794d35a74b0967f27c3e2c`,
+`fc37c305f2fb4174ad10ad2f44ad0915`. An initial nested private-sentinel test setup
+failure promoted nothing; the parent-directory setup correction passed on retry.
+
+Packaged Node 24.22.1 / Playwright driver 1.64.1 exercised installed Edge
+157.0.4341.57 with synthetic loopback only. No corporate sign-in or personal
+profile. Prior archives stayed byte-identical; owner-confirmed extra rc.11 ZIP
+absence remains unchanged. The immutable package contains build-time docs;
+post-generation receipts here never rewrite its ZIP/manifest.
 
 ## Deployment Gates
+
+Local activation `activation-a2fbff8a13734e9eab22e41e763ebcad` preserved a verified
+before.db, matched eight API responses and exact document exports, and retained
+all original Data JSON. PID 26428 runs rc.17 + source commit 132396c on private
+.NET 10.0.15, SQLite schema 2/engine 3.53.3. No migration/database rollback.
+Live Dashboard/About read-only UI checks confirmed the actual version/runtime
+without running checks, posting writes or capturing private inventory screenshots.
 
 | Gate | Evidence / Scope |
 | --- | --- |
@@ -70,7 +99,7 @@ the preceding 6224-file baseline also matched. Post-package reconciliation is pe
 | Security | Strict TLS, no cookies/credentials/downgrade, known Microsoft login not fetched/marked healthy; escaped metadata, private payload exclusions and zero reported dependency advisories. Not a public-service penetration test. |
 | Concurrency/resilience | Concurrent reviewed commits allow one winner; profile-first transaction locking; write/snapshot failures do not replace configuration; JSON can retain an extra safe point. Partial native errors retain staged bytes. |
 | Performance/resources | One deadline/five hops/1-MiB body bound; 5-MiB config and 20-point/80-MiB vault bounds; bounded SQL tests, browser startup deadlines and private pilot measurement above. Not a maximum-vault/production soak. |
-| Compatibility/deployment | Existing-data rc.16 reversal/schema-2/API/raw-byte pilot passed; immutable native ZIP/folder and final activation checks pending. |
+| Compatibility/deployment | Existing-data rc.16 reversal/schema-2/API/raw-byte pilot, native immutable ZIP/folder and backed-up local activation/API/document reconciliation passed. |
 
 Private receipts are under `artifacts/verification/ux17-20261113`, mutation run
 `uxmut-82f56479` and the named packaging guard runs. Use loopback/synthetic

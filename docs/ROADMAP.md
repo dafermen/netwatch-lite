@@ -13,9 +13,10 @@ and extend existing IMP-013; scope/acceptance are in [IMPROVEMENTS](IMPROVEMENTS
 The owner clarified that Device Type/Category must have independent option lists
 but retain AND filtering. Do not implement a union or loosen MonitorPlans guards.
 
-Authorized local implementation is in validation: confirmed imports/private
+Authorized local implementation is delivered as rc.17: confirmed imports/private
 profile recovery, actual running build, independent options with AND matching,
-participation labels and opt-in bounded redirects. See CURRENT_STATUS and
+participation labels and opt-in bounded redirects, with tests, immutable ZIP/SHA
+and backed-up local activation complete. See CURRENT_STATUS and
 VALIDATION_RECOVERY_2026-11-13.md. The old intake did not authorize implementation;
 the later owner work order did. No schema migration, archive replacement, GitHub
 publication or stable deployment is authorized. Recovery never replaces a live DB.

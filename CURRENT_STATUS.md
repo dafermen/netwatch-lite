@@ -2,7 +2,7 @@
 
 Last updated: 2026-11-13
 
-## rc.17 Work Order - In Progress
+## rc.17 Delivered Locally - Not Published
 
 Owner authorized implementation of IMP-013/016/017/018/019 on 2026-11-13.
 Keep AND semantics; independent option lists do not mean OR. No new GitHub
@@ -17,8 +17,9 @@ not a promise that an OpenAI usage limit can be predicted or avoided.
 
 Stages:
 1. Complete: stable checkpoint artifacts/checkpoints/rc16-20261113-cdba71b6,
-   verified before.db, eight matching APIs. PID 20620 serves frozen rc.16 webroot
-   on port 5000 with the original content root/SQLite. Do not restart a half-build.
+   verified before.db, eight matching APIs. PID 20620 served frozen rc.16 webroot
+   on port 5000 during development with the original content root/SQLite. This
+   frozen process was stopped only after final package validation; see stage 5.
 2. Implemented, initial contracts passed: transactional pre-change versions and
    guarded import/restore APIs (SQLite schema unchanged). JSON snapshots are
    durably written before replacement; a failed write can leave a safe extra point.
@@ -39,15 +40,32 @@ Stages:
    retests after the concurrency refinement. No failures/skips/retries. Static
    script/language/link checks and 2000 JS filter cases passed; dependency audits
    reported zero advisories; 75 packaging guards passed on each PS5.1/7.
-4. Pending: post-package privacy/history audit, rc.17 ZIP/SHA/native checks and
-   backed-up local activation on port 5000. Real corporate checks stay operator-owned.
-   First packaging attempt stopped in a negative-test setup: the new private-vault
-   sentinel needed its parent directory created in the disposable extraction.
-   No version was promoted; the validator setup is corrected for a fresh retry.
+4. Package complete: rc.17 folder/ZIP/SHA generated from clean local commit
+   132396c37ab2270bac8a4ecbafc915ba949b5538. ZIP is 92514810 bytes; SHA-256
+   caf599060965df9b1ba9642a21b0c61413ab67bea73ed04cfc22fddbbc1fb020.
+   568 physical files (567 manifest entries), 98 public assets, 117 pinned driver
+   files. Generation, PS5.1 ZIP and PS7 folder-copy checks passed 47 routes/12
+   negatives plus native guarded import/stale rejection/restore. Driver/Edge
+   loopback smoke passed. All 6790 historical/original files/15 Data JSON matched.
+   Native receipts: 4e05da2bffcf43558a2252fa35897a05,
+   d3a0c93fd0794d35a74b0967f27c3e2c, fc37c305f2fb4174ad10ad2f44ad0915.
+   An initial negative-sentinel parent-folder setup failure promoted nothing;
+   validator fix 132396c passed the fresh retry. No existing archive overwritten.
+5. Complete: source rc.17 active at http://localhost:5000, PID 26428, build
+   132396c37ab2270bac8a4ecbafc915ba949b5538, CLR 10.0.15 from the private SDK,
+   SQLite schema 2/engine 3.53.3. Activation a2fbff8a13734e9eab22e41e763ebcad keeps
+   before.db, before/after exports and matching eight APIs. Exact documents and
+   original JSON matched; no migration, fallback or database rollback occurred.
+   Read-only live Dashboard/About UI checks passed without writes/check attempts
+   or screenshots of private inventory. Reload an existing tab to load rc.17 UI.
+   Real corporate/other-PC acceptance remains operator-owned. No GitHub push.
 
 Resume: read this section first, then docs/IMPROVEMENTS.md and docs/ROADMAP.md.
-Do not infer completion from rc.16 receipts. Record actual checkpoint paths and
-phase results below as they become available.
+Evidence: artifacts/verification/ux17-20261113 plus the named native/mutation
+receipts. The ZIP is the primary file to copy, with its adjacent SHA-256.
+Post-generation documentation does not modify the immutable build-time package.
+Next: owner tests real sites/SSO and the ZIP on the destination PC; GitHub remains
+on hold for this delivery. Do not infer rc.17 evidence from older rc.16 receipts.
 
 ## Historical Intake - 2026-11-13
 

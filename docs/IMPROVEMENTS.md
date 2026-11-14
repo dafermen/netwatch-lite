@@ -8,12 +8,13 @@ explicit; technical/release risks remain in [CURRENT_STATUS.md](../CURRENT_STATU
 The user requested coordination on 2026-11-09. Delivery order and cross-cutting
 gates are in [ROADMAP.md](ROADMAP.md); queued work is not implemented work.
 
-## Owner Notes - 2026-11-13 (Implementation In Validation)
+## Owner Notes - 2026-11-13 (Delivered Locally As rc.17)
 
 Subsequent approval on 2026-11-13: implement IMP-013/016/017/018/019 locally,
 with safety checkpoints, tests/docs/new portable and port-5000 activation.
-Statuses below describe the original intake until each stage is validated;
-CURRENT_STATUS tracks execution. No additional GitHub publication is authorized.
+The five items below are implemented, validated and delivered locally in rc.17;
+CURRENT_STATUS and VALIDATION_RECOVERY_2026-11-13.md hold receipts and external
+acceptance limits. No additional GitHub publication is authorized.
 
 The initial note-taking request did not authorize changes. The subsequent work
 order above authorizes the local candidate; rc.16 remains the published baseline.
@@ -35,7 +36,7 @@ No database schema migration, live database restore or publication is included.
   and automatic checks use only the visible enabled intersection. Clearing never
   writes inventory, deletes history or starts checks. Preserve unavailable-value,
   in-flight scope and Configuration draft protections when standardizing views.
-- Status: implemented and browser-validated locally; portable validation pending. The clarification supersedes the initial
+- Status: completed in local rc.17 with full browser/native validation. The clarification supersedes the initial
   OR wording, not the shipped AND predicate documented in DASHBOARD_FILTERS.
 
 ## IMP-017 - Confirmed Imports And Configuration Version History
@@ -65,7 +66,8 @@ No database schema migration, live database restore or publication is included.
 - Status: implemented locally with guarded preview/commit, per-profile history,
   exact-byte download/restore, 20-point/80-MiB no-auto-prune bounds and two UI
   confirmations. Fault, stale, integrity and concurrent-write tests passed;
-  full JSON/SQLite browser regression passed; portable evidence is pending. See CONFIGURATION_RECOVERY.md.
+  full JSON/SQLite browser/native regression and backed-up activation passed.
+  Delivered locally as rc.17. See CONFIGURATION_RECOVERY.md.
 
 ## IMP-018 - Opt-In HTTP Redirect Following
 
@@ -86,8 +88,8 @@ No database schema migration, live database restore or publication is included.
   both storage providers. No global redirect switch affecting existing probes.
 - Status: implemented locally, default off, anonymous GET across allowed schemes/
   origins, five hops, one deadline, strict TLS/no downgrade and neutral known
-  login detection. Unit/real-loopback/full browser regression passed; portable
-  validation pending. See HTTP_CHECKS.md for limits/custom-login caveats.
+  login detection. Unit/real-loopback/full browser/native regression passed;
+  delivered locally as rc.17. See HTTP_CHECKS.md for limits/custom-login caveats.
 
 ## IMP-019 - Explain Monitoring Participation
 
@@ -99,7 +101,8 @@ No database schema migration, live database restore or publication is included.
 - Runs always exclude paused items, including with All selected. An enabled item
   can be offline or not yet checked. Automatic refresh is a separate control.
 - Status: selectors renamed bilingually to Enabled for checks / Checks paused /
-  All items, without changing enabled/status/Auto Refresh semantics. Browser-validated.
+  All items, without changing enabled/status/Auto Refresh semantics. Delivered
+  locally as rc.17 with browser/native validation.
 
 ## IMP-008 - Multilingual Monitoring And Diagnostics
 
@@ -178,7 +181,8 @@ owner's authenticated-browser work order on 2026-11-12. See IMP-014/current stat
   provider/schema details read-only in About and never expose private file paths,
   inventory or credentials. Verify source versus portable and both UI languages.
   Status: implemented locally from actual running assembly/runtime/storage metadata;
-  bilingual main/About validated; native-package validation pending. No duplicate ID.
+  bilingual main/About and native package validated; delivered locally as rc.17.
+  No duplicate ID.
 
 These are recommendations only. Prioritize offline assets for portable usability;
 prioritize access controls first if the service will be shared beyond a trusted PC.
