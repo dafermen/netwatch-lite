@@ -41,6 +41,9 @@ Stages:
    reported zero advisories; 75 packaging guards passed on each PS5.1/7.
 4. Pending: post-package privacy/history audit, rc.17 ZIP/SHA/native checks and
    backed-up local activation on port 5000. Real corporate checks stay operator-owned.
+   First packaging attempt stopped in a negative-test setup: the new private-vault
+   sentinel needed its parent directory created in the disposable extraction.
+   No version was promoted; the validator setup is corrected for a fresh retry.
 
 Resume: read this section first, then docs/IMPROVEMENTS.md and docs/ROADMAP.md.
 Do not infer completion from rc.16 receipts. Record actual checkpoint paths and

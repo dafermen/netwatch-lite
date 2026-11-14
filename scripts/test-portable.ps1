@@ -48,6 +48,7 @@ try {
     foreach ($privateName in @('configuration-versions/private.backup.json', 'config.json', 'netwatch.db', 'netwatch.db-wal', '.netwatch-runtime.lock', 'storage-policy.json', '.playwright/package/session.json')) {
     $privateProbe = Join-Path $copy $privateName
     try {
+        New-Item -ItemType Directory -Path (Split-Path -Parent $privateProbe) -Force | Out-Null
         Write-NewPortableText $privateProbe '{"privateTestSentinel":true}'
         $rejected = $false
         try { $null = Assert-PortablePackage $copy } catch { $rejected = $true }
